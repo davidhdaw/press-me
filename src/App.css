@@ -1,0 +1,266 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+  height: 100vh;
+  overflow: hidden;
+}
+
+h2 {
+  color: #ffffff;
+  text-align: center;
+}
+
+.login-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #4d5051 0%, #51565b 50%, #313233 100%);
+  overflow: hidden;
+}
+
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(52, 152, 219, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(52, 152, 219, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.login-card {
+  background: rgba(44, 62, 80, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid #3498db;
+  border-radius: 8px;
+  padding: 3rem;
+  width: 100%;
+  max-width: 450px;
+  position: relative;
+  box-shadow: 
+    0 0 20px rgba(52, 152, 219, 0.2),
+    inset 0 0 20px rgba(52, 152, 219, 0.05);
+  z-index: 10;
+}
+
+.login-card h1 {
+  margin-bottom: 2rem;
+  color: #3498db;
+  font-size: 2.2rem;
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  text-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+  position: relative;
+}
+
+.login-card h1::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #3498db, transparent);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  position: relative;
+}
+
+.form-group label {
+  margin-bottom: 0.5rem;
+  font-weight: 400;
+  color: #3498db;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.form-group input {
+  padding: 1rem;
+  background: rgba(52, 73, 94, 0.8);
+  border: 1px solid #3498db;
+  border-radius: 4px;
+  font-size: 1rem;
+  color: #ecf0f1;
+  transition: all 0.3s ease;
+  font-family: 'Courier New', monospace;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #2980b9;
+  box-shadow: 
+    0 0 10px rgba(52, 152, 219, 0.2),
+    inset 0 0 5px rgba(52, 152, 219, 0.1);
+  background: rgba(52, 73, 94, 0.9);
+}
+
+.form-group input::placeholder {
+  color: rgba(189, 195, 199, 0.6);
+}
+
+.login-button {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: linear-gradient(45deg, #3498db, #2980b9);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+}
+
+.login-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.login-button:hover::before {
+  left: 100%;
+}
+
+.login-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 
+    0 3px 15px rgba(52, 152, 219, 0.3),
+    0 0 20px rgba(52, 152, 219, 0.1);
+}
+
+.login-button:active {
+  transform: translateY(0);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .login-card {
+    margin: 1rem;
+    padding: 2rem;
+  }
+  
+  .login-card h1 {
+    font-size: 1.8rem;
+  }
+}
+
+/* Mission Component Styles */
+.mission-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #4d5051 0%, #51565b 50%, #313233 100%);
+  overflow: hidden;
+}
+
+.mission-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(52, 152, 219, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(52, 152, 219, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.mission-card {
+  background: rgba(44, 62, 80, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid #3498db;
+  border-radius: 8px;
+  padding: 3rem;
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 
+    0 0 20px rgba(52, 152, 219, 0.2),
+    inset 0 0 20px rgba(52, 152, 219, 0.05);
+  z-index: 10;
+}
+
+.mission-card h1 {
+  margin-bottom: 2rem;
+  color: #3498db;
+  font-size: 2.2rem;
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  text-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+  position: relative;
+  text-align: center;
+}
+
+.mission-card h1::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #3498db, transparent);
+}
+
+.mission-content {
+  margin-top: 2rem;
+}
+
+.mission-content h2 {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.mission-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 
+    0 3px 15px rgba(231, 76, 60, 0.3),
+    0 0 20px rgba(231, 76, 60, 0.1);
+}
+
+.mission-button:active {
+  transform: translateY(0);
+}
