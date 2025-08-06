@@ -10,8 +10,10 @@ function App() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    const correctPassword = 'unknown'
+    const sanitizedPassword = password.toLowerCase().trim()
     console.log('Access attempt:', { screenname, password })
-    if (password === 'grasp') {
+    if (sanitizedPassword === correctPassword) {
       // Here you would typically handle the authentication logic
       setShowUnauthorizedMessage(false)
       setIsLoggedIn(true)
