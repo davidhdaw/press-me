@@ -4,7 +4,7 @@ function Mission({ agentName }) {
   const [showGlitch, setShowGlitch] = useState(false)
   
   // Array of food items to randomly select from
-  const foodItems = ['corndog', 'hot dog', 'churro'];
+  const foodItems = ['corndog', 'turkey leg', 'churro'];
   
   // Randomly select a food item
   const randomFoodItem = foodItems[Math.floor(Math.random() * foodItems.length)];
