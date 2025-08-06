@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#2c3e50" stroke="#3498db" stroke-width="2"/>
+  
+  <!-- Spy silhouette -->
+  <path d="M20 40 Q20 35 25 35 L39 35 Q44 35 44 40 L44 45 Q44 50 39 50 L25 50 Q20 50 20 45 Z" fill="#ecf0f1"/>
+  
+  <!-- Head -->
+  <circle cx="32" cy="28" r="8" fill="#ecf0f1"/>
+  
+  <!-- Sunglasses -->
+  <ellipse cx="28" cy="28" rx="3" ry="2" fill="#2c3e50"/>
+  <ellipse cx="36" cy="28" rx="3" ry="2" fill="#2c3e50"/>
+  <rect x="28" y="26" width="8" height="1" fill="#2c3e50"/>
+  
+  <!-- Earpiece -->
+  <circle cx="18" cy="28" r="2" fill="#3498db"/>
+  <rect x="18" y="26" width="8" height="4" fill="#3498db" rx="2"/>
+  
+  <!-- Government seal elements -->
+  <circle cx="32" cy="32" r="15" fill="none" stroke="#3498db" stroke-width="1" opacity="0.3"/>
+  <circle cx="32" cy="32" r="20" fill="none" stroke="#3498db" stroke-width="0.5" opacity="0.2"/>
+  
+  <!-- Security clearance indicator -->
+  <rect x="50" y="12" width="8" height="4" fill="#e74c3c" rx="1"/>
+  <text x="54" y="14.5" font-family="Arial" font-size="3" fill="white" text-anchor="middle">S</text>
+</svg> 
