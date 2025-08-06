@@ -1,6 +1,29 @@
-import React from 'react'
+import React, { useState } from 'react'
+import GoogleHomepage from './GoogleHomepage'
 
 function Mission({ agentName }) {
+  const [showGlitch, setShowGlitch] = useState(false)
+  const [showGoogle, setShowGoogle] = useState(false)
+  
+  // Array of food items to randomly select from
+  const foodItems = ['corndog', 'hot dog', 'churro'];
+  
+  // Randomly select a food item
+  const randomFoodItem = foodItems[Math.floor(Math.random() * foodItems.length)];
+
+  const handleMissionAccept = () => {
+    setShowGlitch(true)
+    
+    // Start glitch sequence
+    setTimeout(() => {
+      setShowGoogle(true)
+    }, 2500) // Show Google homepage after glitch effect
+  }
+
+  if (showGoogle) {
+    return <GoogleHomepage />
+  }
+
   return (
     <div className="mission-container">
       <div className="mission-card">
@@ -28,13 +51,13 @@ function Mission({ agentName }) {
             <p><strong>MISSION CODE:</strong> OPERATION SHADOW STRIKE</p>
             <p><strong>PRIORITY:</strong> CRITICAL</p>
             <p><strong>STATUS:</strong> ACTIVE</p>
-            <p>The president has initiated Ghost Protocol. Your mission, should you choose to accept it, involves infiltrating the secure facility at coordinates 34.04032069062232, -118.23105960396222. Codenamed "The Obscure." Intelligence suggests that classified documents have been compromised and are being held at this location.</p>
+            <p>The president has initiated Ghost Protocol. Your mission, should you choose to accept it, involves the secure facility at coordinates 34.04032069062232, -118.23105960396222. Codenamed "The Obscure." Intelligence suggests we may need to activate multiple assets to handle a potential threat in the next few hours.</p>
             <br />
             <p><strong>OBJECTIVES:</strong></p>
             <ul style={{ marginLeft: '2rem', marginTop: '0.5rem' }}>
-              <li>Find a potential agent with a corndog on their nametag</li>
+              <li>Find a potential agent with a {randomFoodItem} on their nametag</li>
               <li>Hand off the authentication token to the agent</li>
-              <li>Tell them the code phrase: "The Obscure is not the Unknown"</li>
+              <li>Tell them the code phrase: "The Obscure is not the unknown"</li>
               <li>Tell them to hold the token up to their phone and that any additional information is codeword classified</li>
             </ul>
             <br />
@@ -45,7 +68,7 @@ function Mission({ agentName }) {
         
         <button 
           className="mission-button"
-          onClick={() => window.location.reload()}
+          onClick={handleMissionAccept}
           style={{
             marginTop: '2rem',
             padding: '1rem 2rem',
@@ -65,6 +88,20 @@ function Mission({ agentName }) {
           MISSION ACCEPTED
         </button>
       </div>
+
+      {/* Glitch Effect Overlay */}
+      {showGlitch && (
+        <div className="glitch-container">
+          <div className="glitch-overlay"></div>
+          <div className="glitch-text">
+            MESSAGE DELETED<br />
+            SECURE CONNECTION TERMINATED<br />
+            <span style={{ fontSize: '1rem', opacity: 0.8 }}>Redirecting to public network...</span>
+          </div>
+          <div className="glitch-scanner"></div>
+          <div className="glitch-static"></div>
+        </div>
+      )}
     </div>
   )
 }

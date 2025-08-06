@@ -264,3 +264,117 @@ h2 {
 .mission-button:active {
   transform: translateY(0);
 }
+
+/* Glitch Effect Styles */
+.glitch-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.glitch-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 0, 0, 0.1);
+  animation: glitchRed 0.3s ease-in-out;
+}
+
+.glitch-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #ff0000;
+  font-family: 'Courier New', monospace;
+  font-size: 2rem;
+  font-weight: bold;
+  text-align: center;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  animation: glitchText 2s ease-in-out;
+  z-index: 1001;
+}
+
+.glitch-scanner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #ff0000, transparent);
+  animation: glitchScan 1s ease-in-out;
+  z-index: 1002;
+}
+
+.glitch-static {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  background-size: 4px 4px;
+  animation: glitchStatic 0.5s ease-in-out;
+  z-index: 1003;
+}
+
+@keyframes glitchRed {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes glitchText {
+  0% { 
+    opacity: 0; 
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  20% { 
+    opacity: 1; 
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% { 
+    opacity: 1; 
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% { 
+    opacity: 0; 
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+
+@keyframes glitchScan {
+  0% { 
+    top: 0; 
+    opacity: 0;
+  }
+  50% { 
+    opacity: 1;
+  }
+  100% { 
+    top: 100%; 
+    opacity: 0;
+  }
+}
+
+@keyframes glitchStatic {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.3; }
+}
+
+/* Fade out animation */
+.fade-out {
+  animation: fadeOut 0.5s ease-in-out forwards;
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
