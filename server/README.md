@@ -231,3 +231,10 @@ The server uses:
 - **IP addresses are logged** - Consider privacy implications
 - **No rate limiting** - Consider implementing for production use
 - **CORS enabled** - Configure appropriately for production 
+
+## TO DO
+
+- **Refactor to use routing** - React Router Dom sucks now so...gotta figure that out.
+- **Mock out Missions Page** - Dummy data for three missions with 20 minute timers
+- **Editor for adding new missions** - Can be pretty bare bones as only Nikki and I will ever see it.
+- **Ability to complete missions** - Probably by entering some sort of password solution
