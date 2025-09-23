@@ -5,15 +5,6 @@ function Mission({ agentName, onLogout }) {
   const [showMissionAccepted, setShowMissionAccepted] = useState(false)
   const navigate = useNavigate()
   
-<<<<<<< HEAD
-=======
-  // Array of food items to randomly select from
-  const foodItems = ['corndog', 'turkey leg', 'churro'];
-  
-  // Randomly select a food item
-  const randomFoodItem = foodItems[Math.floor(Math.random() * foodItems.length)];
-
->>>>>>> e9bdb7abe3c7071ca72ade46734d9ad0b6c03f51
   const handleMissionAccept = () => {
     setShowMissionAccepted(true)
     // Redirect to dashboard after 3 seconds

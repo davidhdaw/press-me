@@ -61,7 +61,8 @@ function App() {
           element={
             isLoggedIn ? (
               <Dashboard 
-                agentName={currentUser?.codename} 
+                agentName={currentUser?.codename}
+                agentId={currentUser?.id}
                 onLogout={handleLogout}
               />
             ) : (

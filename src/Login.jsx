@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 
 function Login({ onLogin }) {
   const [screenname, setScreenname] = useState('')
+  const [alias1, setAlias1] = useState('')
+  const [alias2, setAlias2] = useState('')
   const [password, setPassword] = useState('')
   const [showUnauthorizedMessage, setShowUnauthorizedMessage] = useState(false)
   const [failedAttempts, setFailedAttempts] = useState(0)
@@ -19,19 +21,25 @@ function Login({ onLogin }) {
         const data = await response.json()
         const agentName = data.codename
         setScreenname(agentName)
+        setAlias1(data.alias_1)
+        setAlias2(data.alias_2)
       } else {
         console.error('Failed to fetch random agent, status:', response.status)
         setScreenname('AGENT')
+        setAlias1('Unknown')
+        setAlias2('Agent')
       }
     } catch (error) {
       console.error('Error fetching random agent:', error)
       setScreenname('AGENT')
+      setAlias1('Unknown')
+      setAlias2('Agent')
     }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Access attempt:', { screenname, password })
+    console.log('Access attempt:', { alias1, alias2, password })
     
     try {
       const response = await fetch('http://localhost:3001/api/auth/login', {
@@ -40,8 +48,8 @@ function Login({ onLogin }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          codename: screenname,
-          password: password
+          alias: alias1, // Send the first alias part
+          passphrase: password
         })
       })
 
@@ -152,7 +160,7 @@ function Login({ onLogin }) {
         </div>
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-group">
-          <h2>WELCOME, AGENT {screenname}</h2>
+          <h2>WELCOME, AGENT {screenname?.toUpperCase()}</h2>
 
           </div>
           <div className="form-group">
@@ -166,14 +174,14 @@ function Login({ onLogin }) {
               style={{ display: 'none' }}
               autoComplete="username"
             />
-            <label htmlFor="password">ACCESS CODE</label>
+            <label htmlFor="password">PASSPHRASE</label>
             <input
               type="password"
               id="password"
               name="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="ENTER LAST WORD OF CODE PHRASE"
+              placeholder="ENTER YOUR PASSPHRASE"
               autoComplete="current-password"
               required
             />

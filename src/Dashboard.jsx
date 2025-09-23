@@ -1,24 +1,66 @@
 import React, { useState, useEffect } from 'react'
 
-function Dashboard({ agentName, onLogout }) {
+function Dashboard({ agentName, agentId, onLogout }) {
   const [missions, setMissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [timeLeft, setTimeLeft] = useState('Calculating...')
+  const [successKeys, setSuccessKeys] = useState({})
+  const [completedMissions, setCompletedMissions] = useState(new Set())
 
   useEffect(() => {
     fetchRandomMissions()
   }, [])
 
+  // Countdown timer effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (missions.length > 0 && missions[0].mission_expires) {
+        const now = new Date()
+        const expiry = new Date(missions[0].mission_expires)
+        const diffMs = expiry - now
+        
+        if (diffMs <= 0) {
+          setTimeLeft('MISSIONS EXPIRED')
+        } else {
+          const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+          const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+          const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000)
+          
+          if (diffHours > 0) {
+            setTimeLeft(`${diffHours}h ${diffMinutes}m ${diffSeconds}s remaining`)
+          } else if (diffMinutes > 0) {
+            setTimeLeft(`${diffMinutes}m ${diffSeconds}s remaining`)
+          } else {
+            setTimeLeft(`${diffSeconds}s remaining`)
+          }
+        }
+      } else {
+        setTimeLeft('No active missions')
+      }
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [missions])
+
   const fetchRandomMissions = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:3001/api/missions/available')
+      const response = await fetch('http://localhost:3001/api/missions/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agentId: agentId
+        })
+      })
       if (response.ok) {
-        const allMissions = await response.json()
-        // Get 3 random missions from available ones
-        const shuffled = allMissions.sort(() => 0.5 - Math.random())
-        const selectedMissions = shuffled.slice(0, 3)
-        setMissions(selectedMissions)
+        const assignedMissions = await response.json()
+        setMissions(assignedMissions)
+        // Clear completed missions state when refreshing
+        setCompletedMissions(new Set())
+        setSuccessKeys({})
       } else {
         setError('Failed to fetch missions')
       }
@@ -34,23 +76,48 @@ function Dashboard({ agentName, onLogout }) {
     onLogout()
   }
 
-  const formatExpiryTime = (expiryDate) => {
-    if (!expiryDate) return 'No expiry'
-    const now = new Date()
-    const expiry = new Date(expiryDate)
-    const diffMs = expiry - now
-    
-    if (diffMs <= 0) return 'EXPIRED'
-    
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
-    
-    if (diffHours > 0) {
-      return `${diffHours}h ${diffMinutes}m remaining`
-    } else {
-      return `${diffMinutes}m remaining`
+  const handleSuccessKeyChange = (missionId, value) => {
+    setSuccessKeys(prev => ({
+      ...prev,
+      [missionId]: value
+    }))
+  }
+
+  const handleSubmitMission = async (missionId) => {
+    const successKey = successKeys[missionId]
+    if (!successKey) return
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/missions/${missionId}/complete`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          successKey: successKey,
+          teamPoints: { team: 'red', points: 10 } // You might want to get actual team from user data
+        })
+      })
+
+      if (response.ok) {
+        // Mission completed successfully
+        setCompletedMissions(prev => new Set([...prev, missionId]))
+        setSuccessKeys(prev => {
+          const newKeys = { ...prev }
+          delete newKeys[missionId]
+          return newKeys
+        })
+        // Mission stays visible with completed status - no automatic refresh
+      } else {
+        const errorData = await response.json()
+        alert(errorData.error || 'Incorrect success key!')
+      }
+    } catch (error) {
+      console.error('Error completing mission:', error)
+      alert('Error completing mission')
     }
   }
+
 
   if (loading) {
     return (
@@ -90,8 +157,8 @@ function Dashboard({ agentName, onLogout }) {
         </div>
         
         <div className="agent-info">
-          <h2>AGENT {agentName}</h2>
-          <p>Available Operations: {missions.length}</p>
+          <h2>AGENT {agentName?.toUpperCase()}</h2>
+          <p>Mission Timer: {timeLeft}</p>
         </div>
 
         <div className="missions-grid">
@@ -99,8 +166,8 @@ function Dashboard({ agentName, onLogout }) {
             <div key={mission.id} className="mission-card">
               <div className="mission-header">
                 <h3>{mission.title}</h3>
-                <span className={`status-badge ${mission.completed ? 'completed' : 'active'}`}>
-                  {mission.completed ? 'COMPLETED' : 'ACTIVE'}
+                <span className={`status-badge ${completedMissions.has(mission.id) ? 'completed' : 'active'}`}>
+                  {completedMissions.has(mission.id) ? 'COMPLETED' : 'ACTIVE'}
                 </span>
               </div>
               
@@ -109,22 +176,26 @@ function Dashboard({ agentName, onLogout }) {
               </div>
               
               <div className="mission-footer">
-                <div className="mission-meta">
-                  <span className="meta-item">
-                    <strong>ID:</strong> {mission.id}
-                  </span>
-                  <span className="meta-item">
-                    <strong>Expires:</strong> {formatExpiryTime(mission.mission_expires)}
-                  </span>
-                </div>
-                
-                <button 
-                  className="accept-mission-button"
-                  onClick={() => console.log(`Accepting mission ${mission.id}`)}
-                  disabled={mission.completed}
-                >
-                  {mission.completed ? 'MISSION COMPLETE' : 'ACCEPT MISSION'}
-                </button>
+                {!completedMissions.has(mission.id) && (
+                  <div className="mission-completion">
+                    <div className="success-key-input">
+                      <input
+                        type="text"
+                        placeholder="Enter success key..."
+                        value={successKeys[mission.id] || ''}
+                        onChange={(e) => handleSuccessKeyChange(mission.id, e.target.value)}
+                        className="success-key-field"
+                      />
+                      <button
+                        onClick={() => handleSubmitMission(mission.id)}
+                        disabled={!successKeys[mission.id]}
+                        className="submit-mission-button"
+                      >
+                        SUBMIT
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -135,7 +206,7 @@ function Dashboard({ agentName, onLogout }) {
             REFRESH MISSIONS
           </button>
           <p className="footer-note">
-            New missions are assigned randomly. Click refresh to get new assignments.
+            Dummy button to assign new missions randomly. Click refresh to get new assignments. this will be removed in the final version.
           </p>
         </div>
       </div>
