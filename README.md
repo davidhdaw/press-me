@@ -79,11 +79,8 @@ NODE_ENV=development
 
 **Initialize Database:**
 ```bash
-# Setup database tables
+# Setup database tables and insert all data
 node setup.js
-
-# Insert mission data
-node insert-missions.js
 
 # (Optional) Reset users if needed
 node reset-users.js
@@ -106,17 +103,18 @@ Frontend runs on: http://localhost:5173
 
 ### 5. Access the Game
 1. Open http://localhost:5173 in your browser
-2. You'll be assigned a random agent codename
-3. Enter the password: `password123`
+2. You'll be assigned a random agent codename (e.g., "Swift Spider")
+3. Enter your unique passphrase (each agent has a different one)
 4. Complete your mission briefing
 5. Access the dashboard to view and accept missions
 
 ## 🎮 How to Play
 
 ### Agent Login
-- Each player gets a random agent codename (e.g., "SHADOWFOX", "SILVERWOLF")
-- All agents use the same password: `password123`
+- Each player gets a random agent codename (e.g., "Swift Spider", "Invisible Mouse")
+- Each agent has a unique passphrase (e.g., "Not every bird is an eagle.", "Have you ever been to Cleveland in August?")
 - Failed login attempts are logged and tracked
+- After 5 failed attempts, the system locks out with a security warning
 
 ### Mission System
 - **Mission Types:**
@@ -159,13 +157,17 @@ press-me/
 
 **Authentication:**
 - `POST /api/auth/login` - Agent login
+  - Body: `{ "alias": "Swift", "passphrase": "Not every bird is an eagle." }`
 
 **Missions:**
 - `GET /api/missions` - All missions
 - `GET /api/missions/available` - Available missions
 - `POST /api/missions/refresh` - Get new missions (15-min timer)
+  - Body: `{ "agentId": 1 }`
 - `PUT /api/missions/:id/assign` - Assign mission
+  - Body: `{ "agentId": 1 }`
 - `PUT /api/missions/:id/complete` - Complete mission
+  - Body: `{ "successKey": "answer", "teamPoints": { "team": "red", "points": 10 } }`
 
 **Teams:**
 - `GET /api/teams/:team/points` - Team points
@@ -173,8 +175,9 @@ press-me/
 
 **Users:**
 - `GET /api/users` - All users
-- `GET /api/users/random` - Random agent
+- `GET /api/users/random` - Random agent (returns codename and alias parts)
 - `GET /api/users/team/:team` - Team members
+- `GET /api/users/team/:team/random` - Random team member
 
 ### Database Schema
 
@@ -183,17 +186,23 @@ press-me/
 - `title` - Mission name
 - `mission_body` - Description
 - `success_key` - Completion answer
-- `type` - Mission category
+- `type` - Mission category (social, sabotage, team, object)
 - `assigned_agent` - Current assignee
+- `past_assigned_agents` - Array of previously assigned agents
+- `assigned_now` - Whether currently assigned
 - `mission_expires` - Expiration time
 - `completed` - Status
 
 **Users Table:**
 - `id` - Agent ID
-- `codename` - Agent name
-- `real_name` - Real name
-- `team` - Red/Blue
-- `password` - Auth password
+- `firstname` - Agent's first name
+- `lastname` - Agent's last name
+- `alias_1` - First part of codename
+- `alias_2` - Second part of codename
+- `team` - Red/Blue team
+- `ishere` - Whether agent is active
+- `passphrase` - Unique authentication phrase
+- `created_at` - Account creation timestamp
 
 ## 🔧 Configuration
 
@@ -210,14 +219,14 @@ NODE_ENV=development
 ```
 
 ### Adding New Missions
-1. Edit `server/insert-missions.js`
-2. Add mission objects to the `missions` array
-3. Run `node insert-missions.js` to update database
+1. Edit `server/setup.js`
+2. Add mission objects to the `missions` array in the setupDatabase function
+3. Run `node setup.js` to recreate database with new missions
 
 ### Customizing Agents
-1. Edit `server/database.sql` or `server/setup.js`
-2. Modify the user insertion queries
-3. Run `node setup.js` to recreate database
+1. Edit `server/setup.js`
+2. Modify the user insertion queries in the setupDatabase function
+3. Run `node setup.js` to recreate database with new agents
 
 ## 🐛 Troubleshooting
 
@@ -231,9 +240,8 @@ NODE_ENV=development
 - Update frontend API calls if server port changes
 
 ### Mission Issues
-- Check mission data with: `node insert-missions.js`
-- Reset missions: `node insert-missions.js`
-- Reset users: `node reset-users.js`
+- Reset all data: `node setup.js`
+- Reset users only: `node reset-users.js`
 
 ### Frontend Issues
 - Clear browser cache
@@ -260,8 +268,9 @@ The game supports 4 mission types:
 
 ## 🔒 Security Notes
 
-- Passwords are stored in plain text (development only)
+- Passphrases are stored in plain text (development only)
 - Login attempts are logged with IP addresses
+- Security lockout after 5 failed attempts
 - No rate limiting implemented
 - CORS enabled for development
 
