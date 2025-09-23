@@ -1,27 +1,121 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-function Mission({ agentName }) {
-  const [showGlitch, setShowGlitch] = useState(false)
+function Mission({ agentName, onLogout }) {
+  const [showMissionAccepted, setShowMissionAccepted] = useState(false)
+  const navigate = useNavigate()
   
-  // Array of food items to randomly select from
-  const foodItems = ['corndog', 'hot dog', 'churro'];
-  
-  // Randomly select a food item
-  const randomFoodItem = foodItems[Math.floor(Math.random() * foodItems.length)];
-
   const handleMissionAccept = () => {
-    setShowGlitch(true)
-    
-    // Start glitch sequence and redirect to actual Google
+    setShowMissionAccepted(true)
+    // Redirect to dashboard after 3 seconds
     setTimeout(() => {
-      window.location.href = 'https://www.google.com'
-    }, 2500) // Redirect to Google after glitch effect
+      navigate('/dashboard')
+    }, 3000)
+  }
+
+  const handleLogout = () => {
+    onLogout()
+  }
+
+  if (showMissionAccepted) {
+    return (
+      <div className="mission-container">
+        <div className="mission-card">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1rem'
+          }}>
+            <h1>MISSION ACCEPTED</h1>
+            <button 
+              onClick={handleLogout}
+              className="logout-button"
+            >
+              LOGOUT
+            </button>
+          </div>
+          
+          <div style={{ 
+            textAlign: 'center', 
+            marginBottom: '2rem', 
+            fontSize: '0.8rem', 
+            color: '#2ecc71', 
+            opacity: 0.8,
+            letterSpacing: '1px'
+          }}>
+            ✅ MISSION BRIEFING COMPLETE - REDIRECTING TO DASHBOARD ✅
+          </div>
+          
+          <div className="mission-content">
+            <h2>AGENT {agentName}</h2>
+            <div style={{ 
+              marginTop: '1rem',
+              fontSize: '1rem',
+              color: '#ecf0f1',
+              lineHeight: '1.6',
+              textAlign: 'center'
+            }}>
+              <p style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '2rem' }}>
+                🎯 MISSION STATUS: ACTIVE
+              </p>
+              
+              <div style={{
+                background: 'rgba(46, 204, 113, 0.1)',
+                padding: '2rem',
+                borderRadius: '8px',
+                border: '1px solid #2ecc71',
+                marginBottom: '2rem'
+              }}>
+                <h3 style={{ color: '#2ecc71', marginBottom: '1rem' }}>MISSION BRIEFING COMPLETE</h3>
+                <p style={{ fontSize: '1rem', lineHeight: '1.6' }}>
+                  You have successfully accepted your mission briefing. 
+                  You are now being redirected to the Mission Control Dashboard 
+                  where you can view available operations and accept specific missions.
+                </p>
+              </div>
+              
+              <p style={{ 
+                color: '#f39c12', 
+                fontWeight: 'bold',
+                fontSize: '0.9rem',
+                marginTop: '2rem'
+              }}>
+                ⏰ REDIRECTING TO DASHBOARD IN 3 SECONDS...
+              </p>
+              
+              <div style={{
+                fontSize: '0.8rem',
+                color: '#bdc3c7',
+                opacity: 0.7,
+                marginTop: '1rem'
+              }}>
+                Prepare for operational deployment. Good luck, Agent.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="mission-container">
       <div className="mission-card">
-        <h1>MISSION BRIEFING</h1>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1rem'
+        }}>
+          <h1>MISSION BRIEFING</h1>
+          <button 
+            onClick={handleLogout}
+            className="logout-button"
+          >
+            LOGOUT
+          </button>
+        </div>
         <div style={{ 
           textAlign: 'center', 
           marginBottom: '2rem', 
@@ -45,57 +139,38 @@ function Mission({ agentName }) {
             <p><strong>MISSION CODE:</strong> OPERATION SHADOW STRIKE</p>
             <p><strong>PRIORITY:</strong> CRITICAL</p>
             <p><strong>STATUS:</strong> ACTIVE</p>
-            <p>The president has initiated Ghost Protocol. Your mission, should you choose to accept it, involves infiltrating the secure facility at coordinates 34.04032069062232, -118.23105960396222. Codenamed "The Obscure." Intelligence suggests that classified documents have been compromised and are being held at this location.</p>
             <br />
-            <p><strong>OBJECTIVES:</strong></p>
+            <p style={{ color: '#e74c3c', fontWeight: 'bold', textAlign: 'center' }}>
+              ⚠️ CRITICAL INFORMATION DISPLAY ⚠️
+            </p>
+            <br />
+            <p>You are about to be shown classified team assignment information that you will <strong>NEVER</strong> be shown again.</p>
+            <br />
+            <p><strong>IMPORTANT:</strong></p>
             <ul style={{ marginLeft: '2rem', marginTop: '0.5rem' }}>
-              <li>Find a potential agent with a {randomFoodItem} on their nametag</li>
-              <li>Hand off the authentication token to the agent</li>
-              <li>Tell them the code phrase: "The Obscure is not the Unknown"</li>
-              <li>Tell them to hold the token up to their phone and that any additional information is codeword classified</li>
+              <li>This information will be displayed for exactly <strong>20 seconds</strong></li>
+              <li>Once the timer expires, all traces will be permanently erased</li>
+              <li>You will have <strong>NO WAY</strong> to access this information again</li>
+              <li>Memorize everything you see - there are no second chances</li>
             </ul>
             <br />
+            <p style={{ color: '#f39c12', fontWeight: 'bold', textAlign: 'center' }}>
+              ⚠️ THIS IS YOUR ONLY OPPORTUNITY TO VIEW THIS DATA ⚠️
+            </p>
             <br />
-            <p style={{ color: '#e74c3c', fontWeight: 'bold', textAlign: 'center' }}>⚠️ WARNING: This message will be deleted from all public networks upon acceptance ⚠️</p>
+            <p style={{ color: '#e74c3c', fontWeight: 'bold', textAlign: 'center' }}>
+              ⚠️ WARNING: This information will be deleted from all secure networks upon acceptance ⚠️
+            </p>
           </div>
         </div>
         
         <button 
           className="mission-button"
           onClick={handleMissionAccept}
-          style={{
-            marginTop: '2rem',
-            padding: '1rem 2rem',
-            background: 'linear-gradient(45deg, #e74c3c, #c0392b)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '1rem',
-            fontWeight: '600',
-            textTransform: 'uppercase',
-            letterSpacing: '1px',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            fontFamily: 'Courier New, monospace'
-          }}
         >
-          MISSION ACCEPTED
+          DISPLAY CLASSIFIED INFORMATION
         </button>
       </div>
-
-      {/* Glitch Effect Overlay */}
-      {showGlitch && (
-        <div className="glitch-container">
-          <div className="glitch-overlay"></div>
-          <div className="glitch-text">
-            MESSAGE DELETED<br />
-            SECURE CONNECTION TERMINATED<br />
-            <span style={{ fontSize: '1rem', opacity: 0.8 }}>Redirecting to public network...</span>
-          </div>
-          <div className="glitch-scanner"></div>
-          <div className="glitch-static"></div>
-        </div>
-      )}
     </div>
   )
 }
