@@ -6,13 +6,14 @@ CREATE DATABASE spy_database;
 
 -- Create users table
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    real_name VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(20) NOT NULL,
-    codename VARCHAR(20) UNIQUE NOT NULL,
+    id INTEGER PRIMARY KEY,
+    firstname VARCHAR(50) NOT NULL,
+    lastname VARCHAR(50) NOT NULL,
     team VARCHAR(4) NOT NULL,
-    initial_intel TEXT,
-    votes VARCHAR(10)[] DEFAULT ARRAY['none'],
+    ishere BOOLEAN DEFAULT true,
+    alias_1 VARCHAR(50) NOT NULL,
+    alias_2 VARCHAR(50) NOT NULL,
+    passphrase TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -32,7 +33,9 @@ CREATE TABLE missions (
     assigned_agent INTEGER,
     past_assigned_agents INTEGER[],
     assigned_now BOOLEAN DEFAULT FALSE,
-    mission_expires TIMESTAMP
+    mission_expires TIMESTAMP,
+    success_key TEXT,
+    type VARCHAR(20)
 );
 
 -- Create teams table
@@ -57,65 +60,26 @@ CREATE TABLE login_logs (
     timestamp TIMESTAMP DEFAULT NOW()
 );
 
--- Insert agent codenames from the JSON file
-INSERT INTO users (codename, real_name, password, team) VALUES
-    ('SHADOWFOX', 'Agent Shadow', 'password123', 'red'),
-    ('SILVERWOLF', 'Agent Silver', 'password123', 'blue'),
-    ('HONEYDEW', 'Agent Honey', 'password123', 'red'),
-    ('NIGHTRAVEN', 'Agent Night', 'password123', 'blue'),
-    ('STORMHAWK', 'Agent Storm', 'password123', 'red'),
-    ('FROSTWIND', 'Agent Frost', 'password123', 'blue'),
-    ('EMBERSTONE', 'Agent Ember', 'password123', 'red'),
-    ('IRONWING', 'Agent Iron', 'password123', 'blue'),
-    ('CRIMSONFALCON', 'Agent Crimson', 'password123', 'red'),
-    ('STEELTALON', 'Agent Steel', 'password123', 'blue'),
-    ('PHANTOMBLADE', 'Agent Phantom', 'password123', 'red'),
-    ('GHOSTWALKER', 'Agent Ghost', 'password123', 'blue'),
-    ('THUNDERBOLT', 'Agent Thunder', 'password123', 'red'),
-    ('FIREBRAND', 'Agent Fire', 'password123', 'blue'),
-    ('ICEWALKER', 'Agent Ice', 'password123', 'red'),
-    ('DARKSTAR', 'Agent Dark', 'password123', 'blue'),
-    ('LIGHTNINGSTRIKE', 'Agent Lightning', 'password123', 'red'),
-    ('WOLFCLAW', 'Agent Wolf', 'password123', 'blue'),
-    ('RAVENWING', 'Agent Raven', 'password123', 'red'),
-    ('STORMCHASER', 'Agent Storm', 'password123', 'blue'),
-    ('FROSTBITE', 'Agent Frost', 'password123', 'red'),
-    ('EMBERHEART', 'Agent Ember', 'password123', 'blue'),
-    ('SHADOWSTALKER', 'Agent Shadow', 'password123', 'red'),
-    ('SILVERFANG', 'Agent Silver', 'password123', 'blue'),
-    ('NIGHTWATCH', 'Agent Night', 'password123', 'red'),
-    ('THUNDERWOLF', 'Agent Thunder', 'password123', 'blue'),
-    ('BLACKTHORN', 'Agent Black', 'password123', 'red'),
-    ('WHITEFANG', 'Agent White', 'password123', 'blue'),
-    ('REDSHADOW', 'Agent Red', 'password123', 'red'),
-    ('BLUESTORM', 'Agent Blue', 'password123', 'blue'),
-    ('GREENFLAME', 'Agent Green', 'password123', 'red'),
-    ('SEVENHILLS', 'Agent Seven', 'password123', 'blue'),
-    ('SILVERSTAR', 'Agent Silver', 'password123', 'red'),
-    ('BRONZEWING', 'Agent Bronze', 'password123', 'blue'),
-    ('COPPERCLAW', 'Agent Copper', 'password123', 'red'),
-    ('IRONHEART', 'Agent Iron', 'password123', 'blue'),
-    ('STEELWIND', 'Agent Steel', 'password123', 'red'),
-    ('OBSIDIAN', 'Agent Obsidian', 'password123', 'blue'),
-    ('JETSTREAM', 'Agent Jet', 'password123', 'red'),
-    ('CRYSTALFANG', 'Agent Crystal', 'password123', 'blue'),
-    ('DIAMONDCLAW', 'Agent Diamond', 'password123', 'red'),
-    ('RUBYSTONE', 'Agent Ruby', 'password123', 'blue'),
-    ('SAPPHIREWING', 'Agent Sapphire', 'password123', 'red'),
-    ('EMERALDEYE', 'Agent Emerald', 'password123', 'blue'),
-    ('AMETHYST', 'Agent Amethyst', 'password123', 'red'),
-    ('FIRSTSTRIKE', 'Agent First', 'password123', 'blue'),
-    ('ONYXWALKER', 'Agent Onyx', 'password123', 'red'),
-    ('FIREHAWK', 'Agent Fire', 'password123', 'blue'),
-    ('OPAL', 'Agent Opal', 'password123', 'red'),
-    ('GARNET', 'Agent Garnet', 'password123', 'blue'),
-    ('QUARTZSTONE', 'Agent Quartz', 'password123', 'red'),
-    ('MARBLEFANG', 'Agent Marble', 'password123', 'blue'),
-    ('GOLDENEYE', 'Agent Golden', 'password123', 'red');
+-- Insert users with new format
+INSERT INTO users (id, firstname, lastname, team, ishere, alias_1, alias_2, passphrase) VALUES
+    (1, 'Nikki', 'Thayer', 'red', true, 'Normal', 'Hawk', 'Winter must be cold.'),
+    (2, 'David', 'Daw', 'blue', true, 'Swift', 'Spider', 'Not every bird is an eagle.'),
+    (3, 'Bhavna', 'Devani', 'red', true, 'Invisible', 'Mouse', 'Have you ever been to Cleveland in August?'),
+    (4, 'Peter', 'Munters', 'blue', true, 'Hidden', 'Jewel', 'She wore a green hat by the river.'),
+    (5, 'Katherine', 'Ramos', 'red', true, 'Exploding', 'Panther', 'A gold room is nothing to sneeze at.'),
+    (6, 'Dominic', 'Ferantelli', 'blue', true, 'Fast', 'Jaguar', 'Alf ate cats.'),
+    (7, 'Jane', 'St. John', 'red', true, 'Tranquil', 'Diamond', 'The pope has a dairy allergy.'),
+    (8, 'Andrew', 'Fernandez', 'blue', true, 'Ominous', 'Lizard', 'Cardboard makes me sleepy.'),
+    (9, 'Brett', 'Jackson', 'red', true, 'Impossible', 'Dealer', 'The piano has been compromised.'),
+    (10, 'Richard', 'Malena', 'blue', true, 'Smooth', 'Operator', 'The thorn of the blue rose is the sharpest.'),
+    (11, 'Amanda', 'Rodriguez', 'red', true, 'Drunken', 'Player', 'A knight is nothing without a jester.'),
+    (12, 'Alex', 'Wawro', 'blue', true, 'Smooth', 'Infiltrator', 'Three birds are better than one.');
 
 -- Create indexes for better performance
-CREATE INDEX idx_users_codename ON users(codename);
+CREATE INDEX idx_users_alias_1 ON users(alias_1);
+CREATE INDEX idx_users_alias_2 ON users(alias_2);
 CREATE INDEX idx_users_team ON users(team);
+CREATE INDEX idx_users_ishere ON users(ishere);
 CREATE INDEX idx_login_logs_timestamp ON login_logs(timestamp);
 CREATE INDEX idx_login_logs_agent_name ON login_logs(agent_name);
 CREATE INDEX idx_missions_assigned_agent ON missions(assigned_agent);
