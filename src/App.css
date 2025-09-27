@@ -1,29 +1,6 @@
 /* Import color variables */
 @import './colors.css';
 
-
-.login-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: var(--bg);
-  overflow: hidden;
-}
-
-.login-card {
-  border-radius: 8px;
-  padding: 3rem;
-  width: 100%;
-  max-width: 450px;
-  position: relative;
-  z-index: 10;
-}
-
 .login-form {
   display: flex;
   flex-direction: column;

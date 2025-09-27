@@ -85,7 +85,6 @@ function Mission({ agentName, onLogout }) {
             <ul>
               <li>This information will be displayed for exactly <strong>20 seconds</strong></li>
               <li>Once the timer expires, all traces will be permanently erased</li>
-              <li>You will have <strong>NO WAY</strong> to access this information again</li>
               <li>Memorize everything you see - there are no second chances</li>
             </ul>
           </div>
