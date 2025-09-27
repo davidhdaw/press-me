@@ -24,35 +24,17 @@ h2 {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, var(--bg-dark-gray) 0%, var(--bg-medium-gray) 50%, var(--bg-darker-gray) 100%);
+  background: var(--bg-dark-gray);
   overflow: hidden;
 }
 
-.login-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    radial-gradient(circle at 20% 80%, var(--shadow-primary-light) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, var(--shadow-primary-very-light) 0%, transparent 50%);
-  pointer-events: none;
-}
-
 .login-card {
-  background: var(--bg-card);
   backdrop-filter: blur(10px);
-  border: 1px solid var(--primary-blue);
   border-radius: 8px;
   padding: 3rem;
   width: 100%;
   max-width: 450px;
   position: relative;
-  box-shadow: 
-    0 0 20px var(--shadow-primary),
-    inset 0 0 20px var(--shadow-primary-very-light);
   z-index: 10;
 }
 
@@ -63,19 +45,7 @@ h2 {
   font-weight: 300;
   text-transform: uppercase;
   letter-spacing: 3px;
-  text-shadow: 0 0 5px var(--shadow-primary-dark);
   position: relative;
-}
-
-.login-card h1::after {
-  content: '';
-  position: absolute;
-  bottom: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60px;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--primary-blue), transparent);
 }
 
 .login-form {
@@ -98,100 +68,20 @@ h2 {
   font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 1px;
-  text-shadow: 0 0 3px var(--shadow-primary);
 }
 
 .form-group input {
-  padding: 1rem;
-  background: var(--bg-input);
-  border: 1px solid var(--primary-blue);
-  border-radius: 4px;
-  font-size: 1rem;
-  color: var(--text-light-gray);
-  transition: all 0.3s ease;
-  font-family: 'Courier New', monospace;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: var(--primary-blue-dark);
-  box-shadow: 
-    0 0 10px var(--shadow-primary),
-    inset 0 0 5px var(--shadow-primary-light);
-  background: var(--bg-input-focus);
-}
-
-.form-group input::placeholder {
-  color: var(--text-placeholder);
+  /* Uses .input class from colors.css */
 }
 
 .login-button {
   margin-top: 1.5rem;
-  padding: 1rem;
-  background: linear-gradient(45deg, var(--primary-blue), var(--primary-blue-dark));
-  color: var(--text-white);
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  font-family: 'Courier New', monospace;
-}
-
-.login-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, var(--white-overlay), transparent);
-  transition: left 0.5s;
-}
-
-.login-button:hover::before {
-  left: 100%;
-}
-
-.login-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 
-    0 3px 15px var(--shadow-primary-dark),
-    0 0 20px var(--shadow-primary-light);
-}
-
-.login-button:active {
-  transform: translateY(0);
+  /* Uses .btn .btn-primary .btn-lg classes from colors.css */
 }
 
 /* Logout button styles */
 .logout-button {
-  padding: 0.5rem 1rem;
-  background: var(--shadow-primary);
-  color: var(--primary-blue);
-  border: 1px solid var(--primary-blue);
-  border-radius: 4px;
-  font-size: 0.8rem;
-  cursor: pointer;
-  font-family: 'Courier New', monospace;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.logout-button:hover {
-  background: var(--shadow-primary-dark);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px var(--shadow-primary);
-}
-
-.logout-button:active {
-  transform: translateY(0);
+  /* Uses .btn .btn-outline .btn-sm classes from colors.css */
 }
 
 /* Responsive design */
@@ -216,27 +106,12 @@ h2 {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, var(--bg-dark-gray) 0%, var(--bg-medium-gray) 50%, var(--bg-darker-gray) 100%);
+  background: var(--bg-dark-gray);
   overflow: hidden;
 }
 
-.mission-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    radial-gradient(circle at 20% 80%, var(--shadow-primary-light) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, var(--shadow-primary-very-light) 0%, transparent 50%);
-  pointer-events: none;
-}
-
 .mission-card {
-  background: var(--bg-card);
   backdrop-filter: blur(10px);
-  border: 1px solid var(--primary-blue);
   border-radius: 8px;
   padding: 3rem;
   width: 100%;
@@ -244,9 +119,6 @@ h2 {
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
-  box-shadow: 
-    0 0 20px var(--shadow-primary),
-    inset 0 0 20px var(--shadow-primary-very-light);
   z-index: 10;
 }
 
@@ -257,20 +129,8 @@ h2 {
   font-weight: 300;
   text-transform: uppercase;
   letter-spacing: 3px;
-  text-shadow: 0 0 5px var(--shadow-primary-dark);
   position: relative;
   text-align: center;
-}
-
-.mission-card h1::after {
-  content: '';
-  position: absolute;
-  bottom: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60px;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--primary-blue), transparent);
 }
 
 .mission-content {
@@ -282,40 +142,9 @@ h2 {
   margin-bottom: 1rem;
 }
 
-.mission-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 
-    0 3px 15px var(--shadow-red),
-    0 0 20px var(--shadow-red-light);
-}
-
-.mission-button:active {
-  transform: translateY(0);
-}
-
 .mission-button {
   margin-top: 2rem;
-  padding: 1rem 2rem;
-  background: linear-gradient(45deg, var(--secondary-red), var(--secondary-red-dark));
-  color: var(--text-white);
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  font-family: 'Courier New', monospace;
-}
-
-.mission-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 
-    0 3px 15px var(--shadow-red),
-    0 0 20px var(--shadow-red-light);
+  /* Uses .btn .btn-secondary .btn-lg classes from colors.css */
 }
 
 /* Glitch Effect Styles */
@@ -335,7 +164,7 @@ h2 {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--glitch-red-bg);
+  background: var(--secondary-red);
   animation: glitchRed 0.3s ease-in-out;
 }
 
@@ -344,12 +173,10 @@ h2 {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: var(--glitch-red);
-  font-family: 'Courier New', monospace;
+  color: var(--secondary-red);
   font-size: 2rem;
   font-weight: bold;
   text-align: center;
-  text-shadow: 2px 2px 4px var(--black-shadow);
   animation: glitchText 2s ease-in-out;
   z-index: 1001;
 }
@@ -360,7 +187,7 @@ h2 {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--glitch-red), transparent);
+  background: linear-gradient(90deg, transparent, var(--secondary-red), transparent);
   animation: glitchScan 1s ease-in-out;
   z-index: 1002;
 }
@@ -443,27 +270,13 @@ h2 {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, var(--bg-dark-gray) 0%, var(--bg-medium-gray) 50%, var(--bg-darker-gray) 100%);
+  background: var(--bg-dark-gray);
   overflow: hidden;
 }
 
-.dashboard-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    radial-gradient(circle at 20% 80%, var(--shadow-primary-light) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, var(--shadow-primary-very-light) 0%, transparent 50%);
-  pointer-events: none;
-}
 
 .dashboard-card {
-  background: var(--bg-card);
   backdrop-filter: blur(10px);
-  border: 1px solid var(--primary-blue);
   border-radius: 8px;
   padding: 2rem;
   width: 100%;
@@ -471,9 +284,6 @@ h2 {
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
-  box-shadow: 
-    0 0 20px var(--shadow-primary),
-    inset 0 0 20px var(--shadow-primary-very-light);
   z-index: 10;
 }
 
@@ -482,7 +292,6 @@ h2 {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
-  border-bottom: 1px solid var(--shadow-primary-dark);
   padding-bottom: 1rem;
 }
 
@@ -507,13 +316,13 @@ h2 {
 
 .agent-info h2 {
   margin: 0 0 0.5rem 0;
-  color: var(--text-light-gray);
+  color: var(--text-white);
   font-size: 1.5rem;
 }
 
 .agent-info p {
   margin: 0;
-  color: var(--text-medium-gray);
+  color: var(--text-white);
   font-size: 0.9rem;
 }
 
@@ -528,7 +337,6 @@ h2 {
 
 .mission-card {
   background: var(--bg-input);
-  border: 1px solid var(--border-secondary-light);
   border-radius: 8px;
   padding: 1.5rem;
   transition: all 0.3s ease;
@@ -571,13 +379,11 @@ h2 {
 .status-badge.active {
   background: var(--status-active-bg);
   color: var(--secondary-green);
-  border: 1px solid var(--secondary-green);
 }
 
 .status-badge.completed {
   background: var(--shadow-primary);
   color: var(--primary-blue);
-  border: 1px solid var(--primary-blue);
 }
 
 .mission-body {
@@ -586,7 +392,7 @@ h2 {
 
 .mission-body p {
   margin: 0;
-  color: var(--text-light-gray);
+  color: var(--text-white);
   font-size: 0.9rem;
   line-height: 1.5;
   text-align: justify;
@@ -616,56 +422,17 @@ h2 {
 }
 
 .accept-mission-button {
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(45deg, var(--secondary-green), var(--secondary-green-dark));
-  color: var(--text-white);
-  border: none;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: 'Courier New', monospace;
-}
-
-.accept-mission-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 3px 10px var(--shadow-green);
-}
-
-.accept-mission-button:disabled {
-  background: var(--shadow-primary-dark);
-  color: var(--text-medium-gray);
-  cursor: not-allowed;
+  /* Uses .btn .btn-success classes from colors.css */
 }
 
 .dashboard-footer {
   text-align: center;
-  border-top: 1px solid var(--shadow-primary-dark);
   padding-top: 1.5rem;
 }
 
 .refresh-button {
-  padding: 1rem 2rem;
-  background: linear-gradient(45deg, var(--secondary-orange), var(--secondary-orange-dark));
-  color: var(--text-white);
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: 'Courier New', monospace;
   margin-bottom: 1rem;
-}
-
-.refresh-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 3px 15px var(--shadow-orange);
+  /* Uses .btn .btn-warning .btn-lg classes from colors.css */
 }
 
 .footer-note {
@@ -704,24 +471,8 @@ h2 {
 }
 
 .retry-button {
-  padding: 1rem 2rem;
-  background: linear-gradient(45deg, var(--secondary-red), var(--secondary-red-dark));
-  color: var(--text-white);
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: 'Courier New', monospace;
   margin-top: 1rem;
-}
-
-.retry-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 3px 15px var(--shadow-red);
+  /* Uses .btn .btn-secondary .btn-lg classes from colors.css */
 }
 
 /* Responsive design for dashboard */
@@ -758,62 +509,11 @@ h2 {
 
 .success-key-field {
   flex: 1;
-  padding: 0.75rem 1rem;
-  background: var(--bg-input);
-  border: 1px solid var(--primary-blue);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  color: var(--text-light-gray);
-  font-family: 'Courier New', monospace;
-  transition: all 0.3s ease;
-}
-
-.success-key-field:focus {
-  outline: none;
-  border-color: var(--primary-blue-dark);
-  box-shadow: 
-    0 0 10px var(--shadow-primary),
-    inset 0 0 5px var(--shadow-primary-light);
-}
-
-.success-key-field::placeholder {
-  color: var(--text-placeholder);
-  font-style: italic;
+  /* Uses .input class from colors.css */
 }
 
 .submit-mission-button {
-  padding: 0.75rem 1.25rem;
-  background: linear-gradient(135deg, var(--secondary-red) 0%, var(--secondary-red-dark) 100%);
-  border: 1px solid var(--secondary-red-dark);
-  border-radius: 4px;
-  color: var(--text-white);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  white-space: nowrap;
   min-width: 80px;
-}
-
-.submit-mission-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--secondary-red-dark) 0%, #a93226 100%);
-  border-color: #a93226;
-  box-shadow: 0 4px 8px var(--shadow-red);
-  transform: translateY(-1px);
-}
-
-.submit-mission-button:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 4px var(--shadow-red);
-}
-
-.submit-mission-button:disabled {
-  background: var(--disabled-border);
-  border-color: var(--disabled-border);
-  color: var(--text-disabled);
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+  white-space: nowrap;
+  /* Uses .btn .btn-secondary classes from colors.css */
 }

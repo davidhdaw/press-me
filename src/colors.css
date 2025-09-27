@@ -3,24 +3,14 @@
   /* Primary Colors */
   --primary-blue: #3498db;
   --primary-blue-dark: #2980b9;
-  --primary-blue-darker: #1f4e79;
   
   /* Secondary Colors */
   --secondary-red: #e74c3c;
-  --secondary-red-dark: #c0392b;
-  --secondary-red-darker: #a93226;
-  
   --secondary-green: #2ecc71;
-  --secondary-green-dark: #27ae60;
-  
   --secondary-orange: #f39c12;
-  --secondary-orange-dark: #e67e22;
   
   /* Background Colors */
   --bg-dark-gray: #4d5051;
-  --bg-medium-gray: #51565b;
-  --bg-darker-gray: #313233;
-  --bg-card: rgba(44, 62, 80, 0.9);
   --bg-input: rgba(52, 73, 94, 0.8);
   --bg-input-focus: rgba(52, 73, 94, 0.9);
   
@@ -32,10 +22,9 @@
   
   /* Text Colors */
   --text-white: #ffffff;
-  --text-light-gray: #ecf0f1;
-  --text-medium-gray: #bdc3c7;
   --text-primary: rgba(255, 255, 255, 0.87);
   --text-primary-light: #213547;
+  --text-medium-gray: #bdc3c7;
   --text-placeholder: rgba(189, 195, 199, 0.6);
   --text-disabled: rgba(189, 195, 199, 0.5);
   
@@ -44,41 +33,129 @@
   --link-primary-hover: #535bf2;
   --link-primary-hover-light: #747bff;
   
-  /* Border Colors */
-  --border-primary: #3498db;
-  --border-secondary: rgba(52, 152, 219, 0.3);
-  --border-input: #3498db;
-  --border-input-focus: #2980b9;
-  --border-button-hover: #646cff;
-  
   /* Shadow Colors */
   --shadow-primary: rgba(52, 152, 219, 0.2);
   --shadow-primary-light: rgba(52, 152, 219, 0.1);
   --shadow-primary-dark: rgba(52, 152, 219, 0.3);
   --shadow-primary-very-light: rgba(52, 152, 219, 0.05);
-  --shadow-red: rgba(231, 76, 60, 0.3);
-  --shadow-red-light: rgba(231, 76, 60, 0.1);
-  --shadow-green: rgba(46, 204, 113, 0.3);
-  --shadow-orange: rgba(243, 156, 18, 0.3);
   
   /* Glitch Effect Colors */
-  --glitch-red: #ff0000;
-  --glitch-red-bg: rgba(255, 0, 0, 0.1);
   --glitch-white: rgba(255, 255, 255, 0.1);
-  --white-overlay: rgba(255, 255, 255, 0.2);
-  --black-shadow: rgba(0, 0, 0, 0.8);
   
   /* Status Colors */
   --status-active-bg: rgba(46, 204, 113, 0.2);
-  --status-active-border: #2ecc71;
   --status-completed-bg: rgba(52, 152, 219, 0.2);
-  --status-completed-border: #3498db;
   
   /* Disabled Colors */
   --disabled-bg: rgba(52, 152, 219, 0.3);
-  --disabled-text: #bdc3c7;
-  --disabled-border: rgba(149, 165, 166, 0.3);
-  
-  /* Additional Border Colors */
-  --border-secondary-light: rgba(52, 152, 219, 0.4);
+}
+
+/* Base Button Styles */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Button Variants */
+.btn-primary {
+  background: var(--primary-blue);
+  color: var(--text-white);
+}
+
+.btn-secondary {
+  background: var(--secondary-red);
+  color: var(--text-white);
+}
+
+.btn-success {
+  background: var(--secondary-green);
+  color: var(--text-white);
+}
+
+.btn-warning {
+  background: var(--secondary-orange);
+  color: var(--text-white);
+}
+
+.btn-outline {
+  background: var(--shadow-primary);
+  color: var(--primary-blue);
+  border: 1px solid var(--primary-blue);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: var(--shadow-primary-dark);
+}
+
+/* Button Sizes */
+.btn-sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+}
+
+.btn-lg {
+  padding: 1rem 2rem;
+  font-size: 1rem;
+}
+
+/* Base Input Styles */
+.input {
+  padding: 0.75rem 1rem;
+  background: var(--bg-input);
+  border: 1px solid var(--primary-blue);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: var(--text-white);
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary-blue-dark);
+  background: var(--bg-input-focus);
+}
+
+.input::placeholder {
+  color: var(--text-placeholder);
+  font-style: italic;
+}
+
+.input:disabled {
+  background: var(--disabled-bg);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+/* Input Sizes */
+.input-sm {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.input-lg {
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
 }
