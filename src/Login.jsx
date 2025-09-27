@@ -108,13 +108,10 @@ function Login({ onLogin }) {
   return (
     <div className="login-container">
       <div className="login-card">
-        <h1>SECURE ACCESS</h1>
-        <div>
-          CLASSIFIED DATABASE - LEVEL 1 CLEARANCE REQUIRED
-        </div>
+        <h1>TOP SECRET</h1>
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-group">
-          <h2>WELCOME, AGENT {screenname?.toUpperCase()}</h2>
+          <h2>FOR AGENT {screenname?.toUpperCase()}'S EYES ONLY</h2>
 
           </div>
           <div className="form-group">

@@ -77,38 +77,17 @@ function Mission({ agentName, onLogout }) {
             LOGOUT
           </button>
         </div>
-        <div>
-          CLASSIFIED MISSION - EYES ONLY
-        </div>
         
         <div className="mission-content">
           <h2>AGENT {agentName}</h2>
           <div>
-            <p><strong>MISSION CODE:</strong> OPERATION SHADOW STRIKE</p>
-            <p><strong>PRIORITY:</strong> CRITICAL</p>
-            <p><strong>STATUS:</strong> ACTIVE</p>
-            <br />
-            <p>
-              CRITICAL INFORMATION DISPLAY
-            </p>
-            <br />
             <p>You are about to be shown classified team assignment information that you will <strong>NEVER</strong> be shown again.</p>
-            <br />
-            <p><strong>IMPORTANT:</strong></p>
             <ul>
               <li>This information will be displayed for exactly <strong>20 seconds</strong></li>
               <li>Once the timer expires, all traces will be permanently erased</li>
               <li>You will have <strong>NO WAY</strong> to access this information again</li>
               <li>Memorize everything you see - there are no second chances</li>
             </ul>
-            <br />
-            <p >
-              THIS IS YOUR ONLY OPPORTUNITY TO VIEW THIS DATA
-            </p>
-            <br />
-            <p>
-              WARNING: This information will be deleted from all secure networks upon acceptance
-            </p>
           </div>
         </div>
         

@@ -1,145 +1,58 @@
 /* Global Color Variables */
 :root {
   /* Primary Colors */
-  --primary-blue: #3498db;
+  --primary-blue: #5A7CA7;
   
   /* Secondary Colors */
-  --secondary-red: #e74c3c;
-  --secondary-green: #2ecc71;
-  --secondary-orange: #f39c12;
+  --secondary-red: #E96C55;
+  --secondary-green: #9FBD71;
+  --secondary-orange: #EECD45;
   
   /* Background Colors */
-  --bg-dark-gray: #4d5051;
-  --bg-input: rgba(52, 73, 94, 0.8);
-  --bg-input-focus: rgba(52, 73, 94, 0.9);
+  --bg: #F5E7CB;
+  --bg-input: #C3B482;
+  --bg-input-focus: var(--bg);
   
   /* Base Theme Colors (from index.css) */
-  --bg-primary: #242424;
-  --bg-primary-light: #ffffff;
-  --bg-button: #1a1a1a;
-  --bg-button-light: #f9f9f9;
+  --bg-button: #2E2824;
   
   /* Text Colors */
-  --text-white: #ffffff;
-  --text-primary-light: #213547;
-  --text-placeholder: rgba(189, 195, 199, 0.6);
+  --text: #2E2824;
+  --text-placeholder: var(--text);
   --text-disabled: rgba(189, 195, 199, 0.5);
   
   /* Link Colors */
-  --link-primary: #646cff;
-  --link-primary-hover: #535bf2;
-  --link-primary-hover-light: #747bff;
+  --link-primary: var(--primary-blue);
       
   /* Disabled Colors */
-  --disabled-bg: rgba(52, 152, 219, 0.3);
-}
-
-/* Base Button Styles */
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.btn:disabled {
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Button Variants */
-.btn-primary {
-  background: var(--primary-blue);
-  color: var(--text-white);
-}
-
-.btn-secondary {
-  background: var(--secondary-red);
-  color: var(--text-white);
-}
-
-.btn-success {
-  background: var(--secondary-green);
-  color: var(--text-white);
-}
-
-.btn-warning {
-  background: var(--secondary-orange);
-  color: var(--text-white);
-}
-
-.btn-outline {
-  background: transparent;
-  color: var(--primary-blue);
-  border: 1px solid var(--primary-blue);
-}
-
-.btn-outline:hover:not(:disabled) {
-  background: rgba(52, 152, 219, 0.1);
-}
-
-/* Button Sizes */
-.btn-sm {
-  padding: 0.5rem 1rem;
-  font-size: 0.8rem;
-}
-
-.btn-lg {
-  padding: 1rem 2rem;
-  font-size: 1rem;
+  --disabled-bg: var(--secondary-red);
 }
 
 /* Base Input Styles */
-.input {
+input {
   padding: 0.75rem 1rem;
   background: var(--bg-input);
-  border: 1px solid var(--primary-blue);
+  border: transparent;
   border-radius: 4px;
   font-size: 0.9rem;
-  color: var(--text-white);
   transition: all 0.3s ease;
   width: 100%;
+  box-sizing: border-box;
 }
 
-.input:focus {
+input:focus {
   outline: none;
-  border-color: #2980b9;
+  border: 1px solid var(--primary-blue);
   background: var(--bg-input-focus);
 }
 
-.input::placeholder {
+input::placeholder {
   color: var(--text-placeholder);
   font-style: italic;
 }
 
-.input:disabled {
+input:disabled {
   background: var(--disabled-bg);
   color: var(--text-disabled);
   cursor: not-allowed;
-}
-
-/* Input Sizes */
-.input-sm {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8rem;
-}
-
-.input-lg {
-  padding: 1rem 1.25rem;
-  font-size: 1rem;
 }

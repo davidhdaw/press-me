@@ -1,19 +1,6 @@
 /* Import color variables */
 @import './colors.css';
 
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-  height: 100vh;
-  overflow: hidden;
-}
-
-h2 {
-  color: var(--text-white);
-  text-align: center;
-}
 
 .login-container {
   position: fixed;
@@ -24,28 +11,17 @@ h2 {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: var(--bg-dark-gray);
+  background: var(--bg);
   overflow: hidden;
 }
 
 .login-card {
-  backdrop-filter: blur(10px);
   border-radius: 8px;
   padding: 3rem;
   width: 100%;
   max-width: 450px;
   position: relative;
   z-index: 10;
-}
-
-.login-card h1 {
-  margin-bottom: 2rem;
-  color: var(--primary-blue);
-  font-size: 2.2rem;
-  font-weight: 300;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  position: relative;
 }
 
 .login-form {
@@ -64,88 +40,10 @@ h2 {
 .form-group label {
   margin-bottom: 0.5rem;
   font-weight: 400;
-  color: var(--primary-blue);
   font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
-
-.form-group input {
-  /* Uses .input class from colors.css */
-}
-
-.login-button {
-  margin-top: 1.5rem;
-  /* Uses .btn .btn-primary .btn-lg classes from colors.css */
-}
-
-/* Logout button styles */
-.logout-button {
-  /* Uses .btn .btn-outline .btn-sm classes from colors.css */
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .login-card {
-    margin: 1rem;
-    padding: 2rem;
-  }
-  
-  .login-card h1 {
-    font-size: 1.8rem;
-  }
-}
-
-/* Mission Component Styles */
-.mission-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: var(--bg-dark-gray);
-  overflow: hidden;
-}
-
-.mission-card {
-  border-radius: 8px;
-  padding: 3rem;
-  width: 100%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  z-index: 10;
-}
-
-.mission-card h1 {
-  margin-bottom: 2rem;
-  color: var(--primary-blue);
-  font-size: 2.2rem;
-  font-weight: 300;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  position: relative;
-  text-align: center;
-}
-
-.mission-content {
-  margin-top: 2rem;
-}
-
-.mission-content h2 {
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-.mission-button {
-  margin-top: 2rem;
-  /* Uses .btn .btn-secondary .btn-lg classes from colors.css */
-}
-
 
 /* Fade out animation */
 .fade-out {
@@ -157,68 +55,10 @@ h2 {
   100% { opacity: 0; }
 }
 
-/* Dashboard Component Styles */
-.dashboard-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background: var(--bg-dark-gray);
-  overflow: hidden;
-}
-
-
-.dashboard-card {
-  backdrop-filter: blur(10px);
-  border-radius: 8px;
-  padding: 2rem;
-  width: 100%;
-  max-width: 1200px;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  z-index: 10;
-}
-
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-}
-
-.dashboard-header h1 {
-  margin: 0;
-  color: var(--primary-blue);
-  font-size: 2rem;
-  font-weight: 300;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-}
-
 .agent-info {
-  text-align: center;
   margin-bottom: 2rem;
   padding: 1rem;
   border-radius: 8px;
-}
-
-.agent-info h2 {
-  margin: 0 0 0.5rem 0;
-  color: var(--text-white);
-  font-size: 1.5rem;
-}
-
-.agent-info p {
-  margin: 0;
-  color: var(--text-white);
-  font-size: 0.9rem;
 }
 
 .missions-grid {
@@ -230,33 +70,11 @@ h2 {
   margin-bottom: 2rem;
 }
 
-.mission-card {
-  border-radius: 8px;
-  padding: 1.5rem;
-  transition: all 0.3s ease;
-}
-
-.mission-card:hover {
-  border-color: var(--primary-blue);
-  transform: translateY(-2px);
-}
-
 .mission-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 1rem;
-}
-
-.mission-header h3 {
-  margin: 0;
-  color: var(--primary-blue);
-  font-size: 1.1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  flex: 1;
-  margin-right: 1rem;
 }
 
 .status-badge {
@@ -283,7 +101,7 @@ h2 {
 
 .mission-body p {
   margin: 0;
-  color: var(--text-white);
+  color: var(--text);
   font-size: 0.9rem;
   line-height: 1.5;
   text-align: justify;
@@ -304,33 +122,12 @@ h2 {
 }
 
 .meta-item {
-  color: var(--text-white);
+  color: var(--text);
   font-size: 0.8rem;
 }
 
 .meta-item strong {
   color: var(--primary-blue);
-}
-
-.accept-mission-button {
-  /* Uses .btn .btn-success classes from colors.css */
-}
-
-.dashboard-footer {
-  text-align: center;
-  padding-top: 1.5rem;
-}
-
-.refresh-button {
-  margin-bottom: 1rem;
-  /* Uses .btn .btn-warning .btn-lg classes from colors.css */
-}
-
-.footer-note {
-  color: var(--text-white);
-  font-size: 0.8rem;
-  margin: 0;
-  opacity: 0.7;
 }
 
 .loading-spinner {
@@ -341,7 +138,7 @@ h2 {
 .spinner {
   width: 50px;
   height: 50px;
-  border: 3px solid var(--bg-dark-gray);
+  border: 3px solid var(--bg);
   border-top: 3px solid var(--primary-blue);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -360,23 +157,7 @@ h2 {
   letter-spacing: 1px;
   margin: 0;
 }
-
-.retry-button {
-  margin-top: 1rem;
-  /* Uses .btn .btn-secondary .btn-lg classes from colors.css */
-}
-
-/* Responsive design for dashboard */
-@media (max-width: 768px) {
-  .dashboard-card {
-    margin: 1rem;
-    padding: 1.5rem;
-  }
-  
-  .dashboard-header h1 {
-    font-size: 1.5rem;
-  }
-  
+    
   .missions-grid {
     grid-template-columns: 1fr;
   }
@@ -386,25 +167,10 @@ h2 {
     align-items: stretch;
   }
   
-  .accept-mission-button {
-    width: 100%;
+/* Responsive design for dashboard */
+@media (max-width: 768px) {
+  #root {
+    margin: 1rem;
+    padding: 1rem;
   }
-}
-
-/* Success Key Input and Submit Button Styling */
-.success-key-input {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.success-key-field {
-  flex: 1;
-  /* Uses .input class from colors.css */
-}
-
-.submit-mission-button {
-  min-width: 80px;
-  white-space: nowrap;
-  /* Uses .btn .btn-secondary classes from colors.css */
 }
