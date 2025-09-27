@@ -7,7 +7,7 @@
   font-weight: 400;
 
   color-scheme: light dark;
-  color: var(--text-primary);
+  color: var(--text-white);
   background-color: var(--bg-primary);
 
   font-synthesis: none;
@@ -50,7 +50,7 @@ button {
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: var(--border-button-hover);
+  border-color: var(--link-primary);
 }
 button:focus,
 button:focus-visible {

@@ -111,7 +111,6 @@ h2 {
 }
 
 .mission-card {
-  backdrop-filter: blur(10px);
   border-radius: 8px;
   padding: 3rem;
   width: 100%;
@@ -147,107 +146,6 @@ h2 {
   /* Uses .btn .btn-secondary .btn-lg classes from colors.css */
 }
 
-/* Glitch Effect Styles */
-.glitch-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1000;
-  pointer-events: none;
-}
-
-.glitch-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--secondary-red);
-  animation: glitchRed 0.3s ease-in-out;
-}
-
-.glitch-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: var(--secondary-red);
-  font-size: 2rem;
-  font-weight: bold;
-  text-align: center;
-  animation: glitchText 2s ease-in-out;
-  z-index: 1001;
-}
-
-.glitch-scanner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--secondary-red), transparent);
-  animation: glitchScan 1s ease-in-out;
-  z-index: 1002;
-}
-
-.glitch-static {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: 
-    radial-gradient(circle at 25% 25%, var(--glitch-white) 0%, transparent 50%),
-    radial-gradient(circle at 75% 75%, var(--glitch-white) 0%, transparent 50%);
-  background-size: 4px 4px;
-  animation: glitchStatic 0.5s ease-in-out;
-  z-index: 1003;
-}
-
-@keyframes glitchRed {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
-}
-
-@keyframes glitchText {
-  0% { 
-    opacity: 0; 
-    transform: translate(-50%, -50%) scale(0.8);
-  }
-  20% { 
-    opacity: 1; 
-    transform: translate(-50%, -50%) scale(1);
-  }
-  80% { 
-    opacity: 1; 
-    transform: translate(-50%, -50%) scale(1);
-  }
-  100% { 
-    opacity: 0; 
-    transform: translate(-50%, -50%) scale(1.2);
-  }
-}
-
-@keyframes glitchScan {
-  0% { 
-    top: 0; 
-    opacity: 0;
-  }
-  50% { 
-    opacity: 1;
-  }
-  100% { 
-    top: 100%; 
-    opacity: 0;
-  }
-}
-
-@keyframes glitchStatic {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 0.3; }
-}
 
 /* Fade out animation */
 .fade-out {
@@ -302,16 +200,13 @@ h2 {
   font-weight: 300;
   text-transform: uppercase;
   letter-spacing: 3px;
-  text-shadow: 0 0 5px var(--shadow-primary-dark);
 }
 
 .agent-info {
   text-align: center;
   margin-bottom: 2rem;
   padding: 1rem;
-  background: var(--shadow-primary-light);
   border-radius: 8px;
-  border: 1px solid var(--shadow-primary-dark);
 }
 
 .agent-info h2 {
@@ -336,7 +231,6 @@ h2 {
 }
 
 .mission-card {
-  background: var(--bg-input);
   border-radius: 8px;
   padding: 1.5rem;
   transition: all 0.3s ease;
@@ -344,7 +238,6 @@ h2 {
 
 .mission-card:hover {
   border-color: var(--primary-blue);
-  box-shadow: 0 0 15px var(--shadow-primary);
   transform: translateY(-2px);
 }
 
@@ -377,12 +270,10 @@ h2 {
 }
 
 .status-badge.active {
-  background: var(--status-active-bg);
   color: var(--secondary-green);
 }
 
 .status-badge.completed {
-  background: var(--shadow-primary);
   color: var(--primary-blue);
 }
 
@@ -413,7 +304,7 @@ h2 {
 }
 
 .meta-item {
-  color: var(--text-medium-gray);
+  color: var(--text-white);
   font-size: 0.8rem;
 }
 
@@ -436,7 +327,7 @@ h2 {
 }
 
 .footer-note {
-  color: var(--text-medium-gray);
+  color: var(--text-white);
   font-size: 0.8rem;
   margin: 0;
   opacity: 0.7;
@@ -450,7 +341,7 @@ h2 {
 .spinner {
   width: 50px;
   height: 50px;
-  border: 3px solid var(--shadow-primary-dark);
+  border: 3px solid var(--bg-dark-gray);
   border-top: 3px solid var(--primary-blue);
   border-radius: 50%;
   animation: spin 1s linear infinite;

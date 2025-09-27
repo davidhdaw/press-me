@@ -2,7 +2,6 @@
 :root {
   /* Primary Colors */
   --primary-blue: #3498db;
-  --primary-blue-dark: #2980b9;
   
   /* Secondary Colors */
   --secondary-red: #e74c3c;
@@ -22,9 +21,7 @@
   
   /* Text Colors */
   --text-white: #ffffff;
-  --text-primary: rgba(255, 255, 255, 0.87);
   --text-primary-light: #213547;
-  --text-medium-gray: #bdc3c7;
   --text-placeholder: rgba(189, 195, 199, 0.6);
   --text-disabled: rgba(189, 195, 199, 0.5);
   
@@ -32,20 +29,7 @@
   --link-primary: #646cff;
   --link-primary-hover: #535bf2;
   --link-primary-hover-light: #747bff;
-  
-  /* Shadow Colors */
-  --shadow-primary: rgba(52, 152, 219, 0.2);
-  --shadow-primary-light: rgba(52, 152, 219, 0.1);
-  --shadow-primary-dark: rgba(52, 152, 219, 0.3);
-  --shadow-primary-very-light: rgba(52, 152, 219, 0.05);
-  
-  /* Glitch Effect Colors */
-  --glitch-white: rgba(255, 255, 255, 0.1);
-  
-  /* Status Colors */
-  --status-active-bg: rgba(46, 204, 113, 0.2);
-  --status-completed-bg: rgba(52, 152, 219, 0.2);
-  
+      
   /* Disabled Colors */
   --disabled-bg: rgba(52, 152, 219, 0.3);
 }
@@ -100,13 +84,13 @@
 }
 
 .btn-outline {
-  background: var(--shadow-primary);
+  background: transparent;
   color: var(--primary-blue);
   border: 1px solid var(--primary-blue);
 }
 
 .btn-outline:hover:not(:disabled) {
-  background: var(--shadow-primary-dark);
+  background: rgba(52, 152, 219, 0.1);
 }
 
 /* Button Sizes */
@@ -134,7 +118,7 @@
 
 .input:focus {
   outline: none;
-  border-color: var(--primary-blue-dark);
+  border-color: #2980b9;
   background: var(--bg-input-focus);
 }
 
