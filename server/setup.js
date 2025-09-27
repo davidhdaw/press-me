@@ -212,7 +212,9 @@ async function setupDatabase() {
     console.error('Error setting up database:', err);
     process.exit(1);
   } finally {
-    await spyPool.end();
+    if (spyPool) {
+      await spyPool.end();
+    }
   }
 }
 
