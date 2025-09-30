@@ -7,6 +7,7 @@ function Dashboard({ agentName, agentId, onLogout }) {
   const [timeLeft, setTimeLeft] = useState('Calculating...')
   const [successKeys, setSuccessKeys] = useState({})
   const [completedMissions, setCompletedMissions] = useState(new Set())
+  const [activeTab, setActiveTab] = useState('missions')
 
   useEffect(() => {
     fetchRandomMissions()
@@ -122,10 +123,34 @@ function Dashboard({ agentName, agentId, onLogout }) {
   if (loading) {
     return (
       <div className="dashboard-container">
-        <div className="dashboard-card">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <p>LOADING MISSION DATA...</p>
+        <div className="dashboard-header">
+          <div className="dashboard-tabs">
+            <button 
+              className={`tab-button ${activeTab === 'agent' ? 'active' : ''}`}
+              onClick={() => setActiveTab('agent')}
+            >
+              AGENT
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'missions' ? 'active' : ''}`}
+              onClick={() => setActiveTab('missions')}
+            >
+              MISSIONS
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'intel' ? 'active' : ''}`}
+              onClick={() => setActiveTab('intel')}
+            >
+              INTEL
+            </button>
+          </div>
+        </div>
+        <div className="dashboard-content">
+          <div className="tab-content">
+            <div className="loading-spinner">
+              <div className="spinner"></div>
+              <p>LOADING MISSION DATA...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -135,12 +160,38 @@ function Dashboard({ agentName, agentId, onLogout }) {
   if (error) {
     return (
       <div className="dashboard-container">
-        <div className="dashboard-card">
-          <h1>ERROR</h1>
-          <p style={{ color: '#e74c3c' }}>{error}</p>
-          <button onClick={fetchRandomMissions} className="retry-button">
-            RETRY
-          </button>
+        <div className="dashboard-header">
+          <div className="dashboard-tabs">
+            <button 
+              className={`tab-button ${activeTab === 'agent' ? 'active' : ''}`}
+              onClick={() => setActiveTab('agent')}
+            >
+              AGENT
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'missions' ? 'active' : ''}`}
+              onClick={() => setActiveTab('missions')}
+            >
+              MISSIONS
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'intel' ? 'active' : ''}`}
+              onClick={() => setActiveTab('intel')}
+            >
+              INTEL
+            </button>
+          </div>
+        </div>
+        <div className="dashboard-content">
+          <div className="tab-content">
+            <h1>ERROR</h1>
+            <p style={{ color: '#e74c3c' }}>{error}</p>
+            <div className="tab-actions">
+              <button onClick={fetchRandomMissions} className="retry-button">
+                RETRY
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -148,67 +199,101 @@ function Dashboard({ agentName, agentId, onLogout }) {
 
   return (
     <div className="dashboard-container">
-      <div className="dashboard-card">
-        <div className="dashboard-header">
-          <h1>MISSION CONTROL</h1>
-          <button onClick={handleLogout} className="logout-button">
-            LOGOUT
+      <div className="dashboard-header">
+        <div className="dashboard-tabs">
+          <button 
+            className={`tab-button ${activeTab === 'agent' ? 'active' : ''}`}
+            onClick={() => setActiveTab('agent')}
+          >
+            AGENT
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'missions' ? 'active' : ''}`}
+            onClick={() => setActiveTab('missions')}
+          >
+            MISSIONS
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'intel' ? 'active' : ''}`}
+            onClick={() => setActiveTab('intel')}
+          >
+            INTEL
           </button>
         </div>
-        
-        <div className="agent-info">
-          <h2>AGENT {agentName?.toUpperCase()}</h2>
-          <p>Mission Timer: {timeLeft}</p>
-        </div>
+      </div>
 
-        <div className="missions-grid">
-          {missions.map((mission, index) => (
-            <div key={mission.id} className="mission-card">
-              <div className="mission-header">
-                <h3>{mission.title}</h3>
-                <span className={`status-badge ${completedMissions.has(mission.id) ? 'completed' : 'active'}`}>
-                  {completedMissions.has(mission.id) ? 'COMPLETED' : 'ACTIVE'}
-                </span>
-              </div>
-              
-              <div className="mission-body">
-                <p>{mission.mission_body}</p>
-              </div>
-              
-              <div className="mission-footer">
-                {!completedMissions.has(mission.id) && (
-                  <div className="mission-completion">
-                    <div className="success-key-input">
-                      <input
-                        type="text"
-                        placeholder="Enter success key..."
-                        value={successKeys[mission.id] || ''}
-                        onChange={(e) => handleSuccessKeyChange(mission.id, e.target.value)}
-                        className="success-key-field"
-                      />
-                      <button
-                        onClick={() => handleSubmitMission(mission.id)}
-                        disabled={!successKeys[mission.id]}
-                        className="submit-mission-button"
-                      >
-                        SUBMIT
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+      <div className="dashboard-content">
+        {activeTab === 'agent' && (
+          <div className="tab-content">
+            <h2>Agent Information</h2>
+            <p>Agent Name: {agentName}</p>
+            <p>Agent ID: {agentId}</p>
+            <p>Mission Timer: {timeLeft}</p>
+            <p>This is placeholder content for the Agent tab.</p>
+            <div className="tab-actions">
+              <button onClick={handleLogout} className="logout-button">
+                LOGOUT
+              </button>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
 
-        <div className="dashboard-footer">
-          <button onClick={fetchRandomMissions} className="refresh-button">
-            REFRESH MISSIONS
-          </button>
-          <p className="footer-note">
-            Dummy button to assign new missions randomly. Click refresh to get new assignments. this will be removed in the final version.
-          </p>
-        </div>
+        {activeTab === 'missions' && (
+          <div className="tab-content">
+            <div className="missions-grid">
+              {missions.map((mission, index) => (
+                <div key={mission.id} className="mission-card">
+                  <div className="mission-header">
+                    <h3>{mission.title}</h3>
+                    <span className={`status-badge ${completedMissions.has(mission.id) ? 'completed' : 'active'}`}>
+                      {completedMissions.has(mission.id) ? 'COMPLETED' : 'ACTIVE'}
+                    </span>
+                  </div>
+                  
+                  <div className="mission-body">
+                    <p>{mission.mission_body}</p>
+                  </div>
+                  
+                  <div className="mission-footer">
+                    {!completedMissions.has(mission.id) && (
+                      <div className="mission-completion">
+                        <div className="success-key-input">
+                          <input
+                            type="text"
+                            placeholder="Enter success key..."
+                            value={successKeys[mission.id] || ''}
+                            onChange={(e) => handleSuccessKeyChange(mission.id, e.target.value)}
+                            className="success-key-field"
+                          />
+                          <button
+                            onClick={() => handleSubmitMission(mission.id)}
+                            disabled={!successKeys[mission.id]}
+                            className="submit-mission-button"
+                          >
+                            SUBMIT
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="tab-actions">
+              <button onClick={fetchRandomMissions} className="refresh-button">
+                GET NEW MISSIONS
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'intel' && (
+          <div className="tab-content">
+            <h2>Intel Reports</h2>
+            <p>This is placeholder content for the Intel tab.</p>
+            <p>Intel information and reports would be displayed here.</p>
+          </div>
+        )}
       </div>
     </div>
   )
