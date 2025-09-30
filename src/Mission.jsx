@@ -3,20 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { addBounce } from './helpers.js'
 
 function Mission({ alias1, alias2, realName, team, onLogout }) {
-  const [showMissionAccepted, setShowMissionAccepted] = useState(false)
   const navigate = useNavigate()
   const effectRef1 = useRef(null)
   const effectRef2 = useRef(null)
   const teamColor = "team-"+{team}.team
   const bgColor = "bg-"+{team}.team
   
-  const handleMissionAccept = () => {
-    setShowMissionAccepted(true)
-    // Redirect to dashboard after 3 seconds
-    setTimeout(() => {
-      navigate('/dashboard')
-    }, 3000)
-  }
 
   const handleLogout = () => {
     onLogout()
@@ -32,53 +24,6 @@ function Mission({ alias1, alias2, realName, team, onLogout }) {
     }
   }, [])
 
-  if (showMissionAccepted) {
-    return (
-      <div className="mission-container">
-        <div className="mission-card">
-          <div>
-            <h1>MISSION ACCEPTED</h1>
-            <button 
-              onClick={handleLogout}
-              className="logout-button"
-            >
-              LOGOUT
-            </button>
-          </div>
-          
-          <div>
-            MISSION BRIEFING COMPLETE - REDIRECTING TO DASHBOARD
-          </div>
-          
-          <div className="mission-content">
-            <h2>AGENT {alias1} {alias2}</h2>
-            <div>
-              <p>
-                MISSION STATUS: ACTIVE
-              </p>
-              
-              <div>
-                <h3>MISSION BRIEFING COMPLETE</h3>
-                <p>
-                  You have successfully accepted your mission briefing. 
-                  You are now being redirected to the Mission Control Dashboard 
-                  where you can view available operations and accept specific missions.
-                </p>
-              </div>
-              
-              <p>
-                REDIRECTING TO DASHBOARD IN 3 SECONDS...
-              </p>
-              
-              <div>
-                Prepare for operational deployment. Good luck, Agent.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className={"mission-container " + (bgColor)}>
@@ -111,7 +56,7 @@ function Mission({ alias1, alias2, realName, team, onLogout }) {
             </ul>
             <button 
           className="mission-button"
-          onClick={handleMissionAccept}
+          onClick={() => navigate('/dashboard')}
         >
           This message will self destruct in 3 seconds.
         </button>
