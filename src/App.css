@@ -1,26 +1,6 @@
 /* Import color variables */
 @import './colors.css';
 
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-  position: relative;
-}
-
-.form-group label {
-  margin-bottom: 0.5rem;
-  font-weight: 400;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
 
 /* Fade out animation */
 .fade-out {
@@ -32,10 +12,47 @@
   100% { opacity: 0; }
 }
 
-.agent-info {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  border-radius: 8px;
+.login-container{
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  justify-content: space-between;
+}
+
+.login-container .logo{
+  background-color: var(--red);
+  padding: var(--side-padding);
+}
+
+.login-container .logo h1{
+  color: var(--yellow);
+}
+
+.login-container .login-form{
+  background-color: var(--blue);
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  position: relative;
+  padding: var(--side-padding);
+}
+
+.login-container .form-group label {
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  font-size: 1.33rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--white);
+}
+
+.login-container input::placeholder{
+  font-style: normal;
+}
+
+.login-container button{
+  margin-top: var(--vertical-margin);
+  background-color: var(--red);
 }
 
 .missions-grid {
@@ -65,24 +82,13 @@
 }
 
 .status-badge.active {
-  color: var(--secondary-green);
+  color: var(--green);
 }
 
 .status-badge.completed {
-  color: var(--primary-blue);
+  color: var(--blue);
 }
 
-.mission-body {
-  margin-bottom: 1.5rem;
-}
-
-.mission-body p {
-  margin: 0;
-  color: var(--text);
-  font-size: 0.9rem;
-  line-height: 1.5;
-  text-align: justify;
-}
 
 .mission-footer {
   display: flex;
@@ -92,20 +98,6 @@
   gap: 1rem;
 }
 
-.mission-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.meta-item {
-  color: var(--text);
-  font-size: 0.8rem;
-}
-
-.meta-item strong {
-  color: var(--primary-blue);
-}
 
 .loading-spinner {
   text-align: center;
@@ -115,8 +107,8 @@
 .spinner {
   width: 50px;
   height: 50px;
-  border: 3px solid var(--bg);
-  border-top: 3px solid var(--primary-blue);
+  border: 3px solid var(--white);
+  border-top: 3px solid var(--blue);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 1rem auto;
@@ -128,7 +120,7 @@
 }
 
 .loading-spinner p {
-  color: var(--primary-blue);
+  color: var(--blue);
   font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -143,11 +135,17 @@
     flex-direction: column;
     align-items: stretch;
   }
-  
-/* Responsive design for dashboard */
-@media (max-width: 768px) {
-  #root {
-    margin: 1rem;
-    padding: 1rem;
+
+  .rotate{
+    display: flex;
+    gap: 4px;
+    text-transform: uppercase;
   }
-}
+
+  .rotate span:nth-child(even){
+    transform: rotate(-4deg);
+    transform: translateY(5px);
+  }
+  .rotate span:nth-child(odd){
+    transform: rotate(12deg);
+  }

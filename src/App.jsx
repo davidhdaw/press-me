@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
+import './helpers.js'
 import Mission from './Mission'
 import Login from './Login'
 import Dashboard from './Dashboard'

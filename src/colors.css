@@ -1,58 +1,14 @@
 /* Global Color Variables */
 :root {
   /* Primary Colors */
-  --primary-blue: #5A7CA7;
+  --blue: #5A7CA7;
+  --red: #E96C55;
+  --green: #9FBD71;
+  --yellow: #EECD45;  
+  --white: #F5E7CB;
+  --brown: #C3B482;  
+  --black: #2E2824;
   
-  /* Secondary Colors */
-  --secondary-red: #E96C55;
-  --secondary-green: #9FBD71;
-  --secondary-orange: #EECD45;
-  
-  /* Background Colors */
-  --bg: #F5E7CB;
-  --bg-input: #C3B482;
-  --bg-input-focus: var(--bg);
-  
-  /* Base Theme Colors (from index.css) */
-  --bg-button: #2E2824;
-  
-  /* Text Colors */
-  --text: #2E2824;
-  --text-placeholder: var(--text);
-  --text-disabled: rgba(189, 195, 199, 0.5);
-  
-  /* Link Colors */
-  --link-primary: var(--primary-blue);
-      
-  /* Disabled Colors */
-  --disabled-bg: var(--secondary-red);
-}
-
-/* Base Input Styles */
-input {
-  padding: 0.75rem 1rem;
-  background: var(--bg-input);
-  border: transparent;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-input:focus {
-  outline: none;
-  border: 1px solid var(--primary-blue);
-  background: var(--bg-input-focus);
-}
-
-input::placeholder {
-  color: var(--text-placeholder);
-  font-style: italic;
-}
-
-input:disabled {
-  background: var(--disabled-bg);
-  color: var(--text-disabled);
-  cursor: not-allowed;
+  --side-padding: 20px;
+  --vertical-margin: 20px;
 }

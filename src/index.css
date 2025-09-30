@@ -1,28 +1,33 @@
 /* Import Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Jost:ital,wght@0,100..900;1,100..900&display=swap');
 
 /* Import color variables */
 @import './colors.css';
 
 :root {
-  font-family: 'Libre Franklin', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Jost', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: light dark;
-  color: var(--text);
-  background-color: var(--bg);
+  color: var(--black);
+  background-color: var(--white);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  font-size: 18px;
 }
 
+#root{
+  width: 100%;
+}
 
 a {
   font-weight: 500;
-  color: var(--link-primary);
+  color: var(--blue);
   text-decoration: inherit;
 }
 
@@ -40,7 +45,7 @@ h1 {
 }
 
 h2 {
-  color: var(--text);
+  color: var(--black);
 }
 
 button {
@@ -50,15 +55,46 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  color: var(--bg);
-  background-color: var(--bg-button);
+  color: var(--white);
+  background-color: var(--black);
   cursor: pointer;
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: var(--link-primary);
+  border-color: var(--blue);
 }
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
+}
+
+
+/* Base Input Styles */
+input {
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  padding: 0.75rem 1rem;
+  background: var(--white);
+  border: transparent;
+  border-radius: 4px;
+  font-size: 1.33rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+input:focus {
+  outline: none;
+}
+
+input::placeholder {
+  color: var(--black);
+  font-style: italic;
+}
+
+input:disabled {
+  background: var(--brown);
+  color: var(--black);
+  cursor: not-allowed;
 }

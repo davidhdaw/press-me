@@ -107,13 +107,11 @@ function Login({ onLogin }) {
 
   return (
     <div className="login-container">
-      <div className="login-card">
-        <h1>TOP SECRET</h1>
+        <div className="logo">
+          <h1>Press me, I talk!</h1>
+          <p>A Daw Industries game product</p>
+        </div>
         <form onSubmit={handleSubmit} className="login-form">
-          <div className="form-group">
-          <h2>FOR AGENT {screenname?.toUpperCase()}'S EYES ONLY</h2>
-
-          </div>
           <div className="form-group">
             <label htmlFor="username" style={{ display: 'none' }}>Username</label>
             <input
@@ -125,28 +123,27 @@ function Login({ onLogin }) {
               style={{ display: 'none' }}
               autoComplete="username"
             />
-            <label htmlFor="password">PASSPHRASE</label>
+            <label htmlFor="password">Prove it's really you.</label>
             <input
-              type="password"
+              type="text"
               id="password"
               name="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="ENTER YOUR PASSPHRASE"
+              placeholder={screenname}
               autoComplete="current-password"
               required
             />
           </div>
           <button type="submit" className="login-button">
-            INITIALIZE ACCESS
+            Let the games begin!
           </button>
         </form>
         {showUnauthorizedMessage && (
           <div>
-            INCORRECT ACCESS CODE - UNAUTHORIZED ACCESS WILL BE TRACED
+            That ain't it, chief.
           </div>
         )}
-      </div>
     </div>
   )
 }

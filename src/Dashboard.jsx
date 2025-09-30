@@ -150,7 +150,7 @@ function Dashboard({ agentName, agentId, onLogout }) {
     <div className="dashboard-container">
       <div className="dashboard-card">
         <div className="dashboard-header">
-          <h1>MISSION CONTROL DASHBOARD</h1>
+          <h1>MISSION CONTROL</h1>
           <button onClick={handleLogout} className="logout-button">
             LOGOUT
           </button>

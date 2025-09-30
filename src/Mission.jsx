@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { addBounce } from './helpers.js'
 
 function Mission({ agentName, onLogout }) {
   const [showMissionAccepted, setShowMissionAccepted] = useState(false)
   const navigate = useNavigate()
+  const effectRef = useRef(null)
   
   const handleMissionAccept = () => {
     setShowMissionAccepted(true)
@@ -16,6 +18,13 @@ function Mission({ agentName, onLogout }) {
   const handleLogout = () => {
     onLogout()
   }
+
+  // Apply addBounce effect when component mounts
+  useEffect(() => {
+    if (effectRef.current) {
+      addBounce(effectRef.current)
+    }
+  }, [])
 
   if (showMissionAccepted) {
     return (
@@ -78,8 +87,8 @@ function Mission({ agentName, onLogout }) {
           </button>
         </div>
         
-        <div className="mission-content">
-          <h2>AGENT {agentName}</h2>
+        <div className="mission-content" >
+          <h2 ref={effectRef} className="rotate">Agent {agentName}</h2>
           <div>
             <p>You are about to be shown classified team assignment information that you will <strong>NEVER</strong> be shown again.</p>
             <ul>
