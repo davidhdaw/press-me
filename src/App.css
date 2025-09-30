@@ -133,6 +133,30 @@
   padding: var(--side-padding);
 }
 
+.mission-objectives p {
+  font-size: 1.5em;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.mission-objectives ul {
+  margin: var(--vertical-margin-sm) 0;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.25rem;
+  text-transform: uppercase;
+}
+
+.mission-objectives ul :last-child {
+  font-weight: 600;
+}
+
+.mission-objectives ul li {
+  line-height: 1.25;
+}
+
 .missions-grid {
   display: flex;
   flex-direction: column;

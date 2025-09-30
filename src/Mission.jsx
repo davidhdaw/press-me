@@ -106,7 +106,7 @@ function Mission({ alias1, alias2, realName, team, onLogout }) {
               <li>Complete missions.</li>
               <li>Make new friends.</li>
               <li>Do not get caught.</li>
-              <li>Ask the hosts if you need any help.</li>
+              <li>Ask the hosts if you need help.</li>
               <li>Do not get caught.</li>
             </ul>
             <button 
