@@ -373,27 +373,63 @@
   box-shadow: 5px 5px 0px 0 var(--black);
 }
 
+.mission-card:nth-child(3n) h3{
+  color: var(--red);
+}
+
+.mission-card:nth-child(3n) .success-key-field{
+  border: 2px solid var(--red);
+}
+
+.mission-card:nth-child(3n+1) h3{
+  color: var(--blue);
+}
+
+.mission-card:nth-child(3n+1) .success-key-field{
+  border: 2px solid var(--blue);
+}
+
+.mission-card:nth-child(3n+2) h3{
+  color: var(--green);
+}
+
+.mission-card:nth-child(3n+2) .success-key-field{
+  border: 2px solid var(--green);
+}
+
+.mission-card:nth-child(3n) .submit-mission-button {
+  background-color: var(--red);
+}
+
+.mission-card:nth-child(3n+1) .submit-mission-button {
+  background-color: var(--blue);
+}
+
+.mission-card:nth-child(3n+2) .submit-mission-button {
+  background-color: var(--green);
+}
+
 .mission-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
+  margin-bottom: var(--vertical-margin-sm);
 }
 
 .mission-header h3 {
-  color: var(--black);
   margin: 0;
   font-size: 1em;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  font-weight: 500;
   flex: 1;
 }
 
 .mission-card p{
-  font-size: 1.25em;
+  font-size: 1.15em;
   text-transform: uppercase;
   font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.2;
+  margin: 0 0 var(--vertical-margin-sm) 0;
 }
 
 .status-badge {
@@ -437,40 +473,19 @@
 
 .success-key-field {
   flex: 1;
-  border: 2px solid var(--black);
-  border-radius: 8px;
-  font-size: 1rem;
-  text-transform: none;
-  letter-spacing: normal;
+  border-radius: 4px;
+  font-size: 0.9em;
+  padding: var(--side-padding-sm);
 }
 
-.success-key-field:focus {
-  outline: none;
-  border-color: var(--blue);
+.success-key-field::placeholder {
+  font-style: normal;
 }
 
-.submit-mission-button {
-  background-color: var(--green);
-  color: var(--white);
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  white-space: nowrap;
+.submit-mission-button{
+  padding: 8px 16px;
+  border-radius: 4px;
 }
-
-.submit-mission-button:hover:not(:disabled) {
-  background-color: var(--green);
-}
-
-.submit-mission-button:disabled {
-  background-color: var(--brown);
-  cursor: not-allowed;
-}
-
 
 .retry-button {
   background-color: var(--red);
@@ -490,43 +505,10 @@
   background-color: var(--red);
 }
 
-.tab-actions {
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 2px solid var(--blue);
-  text-align: center;
-}
-
-.tab-actions .logout-button {
+.refresh-button {
   background-color: var(--red);
   color: var(--white);
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.tab-actions .logout-button:hover {
-  background-color: #c0392b;
-}
-
-.tab-actions .refresh-button {
-  background-color: var(--blue);
-  color: var(--white);
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.tab-actions .refresh-button:hover {
-  background-color: var(--red);
+  display: block;
+  padding: 0 0 var(--side-padding) 0;
+  margin: 0 auto var(--vertical-margin-sm);
 }
