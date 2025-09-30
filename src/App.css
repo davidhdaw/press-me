@@ -12,12 +12,14 @@
   100% { opacity: 0; }
 }
 
-.login-container{
+.login-container, .mission-container{
   display: flex;
   flex-direction: column;
   height: 100vh;
   justify-content: space-between;
 }
+
+/* LOGIN */
 
 .login-container .logo{
   background-color: var(--red);
@@ -48,11 +50,87 @@
 
 .login-container input::placeholder{
   font-style: normal;
+  color: var(--blue);
+}
+
+.login-container .helper-error{
+  margin-top: var(--vertical-margin-sm);
+  color: var(--white);
 }
 
 .login-container button{
   margin-top: var(--vertical-margin);
   background-color: var(--red);
+}
+
+
+/* MISSION */
+
+.mission-container .agent-header{
+  padding: var(--side-padding);
+  background-color: var(--black);
+}
+
+.mission-container .agent-header button{
+  background-color: transparent;
+  padding:0;
+  text-align: right;
+  font-size: 0.8em;
+  width: 100%;
+}
+
+.logout-button {
+  float: right;
+}
+
+.mission-container .agent-header p{
+  color: var(--white);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.75em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.mission-container .team-red{
+  color: var(--red);
+}
+
+.mission-container .bg-red, .mission-container.bg-red{
+  background-color: var(--red);
+}
+
+.mission-container .team-blue{
+  color: var(--blue);
+}
+
+.mission-container .bg-blue, .mission-container.bg-blue{
+  background-color: var(--blue);
+}
+
+.mission-container .agent-intro{
+  background-color: var(--white);
+  padding: var(--side-padding-sm);
+  margin: 0px auto;
+  text-align: center;
+  display: inline-block;
+  position: relative;
+  transform: skewY(-10deg) translateY(-40px);
+}
+
+.mission-container .agent-intro p{
+  text-transform: uppercase;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.33rem;
+  letter-spacing: 1px;
+}
+
+.mission-container .agent-intro *{
+  margin:0;
+}
+
+.mission-content{
+  padding: var(--side-padding);
 }
 
 .missions-grid {
@@ -140,6 +218,7 @@
     display: flex;
     gap: 4px;
     text-transform: uppercase;
+    justify-content: center;
   }
 
   .rotate span:nth-child(even){

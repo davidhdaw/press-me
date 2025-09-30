@@ -134,16 +134,16 @@ function Login({ onLogin }) {
               autoComplete="current-password"
               required
             />
+              {showUnauthorizedMessage && (
+                <div className="helper-error">
+                  That ain't it, chief.
+                </div>
+              )}
           </div>
           <button type="submit" className="login-button">
             Let the games begin!
           </button>
         </form>
-        {showUnauthorizedMessage && (
-          <div>
-            That ain't it, chief.
-          </div>
-        )}
     </div>
   )
 }

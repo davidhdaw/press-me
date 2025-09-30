@@ -2,10 +2,13 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { addBounce } from './helpers.js'
 
-function Mission({ agentName, onLogout }) {
+function Mission({ alias1, alias2, realName, team, onLogout }) {
   const [showMissionAccepted, setShowMissionAccepted] = useState(false)
   const navigate = useNavigate()
-  const effectRef = useRef(null)
+  const effectRef1 = useRef(null)
+  const effectRef2 = useRef(null)
+  const teamColor = "team-"+{team}.team
+  const bgColor = "bg-"+{team}.team
   
   const handleMissionAccept = () => {
     setShowMissionAccepted(true)
@@ -21,8 +24,11 @@ function Mission({ agentName, onLogout }) {
 
   // Apply addBounce effect when component mounts
   useEffect(() => {
-    if (effectRef.current) {
-      addBounce(effectRef.current)
+    if (effectRef1.current) {
+      addBounce(effectRef1.current)
+    }
+    if (effectRef2.current) {
+      addBounce(effectRef2.current)
     }
   }, [])
 
@@ -45,7 +51,7 @@ function Mission({ agentName, onLogout }) {
           </div>
           
           <div className="mission-content">
-            <h2>AGENT {agentName}</h2>
+            <h2>AGENT {alias1} {alias2}</h2>
             <div>
               <p>
                 MISSION STATUS: ACTIVE
@@ -75,37 +81,43 @@ function Mission({ agentName, onLogout }) {
   }
 
   return (
-    <div className="mission-container">
-      <div className="mission-card">
-        <div>
-          <h1>MISSION BRIEFING</h1>
-          <button 
+    <div className={"mission-container " + (bgColor)}>
+        <div className="agent-header">
+        <button 
             onClick={handleLogout}
             className="logout-button"
           >
             LOGOUT
-          </button>
+        </button>
+        <p>Welcome to the <span className={teamColor}>{team} team</span>, <span className={bgColor}>{realName}</span>... or should I say</p>>
         </div>
-        
-        <div className="mission-content" >
-          <h2 ref={effectRef} className="rotate">Agent {agentName}</h2>
-          <div>
-            <p>You are about to be shown classified team assignment information that you will <strong>NEVER</strong> be shown again.</p>
-            <ul>
-              <li>This information will be displayed for exactly <strong>20 seconds</strong></li>
-              <li>Once the timer expires, all traces will be permanently erased</li>
-              <li>Memorize everything you see - there are no second chances</li>
-            </ul>
+
+        <div className="agent-intro">
+            <p>Special Agent</p>
+            <h1 ref={effectRef1} className="rotate">{alias1}</h1>
+            <h1 ref={effectRef2} className="rotate">{alias2}</h1>
           </div>
-        </div>
-        
-        <button 
+
+        <div className="mission-content">
+
+          <div className="mission-objectives">
+            <p>Your objectives are as follows:</p>
+            <ul>
+              <li>Complete missions.</li>
+              <li>Make new friends.</li>
+              <li>Do not get caught.</li>
+              <li>Ask the hosts if you need any help.</li>
+              <li>Do not get caught.</li>
+            </ul>
+            <button 
           className="mission-button"
           onClick={handleMissionAccept}
         >
-          DISPLAY CLASSIFIED INFORMATION
+          This message will self destruct in 3 seconds.
         </button>
-      </div>
+          </div>
+        </div>
+        
     </div>
   )
 }

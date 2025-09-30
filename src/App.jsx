@@ -49,7 +49,10 @@ function App() {
           element={
             isLoggedIn ? (
               <Mission 
-                agentName={currentUser?.codename} 
+                alias1={currentUser?.alias_1} 
+                alias2={currentUser?.alias_2}
+                realName={currentUser?.firstname}
+                team={currentUser?.team}
                 onLogout={handleLogout}
               />
             ) : (
