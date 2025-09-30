@@ -126,26 +126,26 @@ function Dashboard({ agentName, agentId, onLogout }) {
         <div className="dashboard-header">
           <div className="dashboard-tabs">
             <button 
-              className={`tab-button ${activeTab === 'agent' ? 'active' : ''}`}
+              className={`tab-button tab-agent ${activeTab === 'agent' ? 'active' : ''}`}
               onClick={() => setActiveTab('agent')}
             >
               AGENT
             </button>
             <button 
-              className={`tab-button ${activeTab === 'missions' ? 'active' : ''}`}
+              className={`tab-button tab-missions ${activeTab === 'missions' ? 'active' : ''}`}
               onClick={() => setActiveTab('missions')}
             >
               MISSIONS
             </button>
             <button 
-              className={`tab-button ${activeTab === 'intel' ? 'active' : ''}`}
+              className={`tab-button tab-intel ${activeTab === 'intel' ? 'active' : ''}`}
               onClick={() => setActiveTab('intel')}
             >
               INTEL
             </button>
           </div>
         </div>
-        <div className="dashboard-content">
+        <div className={`dashboard-content dashboard-content-${activeTab}`}>
           <div className="tab-content">
             <div className="loading-spinner">
               <div className="spinner"></div>
@@ -163,26 +163,26 @@ function Dashboard({ agentName, agentId, onLogout }) {
         <div className="dashboard-header">
           <div className="dashboard-tabs">
             <button 
-              className={`tab-button ${activeTab === 'agent' ? 'active' : ''}`}
+              className={`tab-button tab-agent ${activeTab === 'agent' ? 'active' : ''}`}
               onClick={() => setActiveTab('agent')}
             >
               AGENT
             </button>
             <button 
-              className={`tab-button ${activeTab === 'missions' ? 'active' : ''}`}
+              className={`tab-button tab-missions ${activeTab === 'missions' ? 'active' : ''}`}
               onClick={() => setActiveTab('missions')}
             >
               MISSIONS
             </button>
             <button 
-              className={`tab-button ${activeTab === 'intel' ? 'active' : ''}`}
+              className={`tab-button tab-intel ${activeTab === 'intel' ? 'active' : ''}`}
               onClick={() => setActiveTab('intel')}
             >
               INTEL
             </button>
           </div>
         </div>
-        <div className="dashboard-content">
+        <div className={`dashboard-content dashboard-content-${activeTab}`}>
           <div className="tab-content">
             <h1>ERROR</h1>
             <p style={{ color: '#e74c3c' }}>{error}</p>
@@ -202,19 +202,19 @@ function Dashboard({ agentName, agentId, onLogout }) {
       <div className="dashboard-header">
         <div className="dashboard-tabs">
           <button 
-            className={`tab-button ${activeTab === 'agent' ? 'active' : ''}`}
+            className={`tab-button tab-agent ${activeTab === 'agent' ? 'active' : ''}`}
             onClick={() => setActiveTab('agent')}
           >
             AGENT
           </button>
           <button 
-            className={`tab-button ${activeTab === 'missions' ? 'active' : ''}`}
+            className={`tab-button tab-missions ${activeTab === 'missions' ? 'active' : ''}`}
             onClick={() => setActiveTab('missions')}
           >
             MISSIONS
           </button>
           <button 
-            className={`tab-button ${activeTab === 'intel' ? 'active' : ''}`}
+            className={`tab-button tab-intel ${activeTab === 'intel' ? 'active' : ''}`}
             onClick={() => setActiveTab('intel')}
           >
             INTEL
@@ -222,7 +222,7 @@ function Dashboard({ agentName, agentId, onLogout }) {
         </div>
       </div>
 
-      <div className="dashboard-content">
+      <div className={`dashboard-content dashboard-content-${activeTab}`}>
         {activeTab === 'agent' && (
           <div className="tab-content">
             <h2>Agent Information</h2>

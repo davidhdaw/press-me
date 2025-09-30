@@ -269,6 +269,8 @@
   z-index: 1000;
   box-sizing: border-box;
   overflow-x: hidden;
+  padding-top: var(--side-padding-sm);
+  background-color: var(--black);
 }
 
 .dashboard-tabs {
@@ -281,88 +283,70 @@
 }
 
 .tab-button {
-  background-color: transparent;
-  color: var(--black);
   border: none;
+  border-radius: 8px 8px 0px 0px;
   padding: var(--side-padding-sm) 0;
-  font-weight: 600;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 1px;
   cursor: pointer;
   transition: all 0.3s ease;
-  border-bottom: 3px solid transparent;
   box-sizing: border-box;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
   min-width: 0;
+  border-left: 2px solid var(--black);
+  border-right: 2px solid var(--black);
+  border-top: 2px solid var(--black);
 }
 
-.tab-button:hover {
-  background-color: var(--blue);
+.tab-button.tab-agent{
+  color: var(--black);
+  background-color: var(--yellow);
+  border-left: 4px solid var(--black);
+}
+
+.tab-button.tab-missions{
   color: var(--white);
-}
-
-.tab-button.active {
-  background-color: var(--blue);
-  color: var(--white);
-  border-bottom-color: var(--red);
-}
-
-.tab-actions {
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 2px solid var(--blue);
-  text-align: center;
-}
-
-.tab-actions .logout-button {
   background-color: var(--red);
+}
+
+.tab-button.tab-intel{
   color: var(--white);
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.tab-actions .logout-button:hover {
-  background-color: #c0392b;
-}
-
-.tab-actions .refresh-button {
   background-color: var(--blue);
-  color: var(--white);
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.tab-actions .refresh-button:hover {
-  background-color: var(--red);
+  border-right: 4px solid var(--black);
 }
 
 .dashboard-content {
-  margin-top: 80px; /* Account for fixed header height */
-  background-color: var(--black);
-  min-height: calc(100vh - 80px);
+  margin-top: 58px; /* Account for fixed header height */
+  min-height: calc(100vh - 58px);
   overflow-y: auto;
-}
-
-.tab-content {
-  margin: 0 auto;
-  border-radius: 12px;
+  border-left: 4px solid var(--black);
+  border-right: 4px solid var(--black);
+  border-bottom: 4px solid var(--black);
   box-sizing: border-box;
 }
+
+.dashboard-content.dashboard-content-agent{
+  background-color: var(--yellow);
+}
+
+.dashboard-content.dashboard-content-missions{
+  background-color: var(--red);
+}
+
+.dashboard-content.dashboard-content-intel{
+  background-color: var(--blue);
+}
+.tab-content {
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
 
 .tab-content h2 {
   color: var(--black);
@@ -434,16 +418,10 @@
   color: var(--white);
 }
 
-.mission-body {
-}
-
 .mission-body p {
   color: var(--black);
   line-height: 1.6;
   margin: 0;
-}
-
-.mission-footer {
 }
 
 .mission-completion {
@@ -510,5 +488,46 @@
 }
 
 .retry-button:hover {
+  background-color: var(--red);
+}
+
+.tab-actions {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid var(--blue);
+  text-align: center;
+}
+
+.tab-actions .logout-button {
+  background-color: var(--red);
+  color: var(--white);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.tab-actions .logout-button:hover {
+  background-color: #c0392b;
+}
+
+.tab-actions .refresh-button {
+  background-color: var(--blue);
+  color: var(--white);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.tab-actions .refresh-button:hover {
   background-color: var(--red);
 }
