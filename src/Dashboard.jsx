@@ -6,10 +6,12 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [error, setError] = useState(null)
   const [timeLeft, setTimeLeft] = useState('Calculating...')
   const [successKeys, setSuccessKeys] = useState({})
+  const [agentNameVisible, setAgentNameVisible] = useState(false)
+  const [realNameVisible, setRealNameVisible] = useState(false)
+  const [teamVisible, setTeamVisible] = useState(false)
   const [completedMissions, setCompletedMissions] = useState(new Set())
   const [activeTab, setActiveTab] = useState('missions')
 
-  console.log(firstName, lastName, team);
   useEffect(() => {
     fetchRandomMissions()
   }, [])
@@ -226,9 +228,67 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       <div className={`dashboard-content dashboard-content-${activeTab}`}>
         {activeTab === 'agent' && (
           <div className="tab-content">
-            <p>Agent Name: {agentName}</p>
-            <p>Real Name: {firstName} {lastName}</p>
-            <p>Team: {team}</p>
+            <div className="agent-card">
+              <h3>Classified</h3>
+              <h4>Reveal to trusted associates only</h4>
+              
+              <div className="field-group">
+                <div className="field-label">Agent</div>
+                <div className="field-row">
+                  <span className={agentNameVisible ? 'visible' : 'hidden'}>{agentName}</span>
+                  <button onClick={() => setAgentNameVisible(!agentNameVisible)} className="toggle-button">
+                    {agentNameVisible ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="currentColor"/>
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z" fill="currentColor"/>
+                      </svg>
+                    )}
+                    <span className="button-text">{agentNameVisible ? 'hide' : 'reveal'}</span>
+                    </button>
+                </div>
+              </div>
+              
+              <div className="field-group">
+                <div className="field-label">AKA</div>
+                <div className="field-row">
+                  <span className={realNameVisible ? 'visible' : 'hidden'}>{firstName} {lastName}</span>
+                  <button onClick={() => setRealNameVisible(!realNameVisible)} className="toggle-button">
+                    {realNameVisible ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="currentColor"/>
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z" fill="currentColor"/>
+                      </svg>
+                    )}
+                    <span className="button-text">{realNameVisible ? 'hide' : 'reveal'}</span>
+                    </button>
+                </div>
+              </div>
+              
+              <div className="field-group">
+                <div className="field-label">Team</div>
+                <div className="field-row">
+                  <span className={`team-${team} ${teamVisible ? 'visible' : 'hidden'}`}>{team} team</span>
+                  <button onClick={() => setTeamVisible(!teamVisible)} className="toggle-button">
+                    {teamVisible ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="currentColor"/>
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z" fill="currentColor"/>
+                      </svg>
+                    )}
+                    <span className="button-text">{teamVisible ? 'hide' : 'reveal'}</span>
+                    </button>
+                </div>
+              </div>
+            </div>
             <div className="tab-actions">
               <button onClick={handleLogout} className="logout-button">
                 LOGOUT

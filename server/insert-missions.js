@@ -263,7 +263,7 @@ async function insertMissions() {
       {
         id: 21,
         title: 'Subterfuge',
-        mission_body: 'Make up a cover story and tell someone. Enter your fake name below.',
+        mission_body: 'Make up a cover story and tell someone. Scout\'s honor.',
         completed: false,
         assigned_agent: null,
         past_assigned_agents: [],

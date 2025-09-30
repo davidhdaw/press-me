@@ -9,8 +9,7 @@
   --brown: #C3B482;  
   --black: #2E2824;
   
-  --side-padding: 20px;
-  --side-padding-sm: 10px;
-  --vertical-margin: 20px;
-  --vertical-margin-sm: 10px;
+  --unit-base: 20px;
+  --unit-sm: 10px;
+  --unit-xs: 5px;
 }

@@ -23,7 +23,7 @@
 
 .login-container .logo{
   background-color: var(--red);
-  padding: var(--side-padding);
+  padding: var(--unit-base);
   box-sizing: border-box;
 }
 
@@ -37,7 +37,7 @@
   flex-direction: column;
   text-align: left;
   position: relative;
-  padding: var(--side-padding);
+  padding: var(--unit-base);
 }
 
 .login-container .form-group label {
@@ -55,12 +55,12 @@
 }
 
 .login-container .helper-error{
-  margin-top: var(--vertical-margin-sm);
+  margin-top: var(--unit-sm);
   color: var(--white);
 }
 
 .login-container button{
-  margin-top: var(--vertical-margin);
+  margin-top: var(--unit-base);
   background-color: var(--red);
 }
 
@@ -68,7 +68,7 @@
 /* MISSION */
 
 .mission-container .agent-header{
-  padding: var(--side-padding);
+  padding: var(--unit-base);
   background-color: var(--black);
 }
 
@@ -111,8 +111,8 @@
 
 .mission-container .agent-intro{
   background-color: var(--white);
-  padding: var(--side-padding-sm);
-  margin: 0px auto;
+  padding: var(--unit-sm);
+  margin: 0 auto;
   text-align: center;
   display: inline-block;
   position: relative;
@@ -131,7 +131,7 @@
 }
 
 .mission-content{
-  padding: var(--side-padding);
+  padding: var(--unit-base);
 }
 
 .mission-objectives p {
@@ -144,7 +144,7 @@
 }
 
 .mission-objectives ul {
-  margin: var(--vertical-margin-sm) 0;
+  margin: var(--unit-sm) 0;
   font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
   font-size: 1.25rem;
   text-transform: uppercase;
@@ -197,7 +197,7 @@
 
 .status-badge {
   padding: 0.25rem 0.75rem;
-  border-radius: 12px;
+  border-radius: var(--unit-sm);
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -269,7 +269,7 @@
   z-index: 1000;
   box-sizing: border-box;
   overflow-x: hidden;
-  padding-top: var(--side-padding-sm);
+  padding-top: var(--unit-sm);
   background-color: var(--black);
 }
 
@@ -285,7 +285,7 @@
 .tab-button {
   border: none;
   border-radius: 8px 8px 0px 0px;
-  padding: var(--side-padding-sm) 0;
+  padding: var(--unit-sm) 0;
   font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
   font-size: 1.25rem;
   font-weight: 500;
@@ -351,8 +351,8 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  padding: var(--side-padding);
-  margin-bottom: var(--vertical-margin);
+  padding: var(--unit-base);
+  margin-bottom: var(--unit-base);
 }
 
 .mission-card {
@@ -360,7 +360,7 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   width: 100%;
   box-sizing: border-box;
-  padding: var(--side-padding-sm);
+  padding: var(--unit-sm);
 }
 
 .mission-card:nth-child(even){
@@ -413,7 +413,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: var(--vertical-margin-sm);
+  margin-bottom: var(--unit-sm);
 }
 
 .mission-header h3 {
@@ -429,7 +429,7 @@
   text-transform: uppercase;
   font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.2;
-  margin: 0 0 var(--vertical-margin-sm) 0;
+  margin: 0 0 var(--unit-sm) 0;
 }
 
 .status-badge {
@@ -475,7 +475,7 @@
   flex: 1;
   border-radius: 4px;
   font-size: 0.9em;
-  padding: var(--side-padding-sm);
+  padding: var(--unit-sm);
 }
 
 .success-key-field::placeholder {
@@ -509,6 +509,94 @@
   background-color: var(--red);
   color: var(--white);
   display: block;
-  padding: 0 0 var(--side-padding) 0;
-  margin: 0 auto var(--vertical-margin-sm);
+  padding: 0 0 var(--unit-base) 0;
+  margin: 0 auto var(--unit-sm);
+}
+
+.agent-card {
+  background-color: var(--black);
+  color: var(--white);
+  margin: var(--unit-base);
+  padding: var(--unit-sm);
+  transform: rotate(-1deg);
+}
+
+.agent-card h3 {
+  margin: var(--unit-xs) 0;
+  font-size: 1.5em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.agent-card h4 {
+  margin: 0 0 var(--unit-xs) 0;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.agent-card span {
+  margin-right: var(--unit-xs);
+  font-size: 1.25em;
+  padding: 0 var(--unit-xs);
+}
+
+
+.field-group {
+  margin-bottom: var(--unit-sm);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.2em;
+  text-transform: uppercase;
+}
+
+.field-label {
+  text-transform: uppercase;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--unit-sm);
+}
+
+.agent-card span.hidden {
+  color: transparent;
+  background-color: var(--white);
+  transition: all 0.2s;
+  border: 1px solid var(--white);
+}
+
+.agent-card span.visible {
+  color: var(--white);
+  background-color: var(--black);
+  transition: all 0.2s;
+  border: 1px solid var(--green);
+}
+
+.agent-card span.visible.team-red {
+  background-color: var(--red);
+  border: 1px solid var(--red);
+}
+
+.agent-card span.visible.team-blue {
+  background-color: var(--blue);
+  border: 1px solid var(--blue);
+}
+
+
+.toggle-button {
+  background-color: var(--black);
+  color: var(--green);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-transform: uppercase;
+  font-size: 0.9em;
+  padding: var(--unit-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--unit-xs);
+}
+
+.toggle-button .button-text {
+  font-size: 0.8em;
 }
