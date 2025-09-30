@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 
-function Dashboard({ agentName, agentId, onLogout }) {
+function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) {
   const [missions, setMissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -9,6 +9,7 @@ function Dashboard({ agentName, agentId, onLogout }) {
   const [completedMissions, setCompletedMissions] = useState(new Set())
   const [activeTab, setActiveTab] = useState('missions')
 
+  console.log(firstName, lastName, team);
   useEffect(() => {
     fetchRandomMissions()
   }, [])
@@ -225,11 +226,9 @@ function Dashboard({ agentName, agentId, onLogout }) {
       <div className={`dashboard-content dashboard-content-${activeTab}`}>
         {activeTab === 'agent' && (
           <div className="tab-content">
-            <h2>Agent Information</h2>
             <p>Agent Name: {agentName}</p>
-            <p>Agent ID: {agentId}</p>
-            <p>Mission Timer: {timeLeft}</p>
-            <p>This is placeholder content for the Agent tab.</p>
+            <p>Real Name: {firstName} {lastName}</p>
+            <p>Team: {team}</p>
             <div className="tab-actions">
               <button onClick={handleLogout} className="logout-button">
                 LOGOUT

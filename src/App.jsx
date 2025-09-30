@@ -67,6 +67,9 @@ function App() {
               <Dashboard 
                 agentName={currentUser?.codename}
                 agentId={currentUser?.id}
+                firstName={currentUser?.firstname}
+                lastName={currentUser?.lastname}
+                team={currentUser?.team}
                 onLogout={handleLogout}
               />
             ) : (
