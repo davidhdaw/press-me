@@ -166,19 +166,19 @@ function Dashboard({ agentName, agentId, onLogout }) {
               className={`tab-button tab-agent ${activeTab === 'agent' ? 'active' : ''}`}
               onClick={() => setActiveTab('agent')}
             >
-              AGENT
+              Agent
             </button>
             <button 
               className={`tab-button tab-missions ${activeTab === 'missions' ? 'active' : ''}`}
               onClick={() => setActiveTab('missions')}
             >
-              MISSIONS
+              Missions
             </button>
             <button 
               className={`tab-button tab-intel ${activeTab === 'intel' ? 'active' : ''}`}
               onClick={() => setActiveTab('intel')}
             >
-              INTEL
+              Intel
             </button>
           </div>
         </div>
@@ -250,11 +250,8 @@ function Dashboard({ agentName, agentId, onLogout }) {
                     </span>
                   </div>
                   
-                  <div className="mission-body">
                     <p>{mission.mission_body}</p>
-                  </div>
                   
-                  <div className="mission-footer">
                     {!completedMissions.has(mission.id) && (
                       <div className="mission-completion">
                         <div className="success-key-input">
@@ -275,7 +272,6 @@ function Dashboard({ agentName, agentId, onLogout }) {
                         </div>
                       </div>
                     )}
-                  </div>
                 </div>
               ))}
             </div>
