@@ -67,11 +67,18 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+.button-min {
+  background-color: transparent;
+  color: var(--black);
+  display: block;
+  padding: 0 0 var(--unit-base) 0;
+  margin: 0 auto var(--unit-sm);
+}
 
 /* Base Input Styles */
-input {
+input, textarea {
   font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  padding: 0.75rem 1rem;
+  padding: var(--unit-sm);
   background: var(--white);
   border: transparent;
   border-radius: 4px;
@@ -83,16 +90,16 @@ input {
   box-sizing: border-box;
 }
 
-input:focus {
+input:focus, textarea:focus {
   outline: none;
 }
 
-input::placeholder {
-  color: var(--black);
-  font-style: italic;
+input::placeholder, textarea::placeholder {
+  color: var(--green);
+  font-style: normal;
 }
 
-input:disabled {
+input:disabled, textarea:disabled {
   background: var(--brown);
   color: var(--black);
   cursor: not-allowed;

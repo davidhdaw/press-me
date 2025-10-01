@@ -3,7 +3,7 @@
   /* Primary Colors */
   --blue: #5A7CA7;
   --red: #E96C55;
-  --green: #9FBD71;
+  --green: #95AF6E;
   --yellow: #EECD45;  
   --white: #F5E7CB;
   --brown: #C3B482;  
@@ -11,6 +11,7 @@
   --black-transparent: rgba(46, 40, 36, 0.9);
   
   --unit-base: 20px;
+  --unit-lg: 30px;
   --unit-sm: 10px;
   --unit-xs: 5px;
 }

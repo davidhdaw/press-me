@@ -15,7 +15,12 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   // New state for relationship and alibi
   const [relationship, setRelationship] = useState('')
   const [alibi, setAlibi] = useState('')
-
+  
+  // Modal state
+  const [showModal, setShowModal] = useState(false)
+  const [modalRelationship, setModalRelationship] = useState('')
+  const [modalAlibi, setModalAlibi] = useState('')
+ 
   // Data arrays for relationships and alibis
   const relationships = [
     'a long lost childhood friend of the host',
@@ -49,6 +54,31 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     const randomAlibi = alibis[Math.floor(Math.random() * alibis.length)]
     setRelationship(randomRelationship)
     setAlibi(randomAlibi)
+  }
+
+  // Modal functions
+  const openModal = () => {
+    setModalRelationship(relationship)
+    setModalAlibi(alibi)
+    setShowModal(true)
+  }
+
+  const closeModal = () => {
+    setShowModal(false)
+  }
+
+  const saveModal = () => {
+    setRelationship(modalRelationship)
+    setAlibi(modalAlibi)
+    setShowModal(false)
+  }
+
+  const clearRelationship = () => {
+    setModalRelationship('')
+  }
+
+  const clearAlibi = () => {
+    setModalAlibi('')
   }
 
   useEffect(() => {
@@ -332,11 +362,16 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
             <div className="backstory-card">
               <h3>Cover story</h3>
               <p>You are {firstName} {lastName}, <span className="relationship">{relationship}</span>. You are here tonight because <span className="alibi">{alibi}</span>.</p>
-              <button onClick={getRandomBackstory} className="reroll-button">
-                Reroll
-              </button>
+              <div className="backstory-buttons">
+                <button onClick={getRandomBackstory} className="reroll-button">
+                  Reroll
+                </button>
+                <button onClick={openModal} className="write-your-own-button">
+                  Write your own
+                </button>
+              </div>
             </div>
-            <button onClick={handleLogout} className="logout-button">
+            <button onClick={handleLogout} className="logout-button button-min">
                 LOGOUT
               </button>
           </div>
@@ -381,7 +416,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                 </div>
               ))}
             </div>
-              <button onClick={fetchRandomMissions} className="refresh-button">
+              <button onClick={fetchRandomMissions} className="refresh-button button-min">
                 Refresh missions
               </button>
           </div>
@@ -395,6 +430,62 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
           </div>
         )}
       </div>
+
+      {/* Modal */}
+        {showModal && (
+          <div className="modal">
+            <div className="modal-header">
+              <button onClick={closeModal} className="close-button">
+                ×
+              </button>
+            </div>
+            
+            <div className="modal-content">
+              <h2>Write Your Own!</h2>
+              
+              <div className="field-group">
+                <label htmlFor="relationship-field">Relationship</label>
+                <div className="input-with-clear">
+                  <textarea
+                    id="relationship-field"
+                    type="text"
+                    value={modalRelationship}
+                    onChange={(e) => setModalRelationship(e.target.value)}
+                    placeholder="Enter your relationship to the host..."
+                  />
+                  <button onClick={clearRelationship} className="clear-button">
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="alibi-field">Alibi</label>
+                <div className="input-with-clear">
+                  <textarea
+                    id="alibi-field"
+                    type="text"
+                    value={modalAlibi}
+                    onChange={(e) => setModalAlibi(e.target.value)}
+                    placeholder="Enter your reason for being here..."
+                  />
+                  <button onClick={clearAlibi} className="clear-button">
+                    ×
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button onClick={closeModal} className="cancel-button">
+                Cancel
+              </button>
+              <button onClick={saveModal} className="save-button">
+                Save
+              </button>
+            </div>
+          </div>
+      )}
     </div>
   )
 }

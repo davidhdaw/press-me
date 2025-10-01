@@ -80,10 +80,6 @@
   width: 100%;
 }
 
-.logout-button {
-  float: right;
-}
-
 .mission-container .agent-header p{
   color: var(--white);
   font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -373,7 +369,7 @@
   box-shadow: 5px 5px 0px 0 var(--black);
 }
 
-.mission-card:nth-child(3n) h3{
+.mission-card:nth-child(3n) h3, .mission-card:nth-child(3n) .success-key-field::placeholder{
   color: var(--red);
 }
 
@@ -381,7 +377,7 @@
   border: 2px solid var(--red);
 }
 
-.mission-card:nth-child(3n+1) h3{
+.mission-card:nth-child(3n+1) h3, .mission-card:nth-child(3n+1) .success-key-field::placeholder{
   color: var(--blue);
 }
 
@@ -389,7 +385,7 @@
   border: 2px solid var(--blue);
 }
 
-.mission-card:nth-child(3n+2) h3{
+.mission-card:nth-child(3n+2) h3, .mission-card:nth-child(3n+2) .success-key-field::placeholder{
   color: var(--green);
 }
 
@@ -476,6 +472,7 @@
   border-radius: 4px;
   font-size: 0.9em;
   padding: var(--unit-sm);
+  font-weight: 500;
 }
 
 .success-key-field::placeholder {
@@ -505,13 +502,6 @@
   background-color: var(--red);
 }
 
-.refresh-button {
-  background-color: var(--red);
-  color: var(--white);
-  display: block;
-  padding: 0 0 var(--unit-base) 0;
-  margin: 0 auto var(--unit-sm);
-}
 
 /* AGENT TAB */
 .agent-card {
@@ -626,10 +616,83 @@
   background-color: var(--green);
 }
 
-.reroll-button {
-  background-color: var(--black);
-  color: var(--white);
-  border: none;
+.backstory-buttons {
+  display: flex;
+  gap: var(--unit-xs);
+  justify-content: flex-end;
+}
+
+.backstory-buttons button {
+  background-color: var(--white);
+  color: var(--black);
+  border: 2px solid var(--black);
+  padding: var(--unit-xs) var(--unit-sm);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal{
+  position: fixed;
+  background-color: var(--white);
+  height: calc(100vh - 60px);
+  top: 60px;
+  width: 100%;
+}
+
+.modal .modal-content{
+  padding: 0 var(--unit-base);
+}
+
+.modal .close-button, .clear-button{
+  padding: var(--unit-sm);
+  color: var(--black);
+  background-color: var(--white);
+}
+
+.clear-button{
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  padding: var(--unit-xs) var(--unit-sm);
+}
+
+.modal h2{
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.modal .input-with-clear{
+  position: relative;
+}
+
+.modal .field-group label{
+  font-weight: 500;
+}
+
+.modal .field-group textarea{
+  border: 2px solid var(--black);
+  padding-right: var(--unit-lg);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--unit-sm);
+  padding: 0 var(--unit-base);
+}
+
+.modal-footer button {
+  background-color: var(--white);
+  color: var(--black);
+  border: 2px solid var(--black);
   padding: var(--unit-xs) var(--unit-sm);
   margin-top: var(--unit-xs);
   font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -637,11 +700,4 @@
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s;
-  border: 2px solid var(--black);
-}
-
-.reroll-button:hover {
-  background-color: var(--green);
-  border-color: var(--green);
-  color: var(--black);
 }
