@@ -11,9 +11,49 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [teamVisible, setTeamVisible] = useState(false)
   const [completedMissions, setCompletedMissions] = useState(new Set())
   const [activeTab, setActiveTab] = useState('missions')
+  
+  // New state for relationship and alibi
+  const [relationship, setRelationship] = useState('')
+  const [alibi, setAlibi] = useState('')
+
+  // Data arrays for relationships and alibis
+  const relationships = [
+    'a long lost childhood friend of the host',
+    'a former business partner of the host',
+    'the host\'s estranged sibling',
+    'a college roommate of the host',
+    'the host\'s ex-spouse',
+    'a former colleague from the host\'s previous job',
+    'the host\'s neighbor from their old apartment',
+    'a member of the host\'s book club',
+    'the host\'s personal trainer',
+    'a friend from the host\'s hiking group'
+  ]
+
+  const alibis = [
+    'the host owes you money',
+    'you\'re here to collect on a bet you won',
+    'you\'re delivering a package for a mutual friend',
+    'you\'re here to discuss a business opportunity',
+    'you\'re attending as the host\'s plus-one',
+    'you\'re here to pick up something you left behind',
+    'you\'re delivering a message from a mutual acquaintance',
+    'you\'re here to finalize plans for an upcoming trip',
+    'you\'re attending as a favor to the host',
+    'you\'re here to discuss a shared investment'
+  ]
+
+  // Function to get random relationship and alibi
+  const getRandomBackstory = () => {
+    const randomRelationship = relationships[Math.floor(Math.random() * relationships.length)]
+    const randomAlibi = alibis[Math.floor(Math.random() * alibis.length)]
+    setRelationship(randomRelationship)
+    setAlibi(randomAlibi)
+  }
 
   useEffect(() => {
     fetchRandomMissions()
+    getRandomBackstory() // Initialize with random backstory
   }, [])
 
   // Countdown timer effect
@@ -289,11 +329,16 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                 </div>
               </div>
             </div>
-            <div className="tab-actions">
-              <button onClick={handleLogout} className="logout-button">
-                LOGOUT
+            <div className="backstory-card">
+              <h3>Cover story</h3>
+              <p>You are {firstName} {lastName}, <span className="relationship">{relationship}</span>. You are here tonight because <span className="alibi">{alibi}</span>.</p>
+              <button onClick={getRandomBackstory} className="reroll-button">
+                Reroll
               </button>
             </div>
+            <button onClick={handleLogout} className="logout-button">
+                LOGOUT
+              </button>
           </div>
         )}
 

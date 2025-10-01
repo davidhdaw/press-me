@@ -8,6 +8,7 @@
   --white: #F5E7CB;
   --brown: #C3B482;  
   --black: #2E2824;
+  --black-transparent: rgba(46, 40, 36, 0.9);
   
   --unit-base: 20px;
   --unit-sm: 10px;
