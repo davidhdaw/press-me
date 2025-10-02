@@ -11,6 +11,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [teamVisible, setTeamVisible] = useState(false)
   const [completedMissions, setCompletedMissions] = useState(new Set())
   const [activeTab, setActiveTab] = useState('missions')
+  const [missionErrors, setMissionErrors] = useState({})
   
   // New state for relationship and alibi
   const [relationship, setRelationship] = useState('')
@@ -135,6 +136,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
         // Clear completed missions state when refreshing
         setCompletedMissions(new Set())
         setSuccessKeys({})
+         // Clear any existing errors when refreshing
+         setMissionErrors({})
       } else {
         setError('Failed to fetch missions')
       }
@@ -155,11 +158,18 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       ...prev,
       [missionId]: value
     }))
+    // Clear error when user starts typing
+    if (missionErrors[missionId]) {
+      setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
+    }
   }
 
   const handleSubmitMission = async (missionId) => {
     const successKey = successKeys[missionId]
     if (!successKey) return
+
+    // Clear any existing error for this mission
+    setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
 
     try {
       const response = await fetch(`http://localhost:3001/api/missions/${missionId}/complete`, {
@@ -181,14 +191,15 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
           delete newKeys[missionId]
           return newKeys
         })
+        setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
         // Mission stays visible with completed status - no automatic refresh
       } else {
         const errorData = await response.json()
-        alert(errorData.error || 'Incorrect success key!')
+        setMissionErrors(prev => ({ ...prev, [missionId]: errorData.error || 'Incorrect success key!' }))
       }
     } catch (error) {
       console.error('Error completing mission:', error)
-      alert('Error completing mission')
+      setMissionErrors(prev => ({ ...prev, [missionId]: 'Failed to complete mission. Please try again.' }))
     }
   }
 
@@ -220,9 +231,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
         </div>
         <div className={`dashboard-content dashboard-content-${activeTab}`}>
           <div className="tab-content">
-            <div className="loading-spinner">
-              <div className="spinner"></div>
-              <p>LOADING MISSION DATA...</p>
+          <div className="loading-spinner">
+            <div className="spinner"></div>
+            <p>LOADING MISSION DATA...</p>
             </div>
           </div>
         </div>
@@ -257,12 +268,12 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
         </div>
         <div className={`dashboard-content dashboard-content-${activeTab}`}>
           <div className="tab-content">
-            <h1>ERROR</h1>
-            <p style={{ color: '#e74c3c' }}>{error}</p>
+          <h1>ERROR</h1>
+          <p style={{ color: '#e74c3c' }}>{error}</p>
             <div className="tab-actions">
-              <button onClick={fetchRandomMissions} className="retry-button">
-                RETRY
-              </button>
+          <button onClick={fetchRandomMissions} className="retry-button">
+            RETRY
+          </button>
             </div>
           </div>
         </div>
@@ -272,7 +283,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
 
   return (
     <div className="dashboard-container">
-      <div className="dashboard-header">
+        <div className="dashboard-header">
         <div className="dashboard-tabs">
           <button 
             className={`tab-button tab-agent ${activeTab === 'agent' ? 'active' : ''}`}
@@ -293,7 +304,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
             INTEL
           </button>
         </div>
-      </div>
+        </div>
 
       <div className={`dashboard-content dashboard-content-${activeTab}`}>
         {activeTab === 'agent' && (
@@ -383,24 +394,21 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
               {missions.map((mission, index) => (
                 <div key={mission.id} className="mission-card">
                   <div className="mission-header">
-                    <h3>{mission.title}</h3>
-                    <span className={`status-badge ${completedMissions.has(mission.id) ? 'completed' : 'active'}`}>
-                      {completedMissions.has(mission.id) ? 'COMPLETED' : 'ACTIVE'}
-                    </span>
+                    <h3>Operation {mission.title}</h3>
                   </div>
                   
                     <p>{mission.mission_body}</p>
                   
-                    {!completedMissions.has(mission.id) && (
-                      <div className="mission-completion">
-                        <div className="success-key-input">
-                          <input
-                            type="text"
-                            placeholder="Enter success key..."
-                            value={successKeys[mission.id] || ''}
-                            onChange={(e) => handleSuccessKeyChange(mission.id, e.target.value)}
-                            className="success-key-field"
-                          />
+                {!completedMissions.has(mission.id) && (
+                  <div className="mission-completion">
+                    <div className="success-key-input">
+                      <input
+                        type="text"
+                        placeholder="Enter success key..."
+                        value={successKeys[mission.id] || ''}
+                        onChange={(e) => handleSuccessKeyChange(mission.id, e.target.value)}
+                        className="success-key-field"
+                      />
                       <button
                         onClick={() => handleSubmitMission(mission.id)}
                         disabled={!successKeys[mission.id]}
@@ -410,10 +418,15 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                           <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"/>
                         </svg>
                       </button>
-                        </div>
+                    </div>
+                    {missionErrors[mission.id] && (
+                      <div className="mission-error">
+                        {missionErrors[mission.id]}
                       </div>
                     )}
-                </div>
+                  </div>
+                )}
+              </div>
               ))}
             </div>
               <button onClick={fetchRandomMissions} className="refresh-button button-min">
@@ -438,8 +451,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
               <button onClick={closeModal} className="close-button">
                 ×
               </button>
-            </div>
-            
+        </div>
+
             <div className="modal-content">
               <h2>Write Your Own!</h2>
               
@@ -482,9 +495,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
               </button>
               <button onClick={saveModal} className="save-button">
                 Save
-              </button>
-            </div>
-          </div>
+          </button>
+        </div>
+      </div>
       )}
     </div>
   )
