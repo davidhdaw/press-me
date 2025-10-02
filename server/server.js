@@ -154,7 +154,7 @@ app.get('/api/missions/available', async (req, res) => {
   }
 });
 
-// Refresh missions for dashboard (assigns 3 random missions with 15-minute expiration)
+// Refresh missions for dashboard (repopulates database and assigns 3 random missions)
 app.post('/api/missions/refresh', async (req, res) => {
   try {
     const { agentId } = req.body;
@@ -163,22 +163,27 @@ app.post('/api/missions/refresh', async (req, res) => {
       return res.status(400).json({ error: 'Agent ID is required' });
     }
     
-    // Reset all completed missions to available status
+    console.log('Refreshing missions for agent:', agentId);
+    
+    // First, repopulate the database by resetting ALL missions to available status
     await pool.query(`
       UPDATE missions 
-      SET completed = false, assigned_now = false, assigned_agent = null, past_assigned_agents = array[]::integer[]
-      WHERE completed = true
+      SET completed = false, assigned_now = false, assigned_agent = null, 
+          past_assigned_agents = array[]::integer[], mission_expires = null
     `);
+    
+    console.log('Database repopulated - all missions reset to available');
     
     // Calculate expiration time (15 minutes from now)
     const expirationTime = new Date(Date.now() + 15 * 60 * 1000);
     
-    // Get 3 random available missions
+    // Get 3 random available missions (should be all missions now)
     const availableResult = await pool.query(
       'SELECT * FROM missions WHERE assigned_now = false ORDER BY RANDOM() LIMIT 3'
     );
     
     const selectedMissions = availableResult.rows;
+    console.log(`Selected ${selectedMissions.length} missions for assignment`);
     
     // Assign each selected mission to the agent with 15-minute expiration
     const assignedMissions = [];
@@ -192,6 +197,7 @@ app.post('/api/missions/refresh', async (req, res) => {
       assignedMissions.push(result.rows[0]);
     }
     
+    console.log(`Successfully assigned ${assignedMissions.length} missions to agent ${agentId}`);
     res.json(assignedMissions);
   } catch (err) {
     console.error('Error refreshing missions:', err);

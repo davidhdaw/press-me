@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
+import './helpers.js'
 import Mission from './Mission'
 import Login from './Login'
 import Dashboard from './Dashboard'
@@ -48,7 +49,10 @@ function App() {
           element={
             isLoggedIn ? (
               <Mission 
-                agentName={currentUser?.codename} 
+                alias1={currentUser?.alias_1} 
+                alias2={currentUser?.alias_2}
+                realName={currentUser?.firstname}
+                team={currentUser?.team}
                 onLogout={handleLogout}
               />
             ) : (
@@ -63,6 +67,9 @@ function App() {
               <Dashboard 
                 agentName={currentUser?.codename}
                 agentId={currentUser?.id}
+                firstName={currentUser?.firstname}
+                lastName={currentUser?.lastname}
+                team={currentUser?.team}
                 onLogout={handleLogout}
               />
             ) : (

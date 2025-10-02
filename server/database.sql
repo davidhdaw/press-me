@@ -71,7 +71,7 @@ INSERT INTO users (id, firstname, lastname, team, ishere, alias_1, alias_2, pass
     (7, 'Jane', 'St. John', 'red', true, 'Tranquil', 'Diamond', 'The pope has a dairy allergy.'),
     (8, 'Andrew', 'Fernandez', 'blue', true, 'Ominous', 'Lizard', 'Cardboard makes me sleepy.'),
     (9, 'Brett', 'Jackson', 'red', true, 'Impossible', 'Dealer', 'The piano has been compromised.'),
-    (10, 'Richard', 'Malena', 'blue', true, 'Smooth', 'Operator', 'The thorn of the blue rose is the sharpest.'),
+    (10, 'Richard', 'Malena', 'blue', true, 'Cool', 'Operator', 'The thorn of the blue rose is the sharpest.'),
     (11, 'Amanda', 'Rodriguez', 'red', true, 'Drunken', 'Player', 'A knight is nothing without a jester.'),
     (12, 'Alex', 'Wawro', 'blue', true, 'Smooth', 'Infiltrator', 'Three birds are better than one.');
 
