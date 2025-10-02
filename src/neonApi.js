@@ -1,0 +1,324 @@
+import { neon } from '@neondatabase/serverless';
+
+// Neon database connection
+const DATABASE_URL = 'postgresql://neondb_owner:npg_3goAkB0KtVQP@ep-blue-shadow-afze8ju2-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+const sql = neon(DATABASE_URL);
+
+// Test connection on load
+console.log('Neon API: Initializing connection to', DATABASE_URL);
+sql`SELECT NOW()`.then(r => console.log('Neon API: Connected successfully', r[0])).catch(e => console.error('Neon API: Connection failed', e));
+
+// API functions that mirror your existing server endpoints
+export const neonApi = {
+  // Get all users
+  async getUsers() {
+    try {
+      const result = await sql`SELECT id, firstname, lastname, team, alias_1, alias_2, ishere FROM users ORDER BY firstname`;
+      return result;
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      throw error;
+    }
+  },
+
+  // Get random user alias
+  async getRandomUser() {
+    try {
+      const result = await sql`SELECT alias_1, alias_2 FROM users WHERE ishere = true ORDER BY RANDOM() LIMIT 1`;
+      const user = result[0];
+      if (user) {
+        return {
+          codename: `${user.alias_1} ${user.alias_2}`,
+          alias_1: user.alias_1,
+          alias_2: user.alias_2
+        };
+      } else {
+        return { codename: 'AGENT', alias_1: 'Unknown', alias_2: 'Agent' };
+      }
+    } catch (error) {
+      console.error('Error fetching random user:', error);
+      throw error;
+    }
+  },
+
+  // Get users by team
+  async getUsersByTeam(team) {
+    try {
+      const result = await sql`SELECT id, firstname, lastname, team, alias_1, alias_2 FROM users WHERE team = $1 AND ishere = true ORDER BY firstname`;
+      return result;
+    } catch (error) {
+      console.error('Error fetching users by team:', error);
+      throw error;
+    }
+  },
+
+  // Get random team member
+  async getRandomTeamMember(team) {
+    try {
+      if (!['red', 'blue'].includes(team)) {
+        throw new Error('Team must be "red" or "blue"');
+      }
+      
+      const result = await sql`SELECT firstname, lastname, alias_1, alias_2 FROM users WHERE team = $1 AND ishere = true ORDER BY RANDOM() LIMIT 1`;
+      
+      if (result.length === 0) {
+        throw new Error(`No users found for team ${team}`);
+      }
+      
+      const user = result[0];
+      return {
+        firstname: user.firstname,
+        lastname: user.lastname,
+        alias_1: user.alias_1,
+        alias_2: user.alias_2,
+        codename: `${user.alias_1} ${user.alias_2}`
+      };
+    } catch (error) {
+      console.error('Error fetching random team member:', error);
+      throw error;
+    }
+  },
+
+  // Get team points
+  async getTeamPoints(team) {
+    try {
+      const result = await sql`SELECT points FROM teams WHERE name = $1`;
+      return result[0] || { points: 0 };
+    } catch (error) {
+      console.error('Error fetching team points:', error);
+      throw error;
+    }
+  },
+
+  // Update team points
+  async updateTeamPoints(team, points) {
+    try {
+      const result = await sql`UPDATE teams SET points = $1 WHERE name = $2 RETURNING *`;
+      return result[0];
+    } catch (error) {
+      console.error('Error updating team points:', error);
+      throw error;
+    }
+  },
+
+  // Get all missions
+  async getMissions() {
+    try {
+      const result = await sql`SELECT * FROM missions ORDER BY id`;
+      return result;
+    } catch (error) {
+      console.error('Error fetching missions:', error);
+      throw error;
+    }
+  },
+
+  // Get available missions
+  async getAvailableMissions() {
+    try {
+      const result = await sql`SELECT * FROM missions WHERE assigned_now = false ORDER BY id`;
+      return result;
+    } catch (error) {
+      console.error('Error fetching available missions:', error);
+      throw error;
+    }
+  },
+
+  // Refresh missions (assign 3 random missions to agent)
+  async refreshMissions(agentId) {
+    try {
+      if (!agentId) {
+        throw new Error('Agent ID is required');
+      }
+
+      // Reset all missions to available
+      await sql`UPDATE missions SET completed = false, assigned_now = false, assigned_agent = null, past_assigned_agents = array[]::integer[], mission_expires = null`;
+
+      // Calculate expiration time (15 minutes from now)
+      const expirationTime = new Date(Date.now() + 15 * 60 * 1000);
+
+      // Get 3 random available missions
+      const availableMissions = await sql`SELECT * FROM missions WHERE assigned_now = false ORDER BY RANDOM() LIMIT 3`;
+
+      // Assign each mission to the agent
+      const assignedMissions = [];
+      for (const mission of availableMissions) {
+        const result = await sql`
+          UPDATE missions 
+          SET assigned_agent = ${agentId}, assigned_now = true, past_assigned_agents = array_append(past_assigned_agents, ${agentId}), mission_expires = ${expirationTime}
+          WHERE id = ${mission.id} RETURNING *
+        `;
+        assignedMissions.push(result[0]);
+      }
+
+      return assignedMissions;
+    } catch (error) {
+      console.error('Error refreshing missions:', error);
+      throw error;
+    }
+  },
+
+  // Assign mission to agent
+  async assignMission(missionId, agentId) {
+    try {
+      const expirationTime = new Date(Date.now() + 15 * 60 * 1000);
+      
+      const result = await sql`
+        UPDATE missions 
+        SET assigned_agent = $1, assigned_now = true, past_assigned_agents = array_append(past_assigned_agents, $1), mission_expires = $2
+        WHERE id = $3 RETURNING *
+      `;
+      return result[0];
+    } catch (error) {
+      console.error('Error assigning mission:', error);
+      throw error;
+    }
+  },
+
+  // Complete mission
+  async completeMission(missionId, successKey, teamPoints) {
+    try {
+      // Get the mission to check the success key
+      const missionResult = await sql`SELECT * FROM missions WHERE id = ${missionId}`;
+      
+      if (missionResult.length === 0) {
+        throw new Error('Mission not found');
+      }
+      
+      const mission = missionResult[0];
+      
+      if (mission.completed) {
+        throw new Error('Mission already completed');
+      }
+      
+      // Validate success key (case-insensitive comparison)
+      const expectedKey = mission.success_key?.toLowerCase().trim();
+      const providedKey = successKey?.toLowerCase().trim();
+      
+      if (!expectedKey || !providedKey) {
+        throw new Error('Success key required');
+      }
+      
+      // Check if success key matches
+      const isCorrect = expectedKey === providedKey || 
+                       expectedKey.includes(providedKey) || 
+                       providedKey.includes(expectedKey) ||
+                       (expectedKey.startsWith('[') && expectedKey.endsWith(']'));
+      
+      if (!isCorrect) {
+        throw new Error('Incorrect success key');
+      }
+      
+      // Mark mission as completed
+      await sql`UPDATE missions SET completed = true, assigned_now = false WHERE id = ${missionId}`;
+      
+      // Update team points if provided
+      if (teamPoints && teamPoints.team) {
+        await sql`UPDATE teams SET points = points + ${teamPoints.points} WHERE name = ${teamPoints.team}`;
+      }
+      
+      return { message: 'Mission completed successfully' };
+    } catch (error) {
+      console.error('Error completing mission:', error);
+      throw error;
+    }
+  },
+
+  // Get intel clues
+  async getIntel() {
+    try {
+      const result = await sql`SELECT * FROM intel ORDER BY id`;
+      return result;
+    } catch (error) {
+      console.error('Error fetching intel:', error);
+      throw error;
+    }
+  },
+
+  // Add intel clue
+  async addIntel(clueText, agentsWhoKnow = []) {
+    try {
+      const result = await sql`INSERT INTO intel (clue_text, agents_who_know) VALUES ($1, $2) RETURNING *`;
+      return result[0];
+    } catch (error) {
+      console.error('Error adding intel:', error);
+      throw error;
+    }
+  },
+
+  // Log login attempt
+  async logLogin(agentName, success, ipAddress, userAgent) {
+    try {
+      const result = await sql`
+        INSERT INTO login_logs (agent_name, success, ip_address, user_agent, timestamp) 
+        VALUES (${agentName}, ${success}, ${ipAddress}, ${userAgent}, NOW()) RETURNING *
+      `;
+      return result[0];
+    } catch (error) {
+      console.error('Error logging login attempt:', error);
+      throw error;
+    }
+  },
+
+  // Authentication
+  async authenticate(alias, passphrase, ipAddress, userAgent) {
+    try {
+      // Get user from database - fix parameter binding
+      const userResult = await sql`
+        SELECT id, firstname, lastname, team, alias_1, alias_2, passphrase 
+        FROM users 
+        WHERE (alias_1 = ${alias} OR alias_2 = ${alias}) AND ishere = true
+      `;
+      
+      if (userResult.length === 0) {
+        // User not found
+        await this.logLogin(alias, false, ipAddress, userAgent);
+        return { success: false, message: 'Invalid credentials' };
+      }
+      
+      const user = userResult[0];
+      
+      // Check passphrase (case-insensitive)
+      if (user.passphrase.toLowerCase().trim() === passphrase.toLowerCase().trim()) {
+        // Passphrase correct
+        await this.logLogin(alias, true, ipAddress, userAgent);
+        return {
+          success: true,
+          message: 'Authentication successful',
+          user: {
+            id: user.id,
+            firstname: user.firstname,
+            lastname: user.lastname,
+            team: user.team,
+            alias_1: user.alias_1,
+            alias_2: user.alias_2,
+            codename: `${user.alias_1} ${user.alias_2}`
+          }
+        };
+      } else {
+        // Passphrase incorrect
+        await this.logLogin(alias, false, ipAddress, userAgent);
+        return { success: false, message: 'Invalid credentials' };
+      }
+    } catch (error) {
+      console.error('Authentication error:', error);
+      throw error;
+    }
+  },
+
+  // Get login statistics
+  async getLoginStats() {
+    try {
+      const result = await sql`
+        SELECT 
+          COUNT(*) as total_attempts,
+          COUNT(CASE WHEN success = true THEN 1 END) as successful_logins,
+          COUNT(CASE WHEN success = false THEN 1 END) as failed_attempts
+        FROM login_logs
+      `;
+      return result[0];
+    } catch (error) {
+      console.error('Error fetching login stats:', error);
+      throw error;
+    }
+  }
+};

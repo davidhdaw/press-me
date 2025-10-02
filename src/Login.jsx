@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { neonApi } from './neonApi'
 
 function Login({ onLogin }) {
   const [screenname, setScreenname] = useState('')
@@ -14,21 +15,13 @@ function Login({ onLogin }) {
   }, [])
 
   const fetchRandomAgent = async () => {
-    console.log('fetchRandomAgent called - making network request')
+    console.log('fetchRandomAgent called - connecting to Neon database')
     try {
-      const response = await fetch('http://localhost:3001/api/users/random')
-      if (response.ok) {
-        const data = await response.json()
-        const agentName = data.codename
-        setScreenname(agentName)
-        setAlias1(data.alias_1)
-        setAlias2(data.alias_2)
-      } else {
-        console.error('Failed to fetch random agent, status:', response.status)
-        setScreenname('AGENT')
-        setAlias1('Unknown')
-        setAlias2('Agent')
-      }
+      const data = await neonApi.getRandomUser()
+      const agentName = data.codename
+      setScreenname(agentName)
+      setAlias1(data.alias_1)
+      setAlias2(data.alias_2)
     } catch (error) {
       console.error('Error fetching random agent:', error)
       setScreenname('AGENT')
@@ -42,31 +35,14 @@ function Login({ onLogin }) {
     console.log('Access attempt:', { alias1, alias2, password })
     
     try {
-      const response = await fetch('http://localhost:3001/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          alias: alias1, // Send the first alias part
-          passphrase: password
-        })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          // Authentication successful
-          setShowUnauthorizedMessage(false)
-          onLogin(data.user)
-        } else {
-          // Authentication failed
-          setFailedAttempts(prev => prev + 1)
-          setShowUnauthorizedMessage(true)
-          setPassword('')
-        }
+      const data = await neonApi.authenticate(alias1, password, null, navigator.userAgent)
+      
+      if (data.success) {
+        // Authentication successful
+        setShowUnauthorizedMessage(false)
+        onLogin(data.user)
       } else {
-        // Server error
+        // Authentication failed
         setFailedAttempts(prev => prev + 1)
         setShowUnauthorizedMessage(true)
         setPassword('')

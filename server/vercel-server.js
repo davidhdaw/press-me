@@ -11,16 +11,16 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Database connection - supports both Vercel Postgres and local PostgreSQL
+// Database connection - supports both local PostgreSQL and Vercel Postgres
 let pool;
 let useVercelPostgres = false;
 
 if (process.env.POSTGRES_URL) {
-  // Use Vercel Postgres (preferred)
+  // Use Vercel Postgres
   useVercelPostgres = true;
   console.log('Using Vercel Postgres');
 } else {
-  // Use local PostgreSQL (fallback)
+  // Use local PostgreSQL
   pool = new Pool({
     user: process.env.DB_USER || 'postgres',
     host: process.env.DB_HOST || 'localhost',
@@ -75,8 +75,8 @@ app.get('/api/users/random', async (req, res) => {
   console.log('Random user request received from:', req.ip);
   try {
     const result = await executeQuery('SELECT alias_1, alias_2 FROM users WHERE ishere = true ORDER BY RANDOM() LIMIT 1');
+    console.log('Random user query result:', result.rows?.[0] || result[0]);
     const user = result.rows?.[0] || result[0];
-    console.log('Random user query result:', user);
     if (user) {
       res.json({ 
         codename: `${user.alias_1} ${user.alias_2}`,
@@ -114,16 +114,17 @@ app.get('/api/users/team/:team/random', async (req, res) => {
       return res.status(400).json({ error: 'Team must be "red" or "blue"' });
     }
     
-    const result = await pool.query(
+    const result = await executeQuery(
       'SELECT firstname, lastname, alias_1, alias_2 FROM users WHERE team = $1 AND ishere = true ORDER BY RANDOM() LIMIT 1',
       [team]
     );
     
-    if (result.rows.length === 0) {
+    const users = result.rows || result;
+    if (users.length === 0) {
       return res.status(404).json({ error: `No users found for team ${team}` });
     }
     
-    const user = result.rows[0];
+    const user = users[0];
     res.json({
       firstname: user.firstname,
       lastname: user.lastname,
@@ -155,8 +156,9 @@ app.put('/api/teams/:team/points', async (req, res) => {
   try {
     const { team } = req.params;
     const { points } = req.body;
-    const result = await pool.query('UPDATE teams SET points = $1 WHERE name = $2 RETURNING *', [points, team]);
-    res.json(result.rows[0]);
+    const result = await executeQuery('UPDATE teams SET points = $1 WHERE name = $2 RETURNING *', [points, team]);
+    const teams = result.rows || result;
+    res.json(teams[0]);
   } catch (err) {
     console.error('Error updating team points:', err);
     res.status(500).json({ error: 'Failed to update team points' });
@@ -177,8 +179,8 @@ app.get('/api/missions', async (req, res) => {
 // Get available missions (not assigned)
 app.get('/api/missions/available', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM missions WHERE assigned_now = false ORDER BY id');
-    res.json(result.rows);
+    const result = await executeQuery('SELECT * FROM missions WHERE assigned_now = false ORDER BY id');
+    res.json(result.rows || result);
   } catch (err) {
     console.error('Error fetching available missions:', err);
     res.status(500).json({ error: 'Failed to fetch available missions' });
@@ -197,7 +199,7 @@ app.post('/api/missions/refresh', async (req, res) => {
     console.log('Refreshing missions for agent:', agentId);
     
     // First, repopulate the database by resetting ALL missions to available status
-    await pool.query(`
+    await executeQuery(`
       UPDATE missions 
       SET completed = false, assigned_now = false, assigned_agent = null, 
           past_assigned_agents = array[]::integer[], mission_expires = null
@@ -209,23 +211,24 @@ app.post('/api/missions/refresh', async (req, res) => {
     const expirationTime = new Date(Date.now() + 15 * 60 * 1000);
     
     // Get 3 random available missions (should be all missions now)
-    const availableResult = await pool.query(
+    const availableResult = await executeQuery(
       'SELECT * FROM missions WHERE assigned_now = false ORDER BY RANDOM() LIMIT 3'
     );
     
-    const selectedMissions = availableResult.rows;
+    const selectedMissions = availableResult.rows || availableResult;
     console.log(`Selected ${selectedMissions.length} missions for assignment`);
     
     // Assign each selected mission to the agent with 15-minute expiration
     const assignedMissions = [];
     for (const mission of selectedMissions) {
-      const result = await pool.query(`
+      const result = await executeQuery(`
         UPDATE missions 
         SET assigned_agent = $1, assigned_now = true, past_assigned_agents = array_append(past_assigned_agents, $1), mission_expires = $2
         WHERE id = $3 RETURNING *
       `, [agentId, expirationTime, mission.id]);
       
-      assignedMissions.push(result.rows[0]);
+      const missions = result.rows || result;
+      assignedMissions.push(missions[0]);
     }
     
     console.log(`Successfully assigned ${assignedMissions.length} missions to agent ${agentId}`);
@@ -246,13 +249,14 @@ app.put('/api/missions/:id/assign', async (req, res) => {
     const expirationTime = new Date(Date.now() + 15 * 60 * 1000);
     
     // Update mission assignment
-    const result = await pool.query(`
+    const result = await executeQuery(`
       UPDATE missions 
       SET assigned_agent = $1, assigned_now = true, past_assigned_agents = array_append(past_assigned_agents, $1), mission_expires = $2
       WHERE id = $3 RETURNING *
     `, [agentId, expirationTime, id]);
     
-    res.json(result.rows[0]);
+    const missions = result.rows || result;
+    res.json(missions[0]);
   } catch (err) {
     console.error('Error assigning mission:', err);
     res.status(500).json({ error: 'Failed to assign mission' });
@@ -266,13 +270,14 @@ app.put('/api/missions/:id/complete', async (req, res) => {
     const { successKey, teamPoints } = req.body;
     
     // Get the mission to check the success key
-    const missionResult = await pool.query('SELECT * FROM missions WHERE id = $1', [id]);
+    const missionResult = await executeQuery('SELECT * FROM missions WHERE id = $1', [id]);
+    const missions = missionResult.rows || missionResult;
     
-    if (missionResult.rows.length === 0) {
+    if (missions.length === 0) {
       return res.status(404).json({ error: 'Mission not found' });
     }
     
-    const mission = missionResult.rows[0];
+    const mission = missions[0];
     
     // Check if mission is already completed
     if (mission.completed) {
@@ -298,11 +303,11 @@ app.put('/api/missions/:id/complete', async (req, res) => {
     }
     
     // Mark mission as completed
-    await pool.query('UPDATE missions SET completed = true, assigned_now = false WHERE id = $1', [id]);
+    await executeQuery('UPDATE missions SET completed = true, assigned_now = false WHERE id = $1', [id]);
     
     // Update team points if provided
     if (teamPoints && teamPoints.team) {
-      await pool.query('UPDATE teams SET points = points + $1 WHERE name = $2', [teamPoints.points, teamPoints.team]);
+      await executeQuery('UPDATE teams SET points = points + $1 WHERE name = $2', [teamPoints.points, teamPoints.team]);
     }
     
     res.json({ message: 'Mission completed successfully' });
@@ -315,8 +320,8 @@ app.put('/api/missions/:id/complete', async (req, res) => {
 // Get intel clues
 app.get('/api/intel', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM intel ORDER BY id');
-    res.json(result.rows);
+    const result = await executeQuery('SELECT * FROM intel ORDER BY id');
+    res.json(result.rows || result);
   } catch (err) {
     console.error('Error fetching intel:', err);
     res.status(500).json({ error: 'Failed to fetch intel' });
@@ -327,11 +332,12 @@ app.get('/api/intel', async (req, res) => {
 app.post('/api/intel', async (req, res) => {
   try {
     const { clueText, agentsWhoKnow } = req.body;
-    const result = await pool.query(
+    const result = await executeQuery(
       'INSERT INTO intel (clue_text, agents_who_know) VALUES ($1, $2) RETURNING *',
       [clueText, agentsWhoKnow || []]
     );
-    res.json(result.rows[0]);
+    const intels = result.rows || result;
+    res.json(intels[0]);
   } catch (err) {
     console.error('Error adding intel:', err);
     res.status(500).json({ error: 'Failed to add intel' });
@@ -342,11 +348,12 @@ app.post('/api/intel', async (req, res) => {
 app.post('/api/logs/login', async (req, res) => {
   try {
     const { agentName, success, ipAddress, userAgent } = req.body;
-    const result = await pool.query(
+    const result = await executeQuery(
       'INSERT INTO login_logs (agent_name, success, ip_address, user_agent, timestamp) VALUES ($1, $2, $3, $4, NOW()) RETURNING *',
       [agentName, success, ipAddress, userAgent]
     );
-    res.json(result.rows[0]);
+    const logs = result.rows || result;
+    res.json(logs[0]);
   } catch (err) {
     console.error('Error logging login attempt:', err);
     res.status(500).json({ error: 'Failed to log login attempt' });
@@ -414,14 +421,15 @@ app.post('/api/auth/login', async (req, res) => {
 // Get login statistics
 app.get('/api/logs/stats', async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await executeQuery(`
       SELECT 
         COUNT(*) as total_attempts,
         COUNT(CASE WHEN success = true THEN 1 END) as successful_logins,
         COUNT(CASE WHEN success = false THEN 1 END) as failed_attempts
       FROM login_logs
     `);
-    res.json(result.rows[0]);
+    const stats = result.rows || result;
+    res.json(stats[0]);
   } catch (err) {
     console.error('Error fetching login stats:', err);
     res.status(500).json({ error: 'Failed to fetch login statistics' });
@@ -441,4 +449,4 @@ app.get('/api/test', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-}); 
+});

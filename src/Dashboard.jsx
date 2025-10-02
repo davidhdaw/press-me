@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { neonApi } from './neonApi'
 
 function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) {
   const [missions, setMissions] = useState([])
@@ -121,26 +122,13 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const fetchRandomMissions = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:3001/api/missions/refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          agentId: agentId
-        })
-      })
-      if (response.ok) {
-        const assignedMissions = await response.json()
-        setMissions(assignedMissions)
-        // Clear completed missions state when refreshing
-        setCompletedMissions(new Set())
-        setSuccessKeys({})
-         // Clear any existing errors when refreshing
-         setMissionErrors({})
-      } else {
-        setError('Failed to fetch missions')
-      }
+      const assignedMissions = await neonApi.refreshMissions(agentId)
+      setMissions(assignedMissions)
+      // Clear completed missions state when refreshing
+      setCompletedMissions(new Set())
+      setSuccessKeys({})
+      // Clear any existing errors when refreshing
+      setMissionErrors({})
     } catch (error) {
       console.error('Error fetching missions:', error)
       setError('Failed to fetch missions')
@@ -172,34 +160,20 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
 
     try {
-      const response = await fetch(`http://localhost:3001/api/missions/${missionId}/complete`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          successKey: successKey,
-          teamPoints: { team: 'red', points: 10 } // You might want to get actual team from user data
-        })
+      await neonApi.completeMission(missionId, successKey, { team: team, points: 10 })
+      
+      // Mission completed successfully
+      setCompletedMissions(prev => new Set([...prev, missionId]))
+      setSuccessKeys(prev => {
+        const newKeys = { ...prev }
+        delete newKeys[missionId]
+        return newKeys
       })
-
-      if (response.ok) {
-        // Mission completed successfully
-        setCompletedMissions(prev => new Set([...prev, missionId]))
-        setSuccessKeys(prev => {
-          const newKeys = { ...prev }
-          delete newKeys[missionId]
-          return newKeys
-        })
-        setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
-        // Mission stays visible with completed status - no automatic refresh
-      } else {
-        const errorData = await response.json()
-        setMissionErrors(prev => ({ ...prev, [missionId]: errorData.error || 'Incorrect success key!' }))
-      }
+      setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
+      // Mission stays visible with completed status - no automatic refresh
     } catch (error) {
       console.error('Error completing mission:', error)
-      setMissionErrors(prev => ({ ...prev, [missionId]: 'Failed to complete mission. Please try again.' }))
+      setMissionErrors(prev => ({ ...prev, [missionId]: error.message || 'Failed to complete mission. Please try again.' }))
     }
   }
 
