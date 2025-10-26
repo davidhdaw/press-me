@@ -28,12 +28,6 @@ function Mission({ alias1, alias2, realName, team, onLogout }) {
   return (
     <div className={"mission-container " + (bgColor)}>
         <div className="agent-header">
-        <button 
-            onClick={handleLogout}
-            className="logout-button"
-          >
-            LOGOUT
-        </button>
         <p>Welcome to the <span className={teamColor}>{team} team</span>, <span className={bgColor}>{realName}</span>... or should I say</p>>
         </div>
 
@@ -43,7 +37,6 @@ function Mission({ alias1, alias2, realName, team, onLogout }) {
             <h1 ref={effectRef2} className="rotate">{alias2}</h1>
           </div>
 
-        <div className="mission-content">
 
           <div className="mission-objectives">
             <p>Your objectives are as follows:</p>
@@ -54,16 +47,15 @@ function Mission({ alias1, alias2, realName, team, onLogout }) {
               <li>Ask the hosts if you need help.</li>
               <li>Do not get caught.</li>
             </ul>
-            <button 
+          </div>
+          <button 
           className="mission-button"
           onClick={() => navigate('/dashboard')}
         >
-          This message will self destruct in 3 seconds.
+          This message will self destruct in 3...
         </button>
-          </div>
         </div>
         
-    </div>
   )
 }
 
