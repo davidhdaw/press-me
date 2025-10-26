@@ -14,6 +14,10 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [activeTab, setActiveTab] = useState('missions')
   const [missionErrors, setMissionErrors] = useState({})
   
+  // Intel state
+  const [users, setUsers] = useState([])
+  const [intelLoading, setIntelLoading] = useState(false)
+  
   // New state for relationship and alibi
   const [relationship, setRelationship] = useState('')
   const [alibi, setAlibi] = useState('')
@@ -87,6 +91,25 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     fetchRandomMissions()
     getRandomBackstory() // Initialize with random backstory
   }, [])
+
+  // Fetch users when intel tab is accessed
+  useEffect(() => {
+    if (activeTab === 'intel' && users.length === 0) {
+      fetchUsers()
+    }
+  }, [activeTab])
+
+  const fetchUsers = async () => {
+    try {
+      setIntelLoading(true)
+      const allUsers = await neonApi.getUsers()
+      setUsers(allUsers)
+    } catch (error) {
+      console.error('Error fetching users:', error)
+    } finally {
+      setIntelLoading(false)
+    }
+  }
 
   // Countdown timer effect
   useEffect(() => {
@@ -411,9 +434,36 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
 
         {activeTab === 'intel' && (
           <div className="tab-content">
-            <h2>Intel Reports</h2>
-            <p>This is placeholder content for the Intel tab.</p>
-            <p>Intel information and reports would be displayed here.</p>
+            {intelLoading ? (
+              <div className="loading-spinner">
+                <div className="spinner"></div>
+                <p>LOADING INTEL...</p>
+              </div>
+            ) : (
+              <>
+                <div className="intel-section">
+                  <h3>Agent Registry</h3>
+                  <div className="users-list">
+                    {users.map((user) => (
+                      <div key={user.id} className="user-item">
+                        <span>{user.firstname} {user.lastname}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="intel-section">
+                  <h3>Known Aliases</h3>
+                  <div className="users-list">
+                    {users.map((user) => (
+                      <div key={user.id} className="user-item">
+                        <span>{user.alias_1}</span> <span>{user.alias_2}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
