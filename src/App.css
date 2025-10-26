@@ -16,10 +16,12 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  justify-content: space-between;
 }
 
 /* LOGIN */
+.login-container{
+  justify-content: space-between;
+}
 
 .login-container .logo{
   background-color: var(--red);
@@ -67,9 +69,38 @@
 
 /* MISSION */
 
+.mission-container{
+  justify-content: flex-start;
+}
+
+.mission-container .team-red{
+  color: var(--red);
+}
+
+.mission-container .bg-red, .mission-container.bg-red{
+  background-color: var(--red);
+}
+
+.mission-container .team-blue{
+  color: var(--blue);
+}
+
+.mission-container .bg-blue, .mission-container.bg-blue{
+  background-color: var(--blue);
+}
+
 .mission-container .agent-header{
   padding: var(--unit-base);
-  background-color: var(--black);
+  height: 35vh;
+}
+
+.mission-container.bg-red .agent-header{
+  background-image: linear-gradient(170deg, var(--black) 70%, var(--red) calc(70% + 2px));
+}
+
+.mission-container.bg-blue .agent-header{
+  padding: var(--unit-base);
+  background-image: linear-gradient(170deg, var(--black) 70%, var(--blue) calc(70% + 2px));
 }
 
 .mission-container .agent-header button{
@@ -89,21 +120,6 @@
   margin: 0;
 }
 
-.mission-container .team-red{
-  color: var(--red);
-}
-
-.mission-container .bg-red, .mission-container.bg-red{
-  background-color: var(--red);
-}
-
-.mission-container .team-blue{
-  color: var(--blue);
-}
-
-.mission-container .bg-blue, .mission-container.bg-blue{
-  background-color: var(--blue);
-}
 
 .mission-container .agent-intro{
   background-color: var(--white);
@@ -111,8 +127,10 @@
   margin: 0 auto;
   text-align: center;
   display: inline-block;
-  position: relative;
-  transform: skewY(-10deg) translateY(-40px);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -120%) skewY(-10deg);
 }
 
 .mission-container .agent-intro p{
@@ -126,11 +144,12 @@
   margin:0;
 }
 
-.mission-content{
+.mission-objectives{
   padding: var(--unit-base);
 }
 
 .mission-objectives p {
+  color: var(--white);
   font-size: 1.5em;
   font-weight: 600;
   letter-spacing: 1px;
@@ -140,6 +159,7 @@
 }
 
 .mission-objectives ul {
+  color: var(--white);
   margin: var(--unit-sm) 0;
   font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
   font-size: 1.25rem;
@@ -152,6 +172,18 @@
 
 .mission-objectives ul li {
   line-height: 1.25;
+}
+
+.mission-container .mission-button{
+  position: fixed;
+  bottom: 0;
+  background-color: var(--yellow);
+  color: var(--black);
+  transform: rotate(-5deg);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 1.3em;
+  line-height: 1.1;
 }
 
 /* LOADING */
@@ -215,12 +247,24 @@
     justify-content: center;
   }
 
+  .bg-red .rotate span{
+    color: var(--red);
+  }
+
+  .bg-blue .rotate span{
+    color: var(--blue);
+  }
+
+  .rotate span{
+    text-shadow: 1px 1px 0px var(--black-transparent), -1px -1px 0px var(--black-transparent), -1px 1px 0px var(--black-transparent), 1px -1px 0px var(--black-transparent), 4px 4px 0px var(--black-transparent);
+  }
+
   .rotate span:nth-child(even){
-    transform: rotate(-4deg);
-    transform: translateY(5px);
+    transform: rotate(-8deg);
+    transform: translateY(4px);
   }
   .rotate span:nth-child(odd){
-    transform: rotate(12deg);
+    transform: rotate(8deg);
   }
 
 /* DASHBOARD STYLES */
