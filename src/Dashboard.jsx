@@ -22,6 +22,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [userAliases, setUserAliases] = useState({})
   const [dragOverId, setDragOverId] = useState(null)
   const [usedAliases, setUsedAliases] = useState(new Set())
+  const [userFilter, setUserFilter] = useState('')
   
   // New state for relationship and alibi
   const [relationship, setRelationship] = useState('')
@@ -137,6 +138,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
 
   const handleDragStart = (e, alias) => {
     e.dataTransfer.setData('text/plain', alias)
+    e.target.classList.add('dragging')
   }
 
   const handleDragOver = (e, userId, targetIndex) => {
@@ -148,9 +150,18 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     setDragOverId(null)
   }
 
+  const handleDragEnd = (e) => {
+    e.target.classList.remove('dragging')
+  }
+
   const handleDrop = (e, userId, targetIndex) => {
     e.preventDefault()
     const alias = e.dataTransfer.getData('text/plain')
+    
+    // Remove the dragging class from all elements
+    document.querySelectorAll('.alias-section .dragging').forEach(el => {
+      el.classList.remove('dragging')
+    })
     
     // Get the current aliases for this user
     const currentAliases = userAliases[userId] || []
@@ -376,7 +387,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
         <div className={`dashboard-content dashboard-content-${activeTab}`}>
           <div className="tab-content">
           <h1>ERROR</h1>
-          <p style={{ color: '#e74c3c' }}>{error}</p>
+          <p>{error}</p>
             <div className="tab-actions">
           <button onClick={fetchRandomMissions} className="retry-button">
             RETRY
@@ -553,11 +564,39 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
               <>
                 <div className="intel-container">
                   <div className="intel-section">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="guest-list-header">
                       <h3>Guest list</h3>
-                      <button onClick={handleClearAll} className="clear-button">
-                        Clear
-                      </button>
+                      <div className="user-filter-container">
+                        <svg 
+                          className="user-filter-search-icon" 
+                          xmlns="http://www.w3.org/2000/svg" 
+                          viewBox="0 0 24 24" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          strokeWidth="2" 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="11" cy="11" r="8"/>
+                          <path d="m21 21-4.35-4.35"/>
+                        </svg>
+                        <input
+                          type="text"
+                          placeholder="Search"
+                          value={userFilter}
+                          onChange={(e) => setUserFilter(e.target.value)}
+                          className="user-filter-input"
+                        />
+                        {userFilter && (
+                          <button 
+                            onClick={() => setUserFilter('')}
+                            className="user-filter-clear-button"
+                            type="button"
+                          >
+                            <img src="/svgs/X.svg" alt="Clear filter" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <table className="users-list">
                     <thead>
@@ -568,7 +607,12 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                       </tr>
                     </thead>
                     <tbody>
-                      {users.map((user) => (
+                      {users
+                        .filter(user => {
+                          const fullName = `${user.firstname} ${user.lastname}`.toLowerCase()
+                          return fullName.includes(userFilter.toLowerCase())
+                        })
+                        .map((user) => (
                         <tr key={`${user.id}-name`}>
                           <td 
                             className={`${
@@ -635,18 +679,21 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                                   onChange={() => handleTeamSelection(user.id, 'red')}
                                   style={{ display: 'none' }}
                                 />
-                                <img 
-                                  src="/svgs/Red.svg" 
-                                  alt="Red" 
-                                  className="team-icon"
-                                />
-                                {userSelections[user.id] === 'red' && (
+                                <div className="radio-content">
                                   <img 
-                                    src="/svgs/Circle.svg" 
-                                    alt="Checked" 
-                                    className="circle-icon"
+                                    src="/svgs/Red.svg" 
+                                    alt="Red" 
+                                    className="team-icon"
                                   />
-                                )}
+                                  {userSelections[user.id] === 'red' && (
+                                    <img 
+                                      src="/svgs/Circle.svg" 
+                                      alt="Checked" 
+                                      className="circle-icon"
+                                    />
+                                  )}
+                                </div>
+                                <span className="team-label">Red</span>
                               </label>
                               <label className="radio-label">
                                 <input
@@ -656,18 +703,21 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                                   onChange={() => handleTeamSelection(user.id, 'blue')}
                                   style={{ display: 'none' }}
                                 />
-                                <img 
-                                  src="/svgs/Blue.svg" 
-                                  alt="Blue" 
-                                  className="team-icon"
-                                />
-                                {userSelections[user.id] === 'blue' && (
+                                <div className="radio-content">
                                   <img 
-                                    src="/svgs/Circle.svg" 
-                                    alt="Checked" 
-                                    className="circle-icon"
+                                    src="/svgs/Blue.svg" 
+                                    alt="Blue" 
+                                    className="team-icon"
                                   />
-                                )}
+                                  {userSelections[user.id] === 'blue' && (
+                                    <img 
+                                      src="/svgs/Circle.svg" 
+                                      alt="Checked" 
+                                      className="circle-icon"
+                                    />
+                                  )}
+                                </div>
+                                <span className="team-label">Blue</span>
                               </label>
                               <label className="radio-label">
                                 <input
@@ -677,18 +727,21 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                                   onChange={() => handleTeamSelection(user.id, 'unknown')}
                                   style={{ display: 'none' }}
                                 />
-                                <img 
-                                  src="/svgs/Question.svg" 
-                                  alt="Unknown" 
-                                  className="team-icon"
-                                />
-                                {userSelections[user.id] === 'unknown' && (
+                                <div className="radio-content">
                                   <img 
-                                    src="/svgs/Circle.svg" 
-                                    alt="Checked" 
-                                    className="circle-icon"
+                                    src="/svgs/Question.svg" 
+                                    alt="Unknown" 
+                                    className="team-icon"
                                   />
-                                )}
+                                  {userSelections[user.id] === 'unknown' && (
+                                    <img 
+                                      src="/svgs/Circle.svg" 
+                                      alt="Checked" 
+                                      className="circle-icon"
+                                    />
+                                  )}
+                                </div>
+                                <span className="team-label">Unknown</span>
                               </label>
                             </div>
                           </td>
@@ -696,7 +749,14 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                       ))}
                     </tbody>
                   </table>
-                  </div>
+                  
+                  <button 
+                    onClick={handleClearAll} 
+                    className="clear-button"
+                  >
+                    Clear
+                  </button>
+                </div>
                 </div>
                 
                 <div className="alias-section">
@@ -706,7 +766,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                         <div 
                           key={`alias-${index}`}
                           draggable
+                          data-alias={alias}
                           onDragStart={(e) => handleDragStart(e, alias)}
+                          onDragEnd={handleDragEnd}
                         >
                           {alias}
                         </div>
