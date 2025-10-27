@@ -17,6 +17,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   // Intel state
   const [users, setUsers] = useState([])
   const [intelLoading, setIntelLoading] = useState(false)
+  const [randomizedAliases, setRandomizedAliases] = useState([])
   
   // New state for relationship and alibi
   const [relationship, setRelationship] = useState('')
@@ -104,6 +105,11 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       setIntelLoading(true)
       const allUsers = await neonApi.getUsers()
       setUsers(allUsers)
+      
+      // Randomize aliases once when users are fetched
+      const aliases = allUsers.flatMap(user => [user.alias_1, user.alias_2])
+      const shuffled = [...aliases].sort(() => Math.random() - 0.5)
+      setRandomizedAliases(shuffled)
     } catch (error) {
       console.error('Error fetching users:', error)
     } finally {
@@ -442,23 +448,32 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
             ) : (
               <>
                 <div className="intel-section">
-                  <h3>Agent Registry</h3>
-                  <div className="users-list">
-                    {users.map((user) => (
-                      <div key={user.id} className="user-item">
-                        <span>{user.firstname} {user.lastname}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <h3>Guest list</h3>
+                  <table className="users-list">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Column 2</th>
+                        <th>Column 3</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <tr key={`${user.id}-name`}>
+                          <td>{user.firstname} {user.lastname}</td>
+                          <td>Placeholder</td>
+                          <td>Placeholder</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
                 
                 <div className="intel-section">
                   <h3>Known Aliases</h3>
                   <div className="users-list">
-                    {users.map((user) => (
-                      <div key={user.id} className="user-item">
-                        <span>{user.alias_1}</span> <span>{user.alias_2}</span>
-                      </div>
+                    {randomizedAliases.map((alias, index) => (
+                      <div key={`alias-${index}`}>{alias}</div>
                     ))}
                   </div>
                 </div>

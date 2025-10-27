@@ -733,3 +733,33 @@
   cursor: pointer;
   transition: all 0.2s;
 }
+
+/* INTEL STYLES */
+.intel-section{
+  background-color: var(--white);
+  padding: var(--unit-sm);
+  margin: var(--unit-base) var(--unit-xs) var(--unit-base) var(--unit-xs);
+  border-radius: 8px;
+  box-shadow: -5px 5px 0px 0 var(--black);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.2em;
+}
+
+.intel-section .users-list{
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--unit-xs);
+}
+
+.intel-section .users-list th,
+.intel-section .users-list td{
+  padding: var(--unit-xs);
+  text-align: left;
+  border: 1px solid var(--brown);
+}
+
+.intel-section h3{
+  font-family: 'Yesteryear', cursive;
+  font-size: 2em;
+  margin: var(--unit-sm) 0;
+}
