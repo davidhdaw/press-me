@@ -151,6 +151,21 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const handleDrop = (e, userId, targetIndex) => {
     e.preventDefault()
     const alias = e.dataTransfer.getData('text/plain')
+    
+    // Get the current aliases for this user
+    const currentAliases = userAliases[userId] || []
+    const existingAlias = currentAliases[targetIndex]
+    
+    // If there's already an alias in this position, return it to the alias-section
+    if (existingAlias) {
+      setUsedAliases(prev => {
+        const updated = new Set(prev)
+        updated.delete(existingAlias)
+        return updated
+      })
+    }
+    
+    // Add the new alias to the drop zone
     setUserAliases(prev => {
       const current = prev[userId] || []
       const updated = [...current]
@@ -160,8 +175,35 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
         [userId]: updated
       }
     })
+    
+    // Mark the new alias as used
     setUsedAliases(prev => new Set([...prev, alias]))
     setDragOverId(null)
+  }
+
+  const handleRemoveAlias = (userId, targetIndex) => {
+    const currentAliases = userAliases[userId] || []
+    const aliasToRemove = currentAliases[targetIndex]
+    
+    if (aliasToRemove) {
+      // Remove from userAliases
+      setUserAliases(prev => {
+        const current = prev[userId] || []
+        const updated = [...current]
+        updated[targetIndex] = undefined
+        return {
+          ...prev,
+          [userId]: updated
+        }
+      })
+      
+      // Return to alias-section by removing from usedAliases
+      setUsedAliases(prev => {
+        const updated = new Set(prev)
+        updated.delete(aliasToRemove)
+        return updated
+      })
+    }
   }
 
   const handleClearAll = () => {
@@ -545,7 +587,20 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                                 onDrop={(e) => handleDrop(e, user.id, 0)}
                                 className={`drop-zone ${dragOverId === `${user.id}-0` ? 'drag-over' : ''} ${userAliases[user.id]?.[0] ? 'filled' : ''}`}
                               >
-                                {userAliases[user.id]?.[0] || 'AKA...'}
+                                <span className="alias-text">
+                                  {userAliases[user.id]?.[0] || 'AKA...'}
+                                </span>
+                                {userAliases[user.id]?.[0] && (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleRemoveAlias(user.id, 0)
+                                    }}
+                                    className="remove-alias-button"
+                                  >
+                                    <img src="/svgs/X.svg" alt="Remove" />
+                                  </button>
+                                )}
                               </div>
                               <div 
                                 onDragOver={(e) => handleDragOver(e, user.id, 1)}
@@ -553,7 +608,20 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                                 onDrop={(e) => handleDrop(e, user.id, 1)}
                                 className={`drop-zone ${dragOverId === `${user.id}-1` ? 'drag-over' : ''} ${userAliases[user.id]?.[1] ? 'filled' : ''}`}
                               >
-                                {userAliases[user.id]?.[1] || 'AKA...'}
+                                <span className="alias-text">
+                                  {userAliases[user.id]?.[1] || 'AKA...'}
+                                </span>
+                                {userAliases[user.id]?.[1] && (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleRemoveAlias(user.id, 1)
+                                    }}
+                                    className="remove-alias-button"
+                                  >
+                                    <img src="/svgs/X.svg" alt="Remove" />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </td>
