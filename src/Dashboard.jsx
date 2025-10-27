@@ -41,6 +41,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [showMissionModal, setShowMissionModal] = useState(false)
   const [isMissionClosing, setIsMissionClosing] = useState(false)
   const [selectedMissionId, setSelectedMissionId] = useState(null)
+  const [showMissionSuccess, setShowMissionSuccess] = useState(false)
  
   // Data arrays for relationships and alibis
   const relationships = [
@@ -103,6 +104,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       setShowMissionModal(false)
       setIsMissionClosing(false)
       setSelectedMissionId(null)
+      setShowMissionSuccess(false)
     }, 300)
   }
 
@@ -475,9 +477,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       })
       setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
       
-      // Close the modal if it's open
+      // Show success state if modal is open
       if (selectedMissionId === missionId) {
-        closeMissionModal()
+        setShowMissionSuccess(true)
       }
     } catch (error) {
       console.error('Error completing mission:', error)
@@ -673,31 +675,39 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
         {activeTab === 'missions' && (
           <div className="tab-content">
             <div className="missions-grid">
-              {missions.map((mission, index) => (
-                <div key={mission.id} className="mission-card">
+              {missions
+                .filter(mission => !completedMissions.has(mission.id))
+                .map((mission, index) => (
+                <div 
+                  key={mission.id} 
+                  className="mission-card clickable"
+                  onClick={() => openMissionModal(mission.id)}
+                >
                   <div className="mission-header">
                     <h3>Operation {mission.title}</h3>
                   </div>
                   
                     <p>{mission.mission_body}</p>
-                  
-                {!completedMissions.has(mission.id) && (
-                  <button
-                    onClick={() => openMissionModal(mission.id)}
-                    className="complete-mission-button"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"/>
-                    </svg>
-                    <span>Complete mission</span>
-                  </button>
-                )}
               </div>
               ))}
             </div>
-              <button onClick={fetchRandomMissions} className="refresh-button button-min">
-                Refresh missions
-              </button>
+            
+            {completedMissions.size > 0 && (
+              <div className="completed-missions">
+                <h3>Completed Missions</h3>
+                <ul>
+                  {missions
+                    .filter(mission => completedMissions.has(mission.id))
+                    .map((mission, index) => (
+                      <li key={mission.id}>Operation {mission.title}</li>
+                    ))}
+                </ul>
+              </div>
+            )}
+            
+            <button onClick={fetchRandomMissions} className="refresh-button button-min">
+              Refresh missions
+            </button>
           </div>
         )}
 
@@ -1008,48 +1018,62 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
           
           return (
             <div className={`modal ${isMissionClosing ? 'closing' : ''}`}>
-              <div className="modal-header">
-                <button onClick={closeMissionModal} className="close-button">
-                  Close
-                </button>
-              </div>
-
-              <div className="modal-content">
-                <h2>Operation {mission.title}</h2>
-                <p>{mission.mission_body}</p>
-                
-                <div className="field-group">
-                  <label htmlFor="mission-success-key">Success Key</label>
-                  <div className="input-with-clear">
-                    <input
-                      id="mission-success-key"
-                      type="text"
-                      value={successKeys[selectedMissionId] || ''}
-                      onChange={(e) => handleSuccessKeyChange(selectedMissionId, e.target.value)}
-                      placeholder="Enter success key..."
-                    />
+              {!showMissionSuccess ? (
+                <>
+                  <div className="modal-header">
+                    <button onClick={closeMissionModal} className="close-button">
+                      Close
+                    </button>
                   </div>
-                </div>
 
-                {missionErrors[selectedMissionId] && (
-                  <div className="mission-error">
-                    {missionErrors[selectedMissionId]}
+                  <div className="modal-content">
+                    <h2>Operation {mission.title}</h2>
+                    <p>{mission.mission_body}</p>
+                    
+                    <div className="field-group">
+                      <label htmlFor="mission-success-key">Success Key</label>
+                      <div className="input-with-clear">
+                        <input
+                          id="mission-success-key"
+                          type="text"
+                          value={successKeys[selectedMissionId] || ''}
+                          onChange={(e) => handleSuccessKeyChange(selectedMissionId, e.target.value)}
+                          placeholder="Enter success key..."
+                        />
+                      </div>
+                    </div>
+
+                    {missionErrors[selectedMissionId] && (
+                      <div className="mission-error">
+                        {missionErrors[selectedMissionId]}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              <div className="modal-footer">
-                <button onClick={closeMissionModal} className="cancel-button">
-                  Cancel
-                </button>
-                <button 
-                  onClick={() => handleSubmitMission(selectedMissionId)}
-                  disabled={!successKeys[selectedMissionId]}
-                  className="save-button"
-                >
-                  Submit
-                </button>
-              </div>
+                  <div className="modal-footer">
+                    <button 
+                      onClick={() => handleSubmitMission(selectedMissionId)}
+                      disabled={!successKeys[selectedMissionId]}
+                      className="save-button"
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="modal-content">
+                    <div className="mission-success">
+                      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <polyline points="22 4 12 14.01 9 11.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <h2>Mission Complete!</h2>
+                      <p>Operation {mission.title} has been successfully completed.</p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )
         })()}
