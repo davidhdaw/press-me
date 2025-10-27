@@ -96,6 +96,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const openMissionModal = (missionId) => {
     setSelectedMissionId(missionId)
     setShowMissionModal(true)
+    setShowMissionSuccess(false) // Reset success state when opening modal
+    setMissionErrors(prev => ({ ...prev, [missionId]: '' })) // Clear any previous errors
   }
 
   const closeMissionModal = () => {
@@ -464,6 +466,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
 
     // Clear any existing error for this mission
     setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
+    setShowMissionSuccess(false) // Reset success state
 
     try {
       await neonApi.completeMission(missionId, successKey, { team: team, points: 10 })
@@ -484,6 +487,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     } catch (error) {
       console.error('Error completing mission:', error)
       setMissionErrors(prev => ({ ...prev, [missionId]: error.message || 'Failed to complete mission. Please try again.' }))
+      setShowMissionSuccess(false) // Ensure success state is not shown on error
     }
   }
 
@@ -1062,14 +1066,23 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                 </>
               ) : (
                 <>
+                  <div className="modal-header">
+                    <button onClick={closeMissionModal} className="close-button">
+                      Close
+                    </button>
+                  </div>
+
                   <div className="modal-content">
                     <div className="mission-success">
-                      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <polyline points="22 4 12 14.01 9 11.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      <h2>Mission Complete!</h2>
-                      <p>Operation {mission.title} has been successfully completed.</p>
+                      <p>Mission success</p>
+                      <h2>Operation {mission.title}</h2>
+                      <div className="success-intel">
+                        <h3>New intel:</h3>
+                        <p>Amanda Rodriguez is also known as
+                        <span className="alias-container filled">Drunken</span> 
+                        <span className="alias-container"></span>.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </>

@@ -195,7 +195,7 @@ export const neonApi = {
       const providedKey = successKey?.toLowerCase().trim();
       
       if (!expectedKey || !providedKey) {
-        throw new Error('Success key required');
+        throw new Error('No dice, buddy. Try again or talk to your handler.');
       }
       
       // Check if success key matches
@@ -205,7 +205,7 @@ export const neonApi = {
                        (expectedKey.startsWith('[') && expectedKey.endsWith(']'));
       
       if (!isCorrect) {
-        throw new Error('Incorrect success key');
+        throw new Error('No dice, buddy. Try again or talk to your handler.');
       }
       
       // Mark mission as completed
