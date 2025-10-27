@@ -18,6 +18,10 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [users, setUsers] = useState([])
   const [intelLoading, setIntelLoading] = useState(false)
   const [randomizedAliases, setRandomizedAliases] = useState([])
+  const [userSelections, setUserSelections] = useState({})
+  const [userAliases, setUserAliases] = useState({})
+  const [dragOverId, setDragOverId] = useState(null)
+  const [usedAliases, setUsedAliases] = useState(new Set())
   
   // New state for relationship and alibi
   const [relationship, setRelationship] = useState('')
@@ -106,6 +110,13 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       const allUsers = await neonApi.getUsers()
       setUsers(allUsers)
       
+      // Initialize user selections with their actual teams
+      const selections = {}
+      allUsers.forEach(user => {
+        selections[user.id] = user.team
+      })
+      setUserSelections(selections)
+      
       // Randomize aliases once when users are fetched
       const aliases = allUsers.flatMap(user => [user.alias_1, user.alias_2])
       const shuffled = [...aliases].sort(() => Math.random() - 0.5)
@@ -115,6 +126,42 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     } finally {
       setIntelLoading(false)
     }
+  }
+
+  const handleTeamSelection = (userId, team) => {
+    setUserSelections(prev => ({
+      ...prev,
+      [userId]: team
+    }))
+  }
+
+  const handleDragStart = (e, alias) => {
+    e.dataTransfer.setData('text/plain', alias)
+  }
+
+  const handleDragOver = (e, userId, targetIndex) => {
+    e.preventDefault()
+    setDragOverId(`${userId}-${targetIndex}`)
+  }
+
+  const handleDragLeave = () => {
+    setDragOverId(null)
+  }
+
+  const handleDrop = (e, userId, targetIndex) => {
+    e.preventDefault()
+    const alias = e.dataTransfer.getData('text/plain')
+    setUserAliases(prev => {
+      const current = prev[userId] || []
+      const updated = [...current]
+      updated[targetIndex] = alias
+      return {
+        ...prev,
+        [userId]: updated
+      }
+    })
+    setUsedAliases(prev => new Set([...prev, alias]))
+    setDragOverId(null)
   }
 
   // Countdown timer effect
@@ -447,35 +494,135 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
               </div>
             ) : (
               <>
-                <div className="intel-section">
-                  <h3>Guest list</h3>
-                  <table className="users-list">
+                <div className="intel-container">
+                  <div className="intel-section">
+                    <h3>Guest list</h3>
+                    <table className="users-list">
                     <thead>
                       <tr>
                         <th>Name</th>
-                        <th>Column 2</th>
-                        <th>Column 3</th>
+                        <th>AKA</th>
+                        <th>Team</th>
                       </tr>
                     </thead>
                     <tbody>
                       {users.map((user) => (
                         <tr key={`${user.id}-name`}>
-                          <td>{user.firstname} {user.lastname}</td>
-                          <td>Placeholder</td>
-                          <td>Placeholder</td>
+                          <td 
+                            className={`${
+                              userSelections[user.id] === 'red' ? 'team-red' : 
+                              userSelections[user.id] === 'blue' ? 'team-blue' : 
+                              ''
+                            }`}
+                          >
+                            {user.firstname} {user.lastname}
+                          </td>
+                          <td>
+                            <div className="aka-container">
+                              <div 
+                                onDragOver={(e) => handleDragOver(e, user.id, 0)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, user.id, 0)}
+                                className={`drop-zone ${dragOverId === `${user.id}-0` ? 'drag-over' : ''} ${userAliases[user.id]?.[0] ? 'filled' : ''}`}
+                              >
+                                {userAliases[user.id]?.[0] || 'Drop alias here'}
+                              </div>
+                              <div 
+                                onDragOver={(e) => handleDragOver(e, user.id, 1)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, user.id, 1)}
+                                className={`drop-zone ${dragOverId === `${user.id}-1` ? 'drag-over' : ''} ${userAliases[user.id]?.[1] ? 'filled' : ''}`}
+                              >
+                                {userAliases[user.id]?.[1] || 'Drop alias here'}
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="team-selector">
+                              <label className="radio-label">
+                                <input
+                                  type="radio"
+                                  name={`team-${user.id}`}
+                                  checked={userSelections[user.id] === 'red'}
+                                  onChange={() => handleTeamSelection(user.id, 'red')}
+                                  style={{ display: 'none' }}
+                                />
+                                <img 
+                                  src="/svgs/Red.svg" 
+                                  alt="Red" 
+                                  className="team-icon"
+                                />
+                                {userSelections[user.id] === 'red' && (
+                                  <img 
+                                    src="/svgs/Circle.svg" 
+                                    alt="Checked" 
+                                    className="circle-icon"
+                                  />
+                                )}
+                              </label>
+                              <label className="radio-label">
+                                <input
+                                  type="radio"
+                                  name={`team-${user.id}`}
+                                  checked={userSelections[user.id] === 'blue'}
+                                  onChange={() => handleTeamSelection(user.id, 'blue')}
+                                  style={{ display: 'none' }}
+                                />
+                                <img 
+                                  src="/svgs/Blue.svg" 
+                                  alt="Blue" 
+                                  className="team-icon"
+                                />
+                                {userSelections[user.id] === 'blue' && (
+                                  <img 
+                                    src="/svgs/Circle.svg" 
+                                    alt="Checked" 
+                                    className="circle-icon"
+                                  />
+                                )}
+                              </label>
+                              <label className="radio-label">
+                                <input
+                                  type="radio"
+                                  name={`team-${user.id}`}
+                                  checked={userSelections[user.id] === 'unknown'}
+                                  onChange={() => handleTeamSelection(user.id, 'unknown')}
+                                  style={{ display: 'none' }}
+                                />
+                                <img 
+                                  src="/svgs/Question.svg" 
+                                  alt="Unknown" 
+                                  className="team-icon"
+                                />
+                                {userSelections[user.id] === 'unknown' && (
+                                  <img 
+                                    src="/svgs/Circle.svg" 
+                                    alt="Checked" 
+                                    className="circle-icon"
+                                  />
+                                )}
+                              </label>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
                 
-                <div className="intel-section">
-                  <h3>Known Aliases</h3>
-                  <div className="users-list">
-                    {randomizedAliases.map((alias, index) => (
-                      <div key={`alias-${index}`}>{alias}</div>
-                    ))}
-                  </div>
+                <div className="alias-section">
+                    {randomizedAliases
+                      .filter(alias => !usedAliases.has(alias))
+                      .map((alias, index) => (
+                        <div 
+                          key={`alias-${index}`}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, alias)}
+                        >
+                          {alias}
+                        </div>
+                      ))}
                 </div>
               </>
             )}
