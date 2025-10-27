@@ -516,6 +516,34 @@
   border-radius: 4px;
 }
 
+.complete-mission-button{
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--unit-xs);
+  padding: var(--unit-sm);
+  border: 2px solid var(--black);
+  background-color: var(--white);
+  color: var(--black);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: var(--unit-sm);
+}
+
+.complete-mission-button:hover{
+  background-color: var(--black);
+  color: var(--white);
+}
+
+.complete-mission-button svg{
+  width: 16px;
+  height: 16px;
+}
+
 .retry-button {
   background-color: var(--red);
   color: var(--white);
@@ -689,23 +717,97 @@
   height: calc(100vh - 60px);
   top: 60px;
   width: 100%;
+  animation: slideIn 0.3s ease-out;
+}
+
+.modal.closing{
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
 }
 
 .modal .modal-content{
   padding: 0 var(--unit-base);
 }
 
-.modal .close-button, .clear-button{
-  padding: var(--unit-sm);
-  color: var(--black);
-  background-color: var(--white);
+.modal .modal-content h2{
+  margin: var(--unit-sm) 0;
+  text-transform: uppercase;
+  font-size: 1.5em;
 }
 
-.clear-button{
-  position: absolute;
-  top: 3px;
-  right: 2px;
+.modal .modal-content > p{
+  margin: var(--unit-sm) 0 var(--unit-base) 0;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.2em;
+  line-height: 1.4;
+}
+
+.modal .modal-content input{
+  border: 2px solid var(--black);
+  padding: var(--unit-sm);
+  font-size: 1em;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.modal .modal-content .mission-error{
+  margin-top: var(--unit-xs);
+  color: var(--red);
+  font-size: 0.85em;
+}
+
+.modal .close-button{
   padding: var(--unit-xs) var(--unit-sm);
+  color: var(--black);
+  background-color: var(--white);
+  border: none;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.modal .clear-button{
+  position: absolute;
+  top: var(--unit-sm);
+  right: var(--unit-sm);
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.modal .clear-button:hover{
+  opacity: 1;
+}
+
+.modal .clear-button img{
+  width: 16px;
+  height: 16px;
+  filter: brightness(0) saturate(100%);
 }
 
 .modal h2{
@@ -859,27 +961,11 @@
   transition: opacity 0.2s ease;
 }
 
-.user-filter-clear-button:hover{
-  opacity: 1;
-}
 
 .user-filter-clear-button img{
   width: 16px;
   height: 16px;
   filter: brightness(0) saturate(100%);
-}
-
-.clear-button{
-  background-color: var(--white);
-  color: var(--red);
-  border: none;
-  padding: var(--unit-xs) var(--unit-sm);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8em;
-  text-transform: uppercase;
-  transition: background-color 0.2s;
-  position: relative;
 }
 
 .intel-section .users-list th{
