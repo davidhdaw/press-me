@@ -24,6 +24,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [usedAliases, setUsedAliases] = useState(new Set())
   const [userFilter, setUserFilter] = useState('')
   
+  // Touch drag state
+  const [touchedElement, setTouchedElement] = useState(null)
+  
   // New state for relationship and alibi
   const [relationship, setRelationship] = useState('')
   const [alibi, setAlibi] = useState('')
@@ -97,6 +100,34 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     fetchRandomMissions()
     getRandomBackstory() // Initialize with random backstory
   }, [])
+
+  // Auto-hide revealed items after 3 seconds
+  useEffect(() => {
+    if (agentNameVisible) {
+      const timer = setTimeout(() => {
+        setAgentNameVisible(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [agentNameVisible])
+
+  useEffect(() => {
+    if (realNameVisible) {
+      const timer = setTimeout(() => {
+        setRealNameVisible(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [realNameVisible])
+
+  useEffect(() => {
+    if (teamVisible) {
+      const timer = setTimeout(() => {
+        setTeamVisible(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [teamVisible])
 
   // Fetch users when intel tab is accessed
   useEffect(() => {
@@ -230,6 +261,101 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     
     // Clear used aliases so they reappear in alias-section
     setUsedAliases(new Set())
+  }
+
+  // Touch handlers for mobile
+  const handleTouchStart = (e, alias) => {
+    e.preventDefault()
+    const touch = e.touches[0]
+    const target = e.currentTarget
+    
+    setTouchedElement({
+      alias,
+      element: target,
+      startX: touch.clientX,
+      startY: touch.clientY
+    })
+    
+    target.classList.add('dragging')
+  }
+
+  const handleTouchMove = (e) => {
+    if (!touchedElement) return
+    
+    e.preventDefault()
+    const touch = e.touches[0]
+    
+    // Find the element under the touch point
+    const element = document.elementFromPoint(touch.clientX, touch.clientY)
+    const dropZone = element?.closest('.drop-zone')
+    
+    if (dropZone) {
+      // Extract userId and targetIndex from data attributes
+      const userId = dropZone.getAttribute('data-user-id')
+      const targetIndex = dropZone.getAttribute('data-target-index')
+      
+      if (userId && targetIndex !== null) {
+        const foundId = `${userId}-${targetIndex}`
+        setDragOverId(foundId)
+      }
+    } else {
+      setDragOverId(null)
+    }
+  }
+
+  const handleTouchEnd = (e) => {
+    if (!touchedElement) return
+    
+    e.preventDefault()
+    const touch = e.changedTouches[0]
+    
+    // Remove dragging class
+    touchedElement.element.classList.remove('dragging')
+    
+    // Find the element under the touch point
+    const element = document.elementFromPoint(touch.clientX, touch.clientY)
+    const dropZone = element?.closest('.drop-zone')
+    
+    if (dropZone) {
+      // Extract userId and targetIndex from data attributes
+      const userId = dropZone.getAttribute('data-user-id')
+      const targetIndex = parseInt(dropZone.getAttribute('data-target-index'), 10)
+      
+      if (userId && !isNaN(targetIndex)) {
+        // Use the existing handleDrop logic
+        const alias = touchedElement.alias
+        
+        // Get the current aliases for this user
+        const currentAliases = userAliases[userId] || []
+        const existingAlias = currentAliases[targetIndex]
+        
+        // If there's already an alias in this position, return it to the alias-section
+        if (existingAlias) {
+          setUsedAliases(prev => {
+            const updated = new Set(prev)
+            updated.delete(existingAlias)
+            return updated
+          })
+        }
+        
+        // Add the new alias to the drop zone
+        setUserAliases(prev => {
+          const current = prev[userId] || []
+          const updated = [...current]
+          updated[targetIndex] = alias
+          return {
+            ...prev,
+            [userId]: updated
+          }
+        })
+        
+        // Mark the new alias as used
+        setUsedAliases(prev => new Set([...prev, alias]))
+      }
+    }
+    
+    setTouchedElement(null)
+    setDragOverId(null)
   }
 
   // Countdown timer effect
@@ -433,8 +559,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
               
               <div className="field-group">
                 <div className="field-label">Agent</div>
-                <div className="field-row">
-                  <span className={agentNameVisible ? 'visible' : 'hidden'}>{agentName}</span>
+                <div className={`field-row ${agentNameVisible ? 'visible' : 'hidden'}`}>
+                  <span>{agentName}</span>
                   <button onClick={() => setAgentNameVisible(!agentNameVisible)} className="toggle-button">
                     {agentNameVisible ? (
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -452,8 +578,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
               
               <div className="field-group">
                 <div className="field-label">AKA</div>
-                <div className="field-row">
-                  <span className={realNameVisible ? 'visible' : 'hidden'}>{firstName} {lastName}</span>
+                <div className={`field-row ${realNameVisible ? 'visible' : 'hidden'}`}>
+                  <span>{firstName} {lastName}</span>
                   <button onClick={() => setRealNameVisible(!realNameVisible)} className="toggle-button">
                     {realNameVisible ? (
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -471,8 +597,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
               
               <div className="field-group">
                 <div className="field-label">Team</div>
-                <div className="field-row">
-                  <span className={`team-${team} ${teamVisible ? 'visible' : 'hidden'}`}>{team} team</span>
+                <div className={`field-row ${teamVisible ? 'visible' : 'hidden'} team-${team}`}>
+                  <span>{team} team</span>
                   <button onClick={() => setTeamVisible(!teamVisible)} className="toggle-button">
                     {teamVisible ? (
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -613,13 +739,14 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                           return fullName.includes(userFilter.toLowerCase())
                         })
                         .map((user) => (
-                        <tr key={`${user.id}-name`}>
+                        <tr key={`${user.id}-name`} data-user-id={user.id}>
                           <td 
                             className={`${
                               userSelections[user.id] === 'red' ? 'team-red' : 
                               userSelections[user.id] === 'blue' ? 'team-blue' : 
                               ''
                             }`}
+                            data-user-id={user.id}
                           >
                             {user.firstname} {user.lastname}
                           </td>
@@ -629,6 +756,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                                 onDragOver={(e) => handleDragOver(e, user.id, 0)}
                                 onDragLeave={handleDragLeave}
                                 onDrop={(e) => handleDrop(e, user.id, 0)}
+                                data-user-id={user.id}
+                                data-target-index="0"
                                 className={`drop-zone ${dragOverId === `${user.id}-0` ? 'drag-over' : ''} ${userAliases[user.id]?.[0] ? 'filled' : ''}`}
                               >
                                 <span className="alias-text">
@@ -650,6 +779,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                                 onDragOver={(e) => handleDragOver(e, user.id, 1)}
                                 onDragLeave={handleDragLeave}
                                 onDrop={(e) => handleDrop(e, user.id, 1)}
+                                data-user-id={user.id}
+                                data-target-index="1"
                                 className={`drop-zone ${dragOverId === `${user.id}-1` ? 'drag-over' : ''} ${userAliases[user.id]?.[1] ? 'filled' : ''}`}
                               >
                                 <span className="alias-text">
@@ -762,17 +893,29 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                 <div className="alias-section">
                     {randomizedAliases
                       .filter(alias => !usedAliases.has(alias))
-                      .map((alias, index) => (
-                        <div 
-                          key={`alias-${index}`}
-                          draggable
-                          data-alias={alias}
-                          onDragStart={(e) => handleDragStart(e, alias)}
-                          onDragEnd={handleDragEnd}
-                        >
-                          {alias}
-                        </div>
-                      ))}
+                      .map((alias, index) => {
+                        // Create a deterministic rotation based on the alias text
+                        const hash = alias.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+                        const rotation = ((hash % 12) - 6) * 0.5 // -3 to +3 degrees
+                        return (
+                          <div 
+                            key={`alias-${index}`}
+                            className="alias-section-item"
+                            draggable
+                            data-alias={alias}
+                            onDragStart={(e) => handleDragStart(e, alias)}
+                            onDragEnd={handleDragEnd}
+                            onTouchStart={(e) => handleTouchStart(e, alias)}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={handleTouchEnd}
+                            style={{
+                              '--rotation': `${rotation}deg`
+                            }}
+                          >
+                            {alias}
+                          </div>
+                        )
+                      })}
                 </div>
               </>
             )}
