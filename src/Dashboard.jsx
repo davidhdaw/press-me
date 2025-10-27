@@ -164,6 +164,21 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     setDragOverId(null)
   }
 
+  const handleClearAll = () => {
+    // Reset all team selections to unknown
+    const unknownSelections = {}
+    users.forEach(user => {
+      unknownSelections[user.id] = 'unknown'
+    })
+    setUserSelections(unknownSelections)
+    
+    // Clear all aliases
+    setUserAliases({})
+    
+    // Clear used aliases so they reappear in alias-section
+    setUsedAliases(new Set())
+  }
+
   // Countdown timer effect
   useEffect(() => {
     const timer = setInterval(() => {
@@ -496,7 +511,12 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
               <>
                 <div className="intel-container">
                   <div className="intel-section">
-                    <h3>Guest list</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3>Guest list</h3>
+                      <button onClick={handleClearAll} className="clear-button">
+                        Clear
+                      </button>
+                    </div>
                     <table className="users-list">
                     <thead>
                       <tr>
@@ -525,7 +545,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                                 onDrop={(e) => handleDrop(e, user.id, 0)}
                                 className={`drop-zone ${dragOverId === `${user.id}-0` ? 'drag-over' : ''} ${userAliases[user.id]?.[0] ? 'filled' : ''}`}
                               >
-                                {userAliases[user.id]?.[0] || 'Drop alias here'}
+                                {userAliases[user.id]?.[0] || 'AKA...'}
                               </div>
                               <div 
                                 onDragOver={(e) => handleDragOver(e, user.id, 1)}
@@ -533,7 +553,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                                 onDrop={(e) => handleDrop(e, user.id, 1)}
                                 className={`drop-zone ${dragOverId === `${user.id}-1` ? 'drag-over' : ''} ${userAliases[user.id]?.[1] ? 'filled' : ''}`}
                               >
-                                {userAliases[user.id]?.[1] || 'Drop alias here'}
+                                {userAliases[user.id]?.[1] || 'AKA...'}
                               </div>
                             </div>
                           </td>

@@ -754,6 +754,7 @@
   width: 100%;
   border-collapse: collapse;
   margin-top: var(--unit-xs);
+  table-layout: fixed;
 }
 
 .intel-section .users-list thead{
@@ -769,6 +770,19 @@
   margin: var(--unit-sm) 0;
 }
 
+.clear-button{
+  background-color: var(--white);
+  color: var(--red);
+  border: none;
+  padding: var(--unit-xs) var(--unit-sm);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
 .intel-section .users-list th{
   font-weight: 500;
   font-size: 0.75em;
@@ -776,8 +790,26 @@
   letter-spacing: 1px;
 }
 
-.intel-section .users-list th:nth-child(3){
+.intel-section .users-list th:nth-child(3),
+.intel-section .users-list td:nth-child(3){
   text-align: center;
+}
+
+.intel-section .users-list th:nth-child(1),
+.intel-section .users-list td:nth-child(1){
+  width: 35%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.intel-section .users-list th:nth-child(2),
+.intel-section .users-list td:nth-child(2){
+  width: 37%;
+}
+
+.intel-section .users-list th:nth-child(3),
+.intel-section .users-list td:nth-child(3){
+  width: 28%;
 }
 
 .intel-section .users-list th,
@@ -872,6 +904,12 @@
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px dashed var(--brown);
+  border-radius: var(--unit-xs);
+  padding: var(--unit-xs);
+  color: var(--brown);
 }
 
 .drop-zone:hover{
@@ -879,11 +917,19 @@
 }
 
 .drop-zone.drag-over{
-  background-color: var(--red);
+  background-color: var(--green);
 }
 
 .drop-zone.filled{
-  background-color: var(--yellow);
+  background-color: var(--white);
+  padding: var(--unit-xs);
+  border-radius: var(--unit-xs);
+  border: 1px solid var(--brown);
+  font-family: 'Jost', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  cursor: default;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .aka-container{
@@ -894,4 +940,9 @@
 
 .aka-container .drop-zone{
   min-height: 35px;
+}
+
+.aka-container .drop-zone.filled{
+  min-height: auto;
+  display: inline-block;
 }
