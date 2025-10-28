@@ -28,7 +28,7 @@ function Mission({ alias1, alias2, realName, team, onLogout }) {
   return (
     <div className={"mission-container " + (bgColor)}>
         <div className="agent-header">
-        <p>Welcome to the <span className={teamColor}>{team} team</span>, <span className={bgColor}>{realName}</span>... or should I say</p>>
+        <p>Welcome to the <span className={teamColor}>{team} team</span>, <span className={bgColor}>{realName}</span>... or should I say</p>
         </div>
 
         <div className="agent-intro">
