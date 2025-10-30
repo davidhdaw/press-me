@@ -417,10 +417,20 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     return () => clearInterval(timer)
   }, [missions])
 
-  const fetchRandomMissions = async () => {
+  const fetchRandomMissions = async (doReset = false) => {
     try {
       setLoading(true)
-      const assignedMissions = await neonApi.refreshMissions(agentId)
+      // Optionally reset and reassign before fetching
+      if (doReset) {
+        await neonApi.resetAndAssignBookMissions()
+      }
+      // Fetch book missions assigned to this agent directly from Neon
+      let assignedMissions = await neonApi.getBookMissionsForAgent(agentId)
+      // If none assigned yet, attempt assignment then fetch again
+      if (!assignedMissions || assignedMissions.length === 0) {
+        await neonApi.assignBookMissions()
+        assignedMissions = await neonApi.getBookMissionsForAgent(agentId)
+      }
       setMissions(assignedMissions)
       // Clear completed missions state when refreshing
       setCompletedMissions(new Set())
@@ -688,7 +698,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   onClick={() => openMissionModal(mission.id)}
                 >
                   <div className="mission-header">
-                    <h3>Operation {mission.title}</h3>
+                    <h3>Book Operation: {mission.title}</h3>
                   </div>
                   
                     <p>{mission.mission_body}</p>
@@ -703,13 +713,13 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   {missions
                     .filter(mission => completedMissions.has(mission.id))
                     .map((mission, index) => (
-                      <li key={mission.id}>Operation {mission.title}</li>
+                      <li key={mission.id}>Book Operation: {mission.title}</li>
                     ))}
                 </ul>
               </div>
             )}
             
-            <button onClick={fetchRandomMissions} className="refresh-button button-min">
+            <button onClick={() => fetchRandomMissions(true)} className="refresh-button button-min">
               Refresh missions
             </button>
           </div>

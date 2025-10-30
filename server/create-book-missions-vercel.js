@@ -1,10 +1,35 @@
+const path = require('path');
+const dotenv = require('dotenv');
+// Load env from server/.env first, then fallback to project root .env
+const loadedServerEnv = dotenv.config({ path: path.resolve(__dirname, '.env') });
+if (loadedServerEnv.error) {
+  dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+}
+
+// Support Neon-style DATABASE_URL by mapping to POSTGRES_URL for @vercel/postgres
+if (!process.env.POSTGRES_URL && process.env.DATABASE_URL) {
+  process.env.POSTGRES_URL = process.env.DATABASE_URL;
+}
+
+// Normalize connection string: ensure sslmode=require and fix truncated values
+(function normalizeDbUrl() {
+  let url = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  if (!url) return;
+  if (/sslmode=$/.test(url)) {
+    url += 'require';
+  }
+  if (!/([?&])sslmode=/.test(url)) {
+    url += (url.includes('?') ? '&' : '?') + 'sslmode=require';
+  }
+  process.env.POSTGRES_URL = url;
+})();
+
 const { sql } = require('@vercel/postgres');
-require('dotenv').config();
 
 async function createBookMissionsTable() {
   try {
-    if (!process.env.POSTGRES_URL) {
-      console.error('POSTGRES_URL is required to run against Vercel Postgres.');
+    if (!process.env.POSTGRES_URL && !process.env.DATABASE_URL) {
+      console.error('Missing database URL. Set POSTGRES_URL or DATABASE_URL in your .env');
       process.exit(1);
     }
 
@@ -18,7 +43,12 @@ async function createBookMissionsTable() {
         answer_red VARCHAR,
         clue_blue VARCHAR,
         answer_blue VARCHAR,
-        assigned_to INTEGER[]
+        red_completed BOOLEAN NOT NULL DEFAULT false,
+        blue_completed BOOLEAN NOT NULL DEFAULT false,
+        assigned_red INTEGER,
+        assigned_blue INTEGER,
+        previous_reds INTEGER[],
+        previous_blues INTEGER[]
       )
     `;
 
@@ -48,8 +78,30 @@ async function createBookMissionsTable() {
 
     for (const s of seeds) {
       await sql`
-        INSERT INTO book_missions (id, book, clue_red, answer_red, clue_blue, answer_blue, assigned_to)
-        VALUES (${s.id}, ${s.book}, ${s.clue_red}, ${s.answer_red}, ${s.clue_blue}, ${s.answer_blue}, ${[]})
+        INSERT INTO book_missions (
+          id,
+          book,
+          clue_red,
+          answer_red,
+          clue_blue,
+          answer_blue,
+          assigned_red,
+          assigned_blue,
+          previous_reds,
+          previous_blues
+        )
+        VALUES (
+          ${s.id},
+          ${s.book},
+          ${s.clue_red},
+          ${s.answer_red},
+          ${s.clue_blue},
+          ${s.answer_blue},
+          ${null},
+          ${null},
+          ${[]},
+          ${[]}
+        )
         ON CONFLICT (id) DO UPDATE SET
           book = EXCLUDED.book,
           clue_red = EXCLUDED.clue_red,

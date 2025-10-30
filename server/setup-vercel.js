@@ -1,13 +1,27 @@
+const path = require('path');
+const dotenv = require('dotenv');
+// Load env
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+
+// Map DATABASE_URL to POSTGRES_URL if needed and normalize
+(function normalizeDbUrl() {
+  let url = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  if (!url) return;
+  if (/sslmode=$/.test(url)) url += 'require';
+  if (!/([?&])sslmode=/.test(url)) url += (url.includes('?') ? '&' : '?') + 'sslmode=require';
+  process.env.POSTGRES_URL = url;
+})();
+
 const { sql } = require('@vercel/postgres');
-require('dotenv').config();
 
 async function setupVercelDatabase() {
   try {
     console.log('Setting up Vercel Postgres database...');
     
-    // Check if we have the POSTGRES_URL
-    if (!process.env.POSTGRES_URL) {
-      console.error('POSTGRES_URL environment variable is required for Vercel Postgres');
+    // Check if we have a usable DB URL
+    if (!process.env.POSTGRES_URL && !process.env.DATABASE_URL) {
+      console.error('Missing database URL. Set POSTGRES_URL or DATABASE_URL in your .env');
       process.exit(1);
     }
     
