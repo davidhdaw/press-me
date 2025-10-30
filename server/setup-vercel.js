@@ -87,6 +87,19 @@ async function setupVercelDatabase() {
         timestamp TIMESTAMP DEFAULT NOW()
       )
     `;
+
+    // Create book_missions table
+    await sql`
+      CREATE TABLE IF NOT EXISTS book_missions (
+        id INTEGER PRIMARY KEY,
+        book VARCHAR,
+        clue_red VARCHAR,
+        answer_red VARCHAR,
+        clue_blue VARCHAR,
+        answer_blue VARCHAR,
+        assigned_to INTEGER[]
+      )
+    `;
     
     // Insert teams
     await sql`
@@ -104,6 +117,7 @@ async function setupVercelDatabase() {
     await sql`CREATE INDEX idx_login_logs_agent_name ON login_logs(agent_name)`;
     await sql`CREATE INDEX idx_missions_assigned_agent ON missions(assigned_agent)`;
     await sql`CREATE INDEX idx_missions_assigned_now ON missions(assigned_now)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_book_missions_book ON book_missions(book)`;
     
     console.log('✓ Tables created successfully');
     
