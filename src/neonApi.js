@@ -234,6 +234,22 @@ export const neonApi = {
     }
   },
 
+  // Get all intel for a specific agent (from agent_intel table)
+  async getAgentIntel(agentId) {
+    try {
+      const result = await sql`
+        SELECT alias, intel_type, intel_value, position
+        FROM agent_intel
+        WHERE agent_id = ${agentId}
+        ORDER BY alias, intel_type
+      `;
+      return result;
+    } catch (error) {
+      console.error('Error fetching agent intel:', error);
+      throw error;
+    }
+  },
+
   // Add intel clue
   async addIntel(clueText, agentsWhoKnow = []) {
     try {
@@ -433,6 +449,19 @@ export const neonApi = {
       return await this.assignBookMissions()
     } catch (error) {
       console.error('Error resetting and assigning book missions (Neon):', error)
+      throw error
+    }
+  }
+  ,
+
+  // Clear all intel for a specific agent
+  async clearAgentIntel(agentId) {
+    try {
+      await sql`
+        DELETE FROM agent_intel WHERE agent_id = ${agentId}
+      `
+    } catch (error) {
+      console.error('Error clearing agent intel:', error)
       throw error
     }
   }

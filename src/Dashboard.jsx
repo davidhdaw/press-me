@@ -20,6 +20,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [randomizedAliases, setRandomizedAliases] = useState([])
   const [userSelections, setUserSelections] = useState({})
   const [userAliases, setUserAliases] = useState({})
+  const [lockedAliases, setLockedAliases] = useState({}) // Track aliases locked by intel: { userId: [position0, position1] }
+  const [aliasTeams, setAliasTeams] = useState({}) // Track team intel for aliases: { alias: 'red' | 'blue' }
   const [dragOverId, setDragOverId] = useState(null)
   const [usedAliases, setUsedAliases] = useState(new Set())
   const [userFilter, setUserFilter] = useState('')
@@ -173,17 +175,53 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       const allUsers = await neonApi.getUsers()
       setUsers(allUsers)
       
+      // Get agent's intel
+      const agentIntel = await neonApi.getAgentIntel(agentId)
+      
       // Initialize user selections with their actual teams
       const selections = {}
+      const knownAliases = {} // { userId: [alias1, alias2] }
+      const lockedPositions = {} // { userId: [position0, position1] - true if locked }
+      
       allUsers.forEach(user => {
         selections[user.id] = user.team
+        knownAliases[user.id] = [null, null]
+        lockedPositions[user.id] = [false, false]
       })
-      setUserSelections(selections)
       
-      // Randomize aliases once when users are fetched
-      const aliases = allUsers.flatMap(user => [user.alias_1, user.alias_2])
-      const shuffled = [...aliases].sort(() => Math.random() - 0.5)
+      // Track team intel for aliases
+      const aliasTeamMap = {}
+      
+      // Process agent intel to populate known aliases
+      agentIntel.forEach(intel => {
+        if (intel.intel_type === 'user' && intel.position) {
+          // Find the user this intel is about
+          const userInfo = allUsers.find(u => u.id === Number(intel.intel_value))
+          if (userInfo) {
+            const positionIndex = intel.position - 1 // position is 1 or 2, array index is 0 or 1
+            knownAliases[userInfo.id][positionIndex] = intel.alias
+            lockedPositions[userInfo.id][positionIndex] = true
+          }
+        } else if (intel.intel_type === 'team') {
+          // Store team affiliation for this alias
+          aliasTeamMap[intel.alias] = intel.intel_value
+        }
+      })
+      
+      setUserSelections(selections)
+      setUserAliases(knownAliases)
+      setLockedAliases(lockedPositions)
+      setAliasTeams(aliasTeamMap)
+      
+      // Randomize aliases, excluding known ones
+      const allAliases = allUsers.flatMap(user => [user.alias_1, user.alias_2])
+      const knownAliasSet = new Set(Object.values(knownAliases).flat().filter(a => a !== null))
+      const unknownAliases = allAliases.filter(alias => !knownAliasSet.has(alias))
+      const shuffled = [...unknownAliases].sort(() => Math.random() - 0.5)
       setRandomizedAliases(shuffled)
+      
+      // Mark known aliases as used so they don't appear in the pool
+      setUsedAliases(knownAliasSet)
     } catch (error) {
       console.error('Error fetching users:', error)
     } finally {
@@ -218,6 +256,13 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
 
   const handleDrop = (e, userId, targetIndex) => {
     e.preventDefault()
+    
+    // Prevent dropping on locked positions
+    if (lockedAliases[userId]?.[targetIndex]) {
+      setDragOverId(null)
+      return
+    }
+    
     const alias = e.dataTransfer.getData('text/plain')
     
     // Remove the dragging class from all elements
@@ -255,6 +300,11 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   }
 
   const handleRemoveAlias = (userId, targetIndex) => {
+    // Prevent removing locked aliases
+    if (lockedAliases[userId]?.[targetIndex]) {
+      return
+    }
+    
     const currentAliases = userAliases[userId] || []
     const aliasToRemove = currentAliases[targetIndex]
     
@@ -287,11 +337,25 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     })
     setUserSelections(unknownSelections)
     
-    // Clear all aliases
-    setUserAliases({})
+    // Clear all aliases except locked ones
+    const clearedAliases = {}
+    const allAliases = new Set()
+    users.forEach(user => {
+      clearedAliases[user.id] = [null, null]
+      // Keep locked aliases
+      if (lockedAliases[user.id]?.[0] && userAliases[user.id]?.[0]) {
+        clearedAliases[user.id][0] = userAliases[user.id][0]
+        allAliases.add(userAliases[user.id][0])
+      }
+      if (lockedAliases[user.id]?.[1] && userAliases[user.id]?.[1]) {
+        clearedAliases[user.id][1] = userAliases[user.id][1]
+        allAliases.add(userAliases[user.id][1])
+      }
+    })
+    setUserAliases(clearedAliases)
     
-    // Clear used aliases so they reappear in alias-section
-    setUsedAliases(new Set())
+    // Keep locked aliases marked as used, clear others
+    setUsedAliases(allAliases)
   }
 
   // Touch handlers for mobile
@@ -326,8 +390,14 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       const targetIndex = dropZone.getAttribute('data-target-index')
       
       if (userId && targetIndex !== null) {
-        const foundId = `${userId}-${targetIndex}`
-        setDragOverId(foundId)
+        // Don't allow drag over locked positions
+        const index = parseInt(targetIndex, 10)
+        if (!lockedAliases[userId]?.[index]) {
+          const foundId = `${userId}-${targetIndex}`
+          setDragOverId(foundId)
+        } else {
+          setDragOverId(null)
+        }
       }
     } else {
       setDragOverId(null)
@@ -353,6 +423,13 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       const targetIndex = parseInt(dropZone.getAttribute('data-target-index'), 10)
       
       if (userId && !isNaN(targetIndex)) {
+        // Prevent dropping on locked positions
+        if (lockedAliases[userId]?.[targetIndex]) {
+          setTouchedElement(null)
+          setDragOverId(null)
+          return
+        }
+        
         // Use the existing handleDrop logic
         const alias = touchedElement.alias
         
@@ -426,6 +503,15 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       // Optionally reset and reassign before fetching
       if (doReset) {
         await neonApi.resetAndAssignBookMissions()
+        // Clear all intel for this agent
+        await neonApi.clearAgentIntel(agentId)
+        // Reset intel tab state if users are loaded
+        if (users.length > 0) {
+          setUserAliases({})
+          setLockedAliases({})
+          setAliasTeams({})
+          setUsedAliases(new Set())
+        }
       }
       // Fetch book missions assigned to this agent directly from Neon
       let assignedMissions = await neonApi.getBookMissionsForAgent(agentId)
@@ -498,6 +584,10 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       // Store the intel if provided
       if (result.intel) {
         setMissionIntel(result.intel)
+        // Refresh intel tab data if it's already loaded
+        if (users.length > 0) {
+          fetchUsers()
+        }
       }
       
       // Show success state if modal is open
@@ -810,17 +900,17 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                           <td>
                             <div className="aka-container">
                               <div 
-                                onDragOver={(e) => handleDragOver(e, user.id, 0)}
+                                onDragOver={(e) => !lockedAliases[user.id]?.[0] && handleDragOver(e, user.id, 0)}
                                 onDragLeave={handleDragLeave}
                                 onDrop={(e) => handleDrop(e, user.id, 0)}
                                 data-user-id={user.id}
                                 data-target-index="0"
-                                className={`drop-zone ${dragOverId === `${user.id}-0` ? 'drag-over' : ''} ${userAliases[user.id]?.[0] ? 'filled' : ''}`}
+                                className={`drop-zone ${dragOverId === `${user.id}-0` ? 'drag-over' : ''} ${userAliases[user.id]?.[0] ? 'filled' : ''} ${lockedAliases[user.id]?.[0] ? 'locked' : ''}`}
                               >
-                                <span className="alias-text">
+                                <span className={`alias-text ${aliasTeams[userAliases[user.id]?.[0]] ? `team-${aliasTeams[userAliases[user.id]?.[0]]}` : ''}`}>
                                   {userAliases[user.id]?.[0] || 'AKA...'}
                                 </span>
-                                {userAliases[user.id]?.[0] && (
+                                {userAliases[user.id]?.[0] && !lockedAliases[user.id]?.[0] && (
                                   <button 
                                     onClick={(e) => {
                                       e.stopPropagation()
@@ -833,17 +923,17 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                                 )}
                               </div>
                               <div 
-                                onDragOver={(e) => handleDragOver(e, user.id, 1)}
+                                onDragOver={(e) => !lockedAliases[user.id]?.[1] && handleDragOver(e, user.id, 1)}
                                 onDragLeave={handleDragLeave}
                                 onDrop={(e) => handleDrop(e, user.id, 1)}
                                 data-user-id={user.id}
                                 data-target-index="1"
-                                className={`drop-zone ${dragOverId === `${user.id}-1` ? 'drag-over' : ''} ${userAliases[user.id]?.[1] ? 'filled' : ''}`}
+                                className={`drop-zone ${dragOverId === `${user.id}-1` ? 'drag-over' : ''} ${userAliases[user.id]?.[1] ? 'filled' : ''} ${lockedAliases[user.id]?.[1] ? 'locked' : ''}`}
                               >
-                                <span className="alias-text">
+                                <span className={`alias-text ${aliasTeams[userAliases[user.id]?.[1]] ? `team-${aliasTeams[userAliases[user.id]?.[1]]}` : ''}`}>
                                   {userAliases[user.id]?.[1] || 'AKA...'}
                                 </span>
-                                {userAliases[user.id]?.[1] && (
+                                {userAliases[user.id]?.[1] && !lockedAliases[user.id]?.[1] && (
                                   <button 
                                     onClick={(e) => {
                                       e.stopPropagation()
@@ -954,10 +1044,11 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                         // Create a deterministic rotation based on the alias text
                         const hash = alias.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
                         const rotation = ((hash % 12) - 6) * 0.5 // -3 to +3 degrees
+                        const teamColor = aliasTeams[alias] ? `team-${aliasTeams[alias]}` : ''
                         return (
                           <div 
                             key={`alias-${index}`}
-                            className="alias-section-item"
+                            className={`alias-section-item ${teamColor}`}
                             draggable
                             data-alias={alias}
                             onDragStart={(e) => handleDragStart(e, alias)}
@@ -1063,6 +1154,11 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                           type="text"
                           value={successKeys[selectedMissionId] || ''}
                           onChange={(e) => handleSuccessKeyChange(selectedMissionId, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && successKeys[selectedMissionId]) {
+                              handleSubmitMission(selectedMissionId)
+                            }
+                          }}
                           placeholder="Enter success key..."
                         />
                       </div>
@@ -1110,7 +1206,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                           ) : missionIntel.intel_type === 'user' && missionIntel.user_name ? (
                             <p>
                               {missionIntel.user_name}
-                              {' uses the alias '}
+                              {' uses the '}
+                              <span className="alias-container filled">{missionIntel.position === 1 ? 'first' : 'second'}</span>
+                              {' alias '}
                               <span className="alias-container filled">{missionIntel.alias}</span>
                               {'.'}
                             </p>
