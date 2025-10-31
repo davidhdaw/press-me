@@ -42,6 +42,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [isMissionClosing, setIsMissionClosing] = useState(false)
   const [selectedMissionId, setSelectedMissionId] = useState(null)
   const [showMissionSuccess, setShowMissionSuccess] = useState(false)
+  const [missionIntel, setMissionIntel] = useState(null)
  
   // Data arrays for relationships and alibis
   const relationships = [
@@ -98,6 +99,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     setShowMissionModal(true)
     setShowMissionSuccess(false) // Reset success state when opening modal
     setMissionErrors(prev => ({ ...prev, [missionId]: '' })) // Clear any previous errors
+    setMissionIntel(null) // Clear any previous intel
   }
 
   const closeMissionModal = () => {
@@ -107,6 +109,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       setIsMissionClosing(false)
       setSelectedMissionId(null)
       setShowMissionSuccess(false)
+      setMissionIntel(null) // Clear intel when closing
     }, 300)
   }
 
@@ -477,9 +480,11 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     // Clear any existing error for this mission
     setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
     setShowMissionSuccess(false) // Reset success state
+    setMissionIntel(null)
 
     try {
-      await neonApi.completeMission(missionId, successKey, { team: team, points: 10 })
+      // Book missions use completeBookMission which returns intel
+      const result = await neonApi.completeBookMission(missionId, successKey, agentId)
       
       // Mission completed successfully
       setCompletedMissions(prev => new Set([...prev, missionId]))
@@ -490,6 +495,11 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       })
       setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
       
+      // Store the intel if provided
+      if (result.intel) {
+        setMissionIntel(result.intel)
+      }
+      
       // Show success state if modal is open
       if (selectedMissionId === missionId) {
         setShowMissionSuccess(true)
@@ -498,6 +508,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       console.error('Error completing mission:', error)
       setMissionErrors(prev => ({ ...prev, [missionId]: error.message || 'Failed to complete mission. Please try again.' }))
       setShowMissionSuccess(false) // Ensure success state is not shown on error
+      setMissionIntel(null)
     }
   }
 
@@ -1085,14 +1096,27 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   <div className="modal-content">
                     <div className="mission-success">
                       <p>Mission success</p>
-                      <h2>Operation {mission.title}</h2>
-                      <div className="success-intel">
-                        <h3>New intel:</h3>
-                        <p>Amanda Rodriguez is also known as
-                        <span className="alias-container filled">Drunken</span> 
-                        <span className="alias-container"></span>.
-                        </p>
-                      </div>
+                      <h2>Book Operation: {mission.title}</h2>
+                      {missionIntel && (
+                        <div className="success-intel">
+                          <h3>New intel:</h3>
+                          {missionIntel.intel_type === 'team' ? (
+                            <p>
+                              <span className="alias-container filled">{missionIntel.alias}</span>
+                              {' is on the '}
+                              <span className={`team-${missionIntel.intel_value}`}>{missionIntel.intel_value}</span>
+                              {' team.'}
+                            </p>
+                          ) : missionIntel.intel_type === 'user' && missionIntel.user_name ? (
+                            <p>
+                              {missionIntel.user_name}
+                              {' uses the alias '}
+                              <span className="alias-container filled">{missionIntel.alias}</span>
+                              {'.'}
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </>
