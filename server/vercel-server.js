@@ -1,8 +1,21 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+
+// Map and normalize DB URL before importing vercel client
+(function normalizeDbUrl() {
+  let url = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  if (!url) return;
+  if (/sslmode=$/.test(url)) url += 'require';
+  if (!/([?&])sslmode=/.test(url)) url += (url.includes('?') ? '&' : '?') + 'sslmode=require';
+  process.env.POSTGRES_URL = url;
+})();
+
 const { sql } = require('@vercel/postgres');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -58,6 +71,144 @@ async function testConnection() {
 testConnection();
 
 // Routes
+// Book missions endpoints
+
+// List all book missions
+app.get('/api/book-missions', async (req, res) => {
+  try {
+    const result = await executeQuery('SELECT * FROM book_missions ORDER BY id');
+    res.json(result.rows || result);
+  } catch (err) {
+    console.error('Error fetching book missions:', err);
+    res.status(500).json({ error: 'Failed to fetch book missions' });
+  }
+});
+
+// Shared assignment logic for book missions
+async function assignBookMissions() {
+  // Get available agents per team
+  const redUsersResult = await executeQuery('SELECT id FROM users WHERE team = $1 AND ishere = true', ['red']);
+  const blueUsersResult = await executeQuery('SELECT id FROM users WHERE team = $1 AND ishere = true', ['blue']);
+  const redUsers = (redUsersResult.rows || redUsersResult).map(u => u.id);
+  const blueUsers = (blueUsersResult.rows || blueUsersResult).map(u => u.id);
+
+  if (redUsers.length === 0 || blueUsers.length === 0) {
+    return { assigned: 0, reason: 'Need at least one available agent on both teams' };
+  }
+
+  // Fetch all book missions with prior assignees
+  const missionsResult = await executeQuery('SELECT id, previous_reds, previous_blues FROM book_missions ORDER BY id');
+  const missions = missionsResult.rows || missionsResult;
+
+  // Helper to pick a random element
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  // Current assignment counts per user (to enforce max 3 missions per agent)
+  const redCountsRes = await executeQuery(
+    `SELECT assigned_red AS user_id, COUNT(*)::int AS cnt
+     FROM book_missions WHERE assigned_red IS NOT NULL GROUP BY assigned_red`
+  );
+  const blueCountsRes = await executeQuery(
+    `SELECT assigned_blue AS user_id, COUNT(*)::int AS cnt
+     FROM book_missions WHERE assigned_blue IS NOT NULL GROUP BY assigned_blue`
+  );
+  const redCountMap = new Map((redCountsRes.rows || redCountsRes).map(r => [r.user_id, r.cnt]));
+  const blueCountMap = new Map((blueCountsRes.rows || blueCountsRes).map(r => [r.user_id, r.cnt]));
+
+  let updates = 0;
+  // Assign each mission to one random red and one random blue, excluding prior assignees
+  for (const m of missions) {
+    const prevReds = Array.isArray(m.previous_reds) ? m.previous_reds : [];
+    const prevBlues = Array.isArray(m.previous_blues) ? m.previous_blues : [];
+
+    const eligibleReds = redUsers.filter(id => !prevReds.includes(id) && (redCountMap.get(id) || 0) < 3);
+    const eligibleBlues = blueUsers.filter(id => !prevBlues.includes(id) && (blueCountMap.get(id) || 0) < 3);
+
+    const redId = eligibleReds.length ? pick(eligibleReds) : null;
+    const blueId = eligibleBlues.length ? pick(eligibleBlues) : null;
+
+    // Only update columns we have eligible users for
+    if (redId !== null && blueId !== null) {
+      await executeQuery(
+        `UPDATE book_missions
+         SET assigned_red = $1,
+             assigned_blue = $2,
+             previous_reds = array_append(COALESCE(previous_reds, ARRAY[]::integer[]), $1),
+             previous_blues = array_append(COALESCE(previous_blues, ARRAY[]::integer[]), $2)
+         WHERE id = $3`,
+        [redId, blueId, m.id]
+      );
+      updates++;
+      redCountMap.set(redId, (redCountMap.get(redId) || 0) + 1);
+      blueCountMap.set(blueId, (blueCountMap.get(blueId) || 0) + 1);
+    } else if (redId !== null) {
+      await executeQuery(
+        `UPDATE book_missions
+         SET assigned_red = $1,
+             previous_reds = array_append(COALESCE(previous_reds, ARRAY[]::integer[]), $1)
+         WHERE id = $2`,
+        [redId, m.id]
+      );
+      updates++;
+      redCountMap.set(redId, (redCountMap.get(redId) || 0) + 1);
+    } else if (blueId !== null) {
+      await executeQuery(
+        `UPDATE book_missions
+         SET assigned_blue = $1,
+             previous_blues = array_append(COALESCE(previous_blues, ARRAY[]::integer[]), $1)
+         WHERE id = $2`,
+        [blueId, m.id]
+      );
+      updates++;
+      blueCountMap.set(blueId, (blueCountMap.get(blueId) || 0) + 1);
+    }
+  }
+
+  return { assigned: updates };
+}
+
+// HTTP endpoint to trigger assignment (use with Vercel Cron in production)
+app.post('/api/book-missions/assign-random', async (req, res) => {
+  try {
+    const result = await assignBookMissions();
+    res.json({ message: `Assignments updated`, ...result });
+  } catch (err) {
+    console.error('Error assigning book missions:', err);
+    res.status(500).json({ error: 'Failed to assign book missions' });
+  }
+});
+
+// Optional: local scheduler to periodically assign missions (not reliable on serverless)
+const intervalMinutes = Number(process.env.BOOK_MISSION_INTERVAL_MINUTES || 15);
+if (process.env.ENABLE_BOOK_MISSION_SCHEDULER === 'true') {
+  setInterval(() => {
+    assignBookMissions().catch(err => console.error('Scheduled book mission assignment failed:', err));
+  }, intervalMinutes * 60 * 1000);
+}
+
+// Get book missions assigned to a specific agent
+app.get('/api/book-missions/for-agent/:agentId', async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const idNum = Number(agentId);
+    const result = await executeQuery(
+      'SELECT id, book, clue_red, clue_blue, assigned_red, assigned_blue FROM book_missions WHERE assigned_red = $1 OR assigned_blue = $1 ORDER BY id',
+      [idNum]
+    );
+    const rows = result.rows || result;
+    const payload = rows.map(r => {
+      if (r.assigned_red === idNum) {
+        return { id: r.id, book: r.book, clue: r.clue_red, color: 'red' };
+      }
+      return { id: r.id, book: r.book, clue: r.clue_blue, color: 'blue' };
+    });
+    res.json(payload);
+  } catch (err) {
+    console.error('Error fetching book missions for agent:', err);
+    res.status(500).json({ error: 'Failed to fetch book missions for agent' });
+  }
+});
+
 
 // Get all users
 app.get('/api/users', async (req, res) => {
