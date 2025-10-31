@@ -436,4 +436,190 @@ export const neonApi = {
       throw error
     }
   }
+  ,
+
+  // Generate and award random unknown intel to an agent
+  async generateRandomIntel(agentId) {
+    try {
+      // Get all users with their aliases and teams
+      const users = await sql`
+        SELECT id, firstname, lastname, alias_1, alias_2, team FROM users WHERE ishere = true
+      `
+
+      // Get the agent's own user info to exclude their own aliases
+      const agentUser = users.find(u => u.id === agentId)
+      const agentAliases = agentUser ? new Set([agentUser.alias_1, agentUser.alias_2]) : new Set()
+
+      // Get what intel this agent already has
+      const existingIntel = await sql`
+        SELECT alias, intel_type FROM agent_intel WHERE agent_id = ${agentId}
+      `
+      const knownMap = new Map()
+      existingIntel.forEach(i => {
+        const key = `${i.alias}_${i.intel_type}`
+        knownMap.set(key, true)
+      })
+
+      // Build list of possible intel (excluding agent's own aliases)
+      const possibleIntel = []
+
+      for (const user of users) {
+        // Skip intel about the agent's own aliases
+        if (agentAliases.has(user.alias_1) || agentAliases.has(user.alias_2)) {
+          continue
+        }
+        // Check alias_1 team intel
+        const alias1TeamKey = `${user.alias_1}_team`
+        if (!knownMap.has(alias1TeamKey)) {
+          possibleIntel.push({
+            alias: user.alias_1,
+            intel_type: 'team',
+            intel_value: user.team,
+            position: null
+          })
+        }
+
+        // Check alias_2 team intel
+        const alias2TeamKey = `${user.alias_2}_team`
+        if (!knownMap.has(alias2TeamKey)) {
+          possibleIntel.push({
+            alias: user.alias_2,
+            intel_type: 'team',
+            intel_value: user.team,
+            position: null
+          })
+        }
+
+        // Check alias_1 user intel
+        const alias1UserKey = `${user.alias_1}_user`
+        if (!knownMap.has(alias1UserKey)) {
+          possibleIntel.push({
+            alias: user.alias_1,
+            intel_type: 'user',
+            intel_value: String(user.id),
+            position: 1
+          })
+        }
+
+        // Check alias_2 user intel
+        const alias2UserKey = `${user.alias_2}_user`
+        if (!knownMap.has(alias2UserKey)) {
+          possibleIntel.push({
+            alias: user.alias_2,
+            intel_type: 'user',
+            intel_value: String(user.id),
+            position: 2
+          })
+        }
+      }
+
+      if (possibleIntel.length === 0) {
+        return null // Agent already knows everything
+      }
+
+      // Pick random intel
+      const selectedIntel = possibleIntel[Math.floor(Math.random() * possibleIntel.length)]
+
+      // Store it in agent_intel
+      await sql`
+        INSERT INTO agent_intel (agent_id, alias, intel_type, intel_value, position)
+        VALUES (${agentId}, ${selectedIntel.alias}, ${selectedIntel.intel_type}, ${selectedIntel.intel_value}, ${selectedIntel.position})
+        ON CONFLICT (agent_id, alias, intel_type) DO NOTHING
+      `
+
+      // Get user info for display (if intel_type is 'user')
+      let user_name = null
+      if (selectedIntel.intel_type === 'user') {
+        const userInfo = users.find(u => u.id === Number(selectedIntel.intel_value))
+        if (userInfo) {
+          user_name = `${userInfo.firstname} ${userInfo.lastname}`
+        }
+      }
+
+      return {
+        alias: selectedIntel.alias,
+        intel_type: selectedIntel.intel_type,
+        intel_value: selectedIntel.intel_value,
+        position: selectedIntel.position,
+        user_name: user_name
+      }
+    } catch (error) {
+      console.error('Error generating random intel:', error)
+      throw error
+    }
+  }
+  ,
+
+  // Complete a book mission
+  async completeBookMission(missionId, answer, agentId) {
+    try {
+      // Get the book mission
+      const missionResult = await sql`
+        SELECT id, answer_red, answer_blue, assigned_red, assigned_blue, red_completed, blue_completed
+        FROM book_missions
+        WHERE id = ${missionId}
+      `
+
+      if (missionResult.length === 0) {
+        throw new Error('Mission not found')
+      }
+
+      const mission = missionResult[0]
+      const isAssignedRed = mission.assigned_red === agentId
+      const isAssignedBlue = mission.assigned_blue === agentId
+
+      if (!isAssignedRed && !isAssignedBlue) {
+        throw new Error('Mission not assigned to you')
+      }
+
+      // Check if already completed for this agent
+      if ((isAssignedRed && mission.red_completed) || (isAssignedBlue && mission.blue_completed)) {
+        throw new Error('Mission already completed')
+      }
+
+      // Get the correct answer
+      const correctAnswer = isAssignedRed ? mission.answer_red : mission.answer_blue
+      const answerLower = answer?.toLowerCase().trim()
+      const correctAnswerLower = correctAnswer?.toLowerCase().trim()
+
+      // Validate answer (case-insensitive, flexible matching)
+      if (!answerLower || !correctAnswerLower) {
+        throw new Error('Answer required')
+      }
+
+      const isCorrect = correctAnswerLower === answerLower ||
+                       correctAnswerLower.includes(answerLower) ||
+                       answerLower.includes(correctAnswerLower)
+
+      if (!isCorrect) {
+        throw new Error('Incorrect answer. Try again or talk to your handler.')
+      }
+
+      // Mark mission as completed
+      if (isAssignedRed) {
+        await sql`
+          UPDATE book_missions
+          SET red_completed = true
+          WHERE id = ${missionId}
+        `
+      } else {
+        await sql`
+          UPDATE book_missions
+          SET blue_completed = true
+          WHERE id = ${missionId}
+        `
+      }
+
+      // Generate and award random intel
+      const newIntel = await this.generateRandomIntel(agentId)
+
+      return { 
+        message: 'Mission completed successfully',
+        intel: newIntel
+      }
+    } catch (error) {
+      console.error('Error completing book mission:', error)
+      throw error
+    }
+  }
 };
