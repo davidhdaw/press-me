@@ -36,6 +36,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   // Ref to store current mission IDs for comparison (avoid recreating interval on every change)
   const missionIdsRef = useRef(new Set())
   
+  // Countdown timer state
+  const [nextReassignmentCountdown, setNextReassignmentCountdown] = useState('Calculating...')
+  
   // Modal state
   const [showModal, setShowModal] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
@@ -265,6 +268,102 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       clearInterval(interval)
     }
   }, [agentId]) // Only depend on agentId, not missions
+
+  // Countdown timer for next mission reassignment
+  useEffect(() => {
+    let hasTriggeredCheck = false // Track if we've already triggered the check for this cycle
+    
+    const updateCountdown = async () => {
+      try {
+        const lastAssigned = await neonApi.getLastAssignmentTimestamp()
+        
+        if (!lastAssigned) {
+          setNextReassignmentCountdown('Unknown')
+          return
+        }
+        
+        const now = new Date()
+        const lastAssignedDate = new Date(lastAssigned)
+        
+        // Calculate difference - handle timezone issues same way as shouldReassignMissions
+        let diffMs = now.getTime() - lastAssignedDate.getTime()
+        let diffMinutes = diffMs / (1000 * 60)
+        
+        // Handle timezone offset (same logic as shouldReassignMissions)
+        if (diffMs < 0 && Math.abs(diffMinutes) > 400 && Math.abs(diffMinutes) < 500) {
+          const timezoneOffsetMinutes = 480 // PST is UTC-8
+          const actualElapsedMs = diffMs + (timezoneOffsetMinutes * 60 * 1000)
+          diffMinutes = actualElapsedMs / (1000 * 60)
+        } else if (diffMinutes < 0) {
+          diffMinutes = Math.abs(diffMinutes)
+        }
+        
+        // Calculate time until next reassignment (1 minute for testing, normally 15 minutes)
+        const reassignmentIntervalMinutes = 1 // Testing - change to 15 for production
+        const elapsedMinutes = diffMinutes
+        const remainingMinutes = Math.max(0, reassignmentIntervalMinutes - elapsedMinutes)
+        
+        if (remainingMinutes <= 0) {
+          setNextReassignmentCountdown('Any moment...')
+          
+          // Trigger reassignment check after half a second if we haven't already
+          if (!hasTriggeredCheck) {
+            hasTriggeredCheck = true
+            setTimeout(async () => {
+              try {
+                const shouldReassign = await neonApi.shouldReassignMissions()
+                if (shouldReassign) {
+                  await neonApi.resetAndAssignAllMissions()
+                  // Fetch updated missions for this agent
+                  const newMissions = await neonApi.getAllMissionsForAgent(agentId)
+                  if (newMissions.length > 0) {
+                    setMissions(newMissions)
+                    missionIdsRef.current = new Set(newMissions.map(m => m.id))
+                    setCompletedMissions(new Set())
+                    setSuccessKeys({})
+                  }
+                }
+              } catch (error) {
+                // Silently fail
+              }
+              // Reset the flag after a delay to allow for next cycle
+              setTimeout(() => {
+                hasTriggeredCheck = false
+              }, 2000)
+            }, 500) // Half a second delay
+          }
+        } else {
+          // Reset the trigger flag when countdown is not at zero
+          hasTriggeredCheck = false
+          
+          const totalSeconds = Math.floor(remainingMinutes * 60)
+          const minutes = Math.floor(totalSeconds / 60)
+          const seconds = totalSeconds % 60
+          
+          if (minutes > 0) {
+            setNextReassignmentCountdown(`${minutes}m ${seconds}s`)
+          } else {
+            setNextReassignmentCountdown(`${seconds}s`)
+          }
+        }
+      } catch (error) {
+        setNextReassignmentCountdown('Error calculating')
+      }
+    }
+    
+    // Update immediately
+    updateCountdown()
+    
+    // Update every second
+    const interval = setInterval(() => {
+      updateCountdown()
+    }, 1000)
+    
+    return () => {
+      clearInterval(interval)
+      hasTriggeredCheck = false
+    }
+  }, [missions, agentId]) // Reset countdown when missions change (reassignment happened)
 
   const fetchUsers = async () => {
     try {
@@ -918,6 +1017,10 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
 
         {activeTab === 'missions' && (
           <div className="tab-content">
+            <div className="reassignment-countdown-header">
+              <span className="countdown-label">NEW MISSIONS IN:</span>
+              <span className="countdown-time">{nextReassignmentCountdown}</span>
+            </div>
             <div className="missions-grid">
               {missions
                 .filter(mission => !completedMissions.has(mission.id))

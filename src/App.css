@@ -382,6 +382,25 @@
   box-sizing: border-box;
 }
 
+.reassignment-countdown-header {
+  padding: var(--unit-base);
+  text-align: center;
+  background-color: var(--black);
+  color: var(--yellow);
+  font-weight: 700;
+  font-size: 1.2rem;
+  border-bottom: 2px solid var(--yellow);
+}
+
+.reassignment-countdown-header .countdown-label {
+  margin-right: 0.5rem;
+}
+
+.reassignment-countdown-header .countdown-time {
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
 .missions-grid {
   display: flex;
   flex-direction: column;

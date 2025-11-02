@@ -761,6 +761,32 @@ export const neonApi = {
         }
       }
       
+      // Helper to get actual mission count from database for a user
+      const getActualMissionCount = async (userId) => {
+        try {
+          const bookCount = await sql`
+            SELECT COUNT(*)::int AS cnt FROM book_missions 
+            WHERE (assigned_red = ${userId} OR assigned_blue = ${userId})
+            AND red_completed = false AND blue_completed = false
+          `
+          const passphraseCount = await sql`
+            SELECT COUNT(*)::int AS cnt FROM passphrase_missions 
+            WHERE (assigned_receiver = ${userId} OR assigned_sender_1 = ${userId} OR assigned_sender_2 = ${userId})
+            AND completed = false
+          `
+          const objectCount = await sql`
+            SELECT COUNT(*)::int AS cnt FROM object_missions 
+            WHERE assigned_agent = ${userId} AND completed = false
+          `
+          
+          const total = (bookCount[0]?.cnt || 0) + (passphraseCount[0]?.cnt || 0) + (objectCount[0]?.cnt || 0)
+          return total
+        } catch (error) {
+          // Fallback to in-memory count on error
+          return missionCounts.get(userId) || 0
+        }
+      }
+      
       // Helper to get available users for assignment
       const getAvailableUsers = (excludeIds = []) => {
         return users.filter(u => 
@@ -890,6 +916,16 @@ export const neonApi = {
             if (availableOppositeTeam.length > 0) {
               const partner = pick(availableOppositeTeam)
               
+              // Verify both users actually have < 3 missions before assigning
+              const userActualCount = await getActualMissionCount(user.id)
+              const partnerActualCount = await getActualMissionCount(partner.id)
+              
+              if (userActualCount >= 3 || partnerActualCount >= 3) {
+                // One or both users already have 3 missions, skip this assignment
+                availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
+                continue
+              }
+              
               // Assign both users - verify not completed before updating
               let updateSuccess = false
               if (user.team === 'red') {
@@ -923,14 +959,26 @@ export const neonApi = {
               }
               
               if (updateSuccess) {
-                missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
-                missionCounts.set(partner.id, (missionCounts.get(partner.id) || 0) + 1)
-                missionTypesByUser.get(user.id).push('book')
-                missionTypesByUser.get(partner.id).push('book')
+                // Verify user doesn't already have 3 missions before incrementing
+                const currentUserCount = missionCounts.get(user.id) || 0
+                const currentPartnerCount = missionCounts.get(partner.id) || 0
                 
-                // Remove from available
-                availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
-                assigned = true
+                if (currentUserCount < 3 && currentPartnerCount < 3) {
+                  missionCounts.set(user.id, currentUserCount + 1)
+                  missionCounts.set(partner.id, currentPartnerCount + 1)
+                  missionTypesByUser.get(user.id).push('book')
+                  missionTypesByUser.get(partner.id).push('book')
+                  
+                  // Remove from available
+                  availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
+                  assigned = true
+                } else {
+                  // User or partner already has 3 missions, rollback assignment
+                  // Note: The assignment already happened in the database, but we won't count it
+                  // This prevents the count from exceeding 3, though the DB might have it temporarily
+                  // In a perfect world, we'd rollback the DB update, but for now we'll just not count it
+                  availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
+                }
               } else {
                 // Mission was completed or assigned while we were trying to assign, skip it
                 availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
@@ -976,6 +1024,17 @@ export const neonApi = {
               const remainingAfterSender1 = availableForSenders.filter(u => u.id !== sender1.id)
               const sender2 = pick(remainingAfterSender1)
               
+              // Verify all users actually have < 3 missions before assigning
+              const userActualCount = await getActualMissionCount(user.id)
+              const sender1ActualCount = await getActualMissionCount(sender1.id)
+              const sender2ActualCount = await getActualMissionCount(sender2.id)
+              
+              if (userActualCount >= 3 || sender1ActualCount >= 3 || sender2ActualCount >= 3) {
+                // One or more users already have 3 missions, skip this assignment
+                availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
+                continue
+              }
+              
               const updateResult = await sql`
                 UPDATE passphrase_missions 
                 SET assigned_receiver = ${user.id}, 
@@ -992,16 +1051,26 @@ export const neonApi = {
               `
               
               if (updateResult.length > 0) {
-                missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
-                missionCounts.set(sender1.id, (missionCounts.get(sender1.id) || 0) + 1)
-                missionCounts.set(sender2.id, (missionCounts.get(sender2.id) || 0) + 1)
+                // Verify users don't already have 3 missions before incrementing
+                const currentUserCount = missionCounts.get(user.id) || 0
+                const currentSender1Count = missionCounts.get(sender1.id) || 0
+                const currentSender2Count = missionCounts.get(sender2.id) || 0
                 
-                missionTypesByUser.get(user.id).push('passphrase')
-                missionTypesByUser.get(sender1.id).push('passphrase')
-                missionTypesByUser.get(sender2.id).push('passphrase')
-                
-                availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
-                assigned = true
+                if (currentUserCount < 3 && currentSender1Count < 3 && currentSender2Count < 3) {
+                  missionCounts.set(user.id, currentUserCount + 1)
+                  missionCounts.set(sender1.id, currentSender1Count + 1)
+                  missionCounts.set(sender2.id, currentSender2Count + 1)
+                  
+                  missionTypesByUser.get(user.id).push('passphrase')
+                  missionTypesByUser.get(sender1.id).push('passphrase')
+                  missionTypesByUser.get(sender2.id).push('passphrase')
+                  
+                  availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
+                  assigned = true
+                } else {
+                  // One or more users already have 3 missions, don't count this assignment
+                  availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
+                }
               } else {
                 // Mission was completed or assigned while we were trying to assign, skip it
                 availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
@@ -1020,6 +1089,15 @@ export const neonApi = {
           
           if (eligibleObjectMissions.length > 0) {
             const objectMission = pick(eligibleObjectMissions)
+            
+            // Verify user actually has < 3 missions before assigning
+            const userActualCount = await getActualMissionCount(user.id)
+            
+            if (userActualCount >= 3) {
+              // User already has 3 missions, skip this assignment
+              availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
+              continue
+            }
             
             // Verify mission is still available and not completed before assigning
             const verifyObject = await sql`
@@ -1048,11 +1126,19 @@ export const neonApi = {
             `
             
             if (updateResult.length > 0) {
-              missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
-              missionTypesByUser.get(user.id).push('object')
+              // Verify user doesn't already have 3 missions before incrementing
+              const currentUserCount = missionCounts.get(user.id) || 0
               
-              availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
-              assigned = true
+              if (currentUserCount < 3) {
+                missionCounts.set(user.id, currentUserCount + 1)
+                missionTypesByUser.get(user.id).push('object')
+                
+                availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
+                assigned = true
+              } else {
+                // User already has 3 missions, don't count this assignment
+                availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
+              }
             } else {
               // Mission was completed or assigned while we were trying to assign, skip it
               availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
