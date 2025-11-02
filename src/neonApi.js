@@ -761,30 +761,72 @@ export const neonApi = {
         }
       }
       
-      // Helper to get actual mission count from database for a user
-      const getActualMissionCount = async (userId) => {
-        try {
-          const bookCount = await sql`
-            SELECT COUNT(*)::int AS cnt FROM book_missions 
-            WHERE (assigned_red = ${userId} OR assigned_blue = ${userId})
-            AND red_completed = false AND blue_completed = false
-          `
-          const passphraseCount = await sql`
-            SELECT COUNT(*)::int AS cnt FROM passphrase_missions 
-            WHERE (assigned_receiver = ${userId} OR assigned_sender_1 = ${userId} OR assigned_sender_2 = ${userId})
-            AND completed = false
-          `
-          const objectCount = await sql`
-            SELECT COUNT(*)::int AS cnt FROM object_missions 
-            WHERE assigned_agent = ${userId} AND completed = false
-          `
-          
-          const total = (bookCount[0]?.cnt || 0) + (passphraseCount[0]?.cnt || 0) + (objectCount[0]?.cnt || 0)
-          return total
-        } catch (error) {
-          // Fallback to in-memory count on error
-          return missionCounts.get(userId) || 0
+      // Build initial mission count cache from database (one query per mission type for all users)
+      const actualMissionCounts = new Map()
+      try {
+        // Get all book mission counts for all users in one query
+        // A book mission has both red and blue, so we need to count both separately
+        const bookCounts = await sql`
+          SELECT user_id, COUNT(*)::int AS cnt FROM (
+            SELECT assigned_red AS user_id FROM book_missions WHERE assigned_red IS NOT NULL AND red_completed = false AND blue_completed = false
+            UNION ALL
+            SELECT assigned_blue AS user_id FROM book_missions WHERE assigned_blue IS NOT NULL AND red_completed = false AND blue_completed = false
+          ) AS all_book_users
+          GROUP BY user_id
+        `
+        bookCounts.forEach(row => {
+          const userId = row.user_id
+          actualMissionCounts.set(userId, (actualMissionCounts.get(userId) || 0) + (row.cnt || 0))
+        })
+        
+        // Get all passphrase mission counts for all users in one query
+        const passphraseCounts = await sql`
+          SELECT user_id, COUNT(*)::int AS cnt FROM (
+            SELECT assigned_receiver AS user_id FROM passphrase_missions WHERE assigned_receiver IS NOT NULL AND completed = false
+            UNION ALL
+            SELECT assigned_sender_1 AS user_id FROM passphrase_missions WHERE assigned_sender_1 IS NOT NULL AND completed = false
+            UNION ALL
+            SELECT assigned_sender_2 AS user_id FROM passphrase_missions WHERE assigned_sender_2 IS NOT NULL AND completed = false
+          ) AS all_users
+          GROUP BY user_id
+        `
+        passphraseCounts.forEach(row => {
+          const userId = row.user_id
+          actualMissionCounts.set(userId, (actualMissionCounts.get(userId) || 0) + (row.cnt || 0))
+        })
+        
+        // Get all object mission counts for all users in one query
+        const objectCounts = await sql`
+          SELECT assigned_agent AS user_id, COUNT(*)::int AS cnt
+          FROM object_missions
+          WHERE assigned_agent IS NOT NULL AND completed = false
+          GROUP BY assigned_agent
+        `
+        objectCounts.forEach(row => {
+          const userId = row.user_id
+          actualMissionCounts.set(userId, (actualMissionCounts.get(userId) || 0) + (row.cnt || 0))
+        })
+      } catch (error) {
+        // If cache building fails, fall back to in-memory counts
+        console.error('Error building mission count cache:', error)
+      }
+      
+      // Initialize cache for all users (set to 0 if not found)
+      users.forEach(user => {
+        if (!actualMissionCounts.has(user.id)) {
+          actualMissionCounts.set(user.id, 0)
         }
+      })
+      
+      // Helper to get actual mission count from cache (updated as assignments happen)
+      const getActualMissionCount = (userId) => {
+        return actualMissionCounts.get(userId) || 0
+      }
+      
+      // Helper to update mission count in cache
+      const updateMissionCount = (userId, increment) => {
+        const current = actualMissionCounts.get(userId) || 0
+        actualMissionCounts.set(userId, current + increment)
       }
       
       // Helper to get available users for assignment
@@ -917,8 +959,8 @@ export const neonApi = {
               const partner = pick(availableOppositeTeam)
               
               // Verify both users actually have < 3 missions before assigning
-              const userActualCount = await getActualMissionCount(user.id)
-              const partnerActualCount = await getActualMissionCount(partner.id)
+              const userActualCount = getActualMissionCount(user.id)
+              const partnerActualCount = getActualMissionCount(partner.id)
               
               if (userActualCount >= 3 || partnerActualCount >= 3) {
                 // One or both users already have 3 missions, skip this assignment
@@ -966,6 +1008,8 @@ export const neonApi = {
                 if (currentUserCount < 3 && currentPartnerCount < 3) {
                   missionCounts.set(user.id, currentUserCount + 1)
                   missionCounts.set(partner.id, currentPartnerCount + 1)
+                  updateMissionCount(user.id, 1)
+                  updateMissionCount(partner.id, 1)
                   missionTypesByUser.get(user.id).push('book')
                   missionTypesByUser.get(partner.id).push('book')
                   
@@ -1025,9 +1069,9 @@ export const neonApi = {
               const sender2 = pick(remainingAfterSender1)
               
               // Verify all users actually have < 3 missions before assigning
-              const userActualCount = await getActualMissionCount(user.id)
-              const sender1ActualCount = await getActualMissionCount(sender1.id)
-              const sender2ActualCount = await getActualMissionCount(sender2.id)
+              const userActualCount = getActualMissionCount(user.id)
+              const sender1ActualCount = getActualMissionCount(sender1.id)
+              const sender2ActualCount = getActualMissionCount(sender2.id)
               
               if (userActualCount >= 3 || sender1ActualCount >= 3 || sender2ActualCount >= 3) {
                 // One or more users already have 3 missions, skip this assignment
@@ -1060,6 +1104,9 @@ export const neonApi = {
                   missionCounts.set(user.id, currentUserCount + 1)
                   missionCounts.set(sender1.id, currentSender1Count + 1)
                   missionCounts.set(sender2.id, currentSender2Count + 1)
+                  updateMissionCount(user.id, 1)
+                  updateMissionCount(sender1.id, 1)
+                  updateMissionCount(sender2.id, 1)
                   
                   missionTypesByUser.get(user.id).push('passphrase')
                   missionTypesByUser.get(sender1.id).push('passphrase')
@@ -1091,7 +1138,7 @@ export const neonApi = {
             const objectMission = pick(eligibleObjectMissions)
             
             // Verify user actually has < 3 missions before assigning
-            const userActualCount = await getActualMissionCount(user.id)
+            const userActualCount = getActualMissionCount(user.id)
             
             if (userActualCount >= 3) {
               // User already has 3 missions, skip this assignment
@@ -1131,6 +1178,7 @@ export const neonApi = {
               
               if (currentUserCount < 3) {
                 missionCounts.set(user.id, currentUserCount + 1)
+                updateMissionCount(user.id, 1)
                 missionTypesByUser.get(user.id).push('object')
                 
                 availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
