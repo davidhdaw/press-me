@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { neonApi } from './neonApi'
 
-function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) {
+function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, team, onLogout }) {
+  const navigate = useNavigate()
   const [missions, setMissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -53,6 +55,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [missionIntel, setMissionIntel] = useState(null)
   const [showMissionFailed, setShowMissionFailed] = useState(false)
   const [missionFailedMessage, setMissionFailedMessage] = useState(null)
+  const [isInActiveSession, setIsInActiveSession] = useState(false)
+  const [sessionCheckLoading, setSessionCheckLoading] = useState(true)
  
   // Data arrays for relationships and alibis
   const relationships = [
@@ -141,10 +145,48 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     setModalAlibi('')
   }
 
+  // Check if user is in active session
   useEffect(() => {
-    fetchRandomMissions()
+    const checkActiveSession = async () => {
+      try {
+        setSessionCheckLoading(true)
+        const activeSession = await neonApi.getActiveSession()
+        if (activeSession && activeSession.participant_user_ids) {
+          const userInSession = activeSession.participant_user_ids.includes(agentId)
+          setIsInActiveSession(userInSession)
+          
+          // If user is not in active session, clear any missions they might have
+          if (!userInSession) {
+            setMissions([])
+            setLoading(false)
+          }
+        } else {
+          // No active session exists
+          setIsInActiveSession(false)
+          setMissions([])
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Error checking active session:', error)
+        setIsInActiveSession(false)
+        setMissions([])
+        setLoading(false)
+      } finally {
+        setSessionCheckLoading(false)
+      }
+    }
+    
+    checkActiveSession()
     getRandomBackstory() // Initialize with random backstory
-  }, [])
+  }, [agentId])
+
+  useEffect(() => {
+    // Only fetch missions if user is in active session
+    if (isInActiveSession && !sessionCheckLoading) {
+      fetchRandomMissions()
+      updateCountdown()
+    }
+  }, [agentId, isInActiveSession, sessionCheckLoading])
 
   // Auto-hide revealed items after 3 seconds
   useEffect(() => {
@@ -174,12 +216,12 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     }
   }, [teamVisible])
 
-  // Fetch users when intel tab is accessed
+  // Fetch users when intel tab is accessed (only if in active session)
   useEffect(() => {
-    if (activeTab === 'intel' && users.length === 0) {
+    if (activeTab === 'intel' && users.length === 0 && isInActiveSession) {
       fetchUsers()
     }
-  }, [activeTab])
+  }, [activeTab, isInActiveSession])
 
   // Auto-check every 10 seconds for mission reassignments and updates
   useEffect(() => {
@@ -187,7 +229,39 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     missionIdsRef.current = new Set(missions.map(m => m.id))
   }, [missions])
 
+  // Periodically check if user is still in active session
   useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const activeSession = await neonApi.getActiveSession()
+        if (activeSession && activeSession.participant_user_ids) {
+          const userInSession = activeSession.participant_user_ids.includes(agentId)
+          if (userInSession !== isInActiveSession) {
+            setIsInActiveSession(userInSession)
+            if (!userInSession) {
+              setMissions([])
+            }
+          }
+        } else {
+          if (isInActiveSession) {
+            setIsInActiveSession(false)
+            setMissions([])
+          }
+        }
+      } catch (error) {
+        console.error('Error checking session status:', error)
+      }
+    }, 10000) // Check every 10 seconds
+    
+    return () => clearInterval(interval)
+  }, [agentId, isInActiveSession])
+
+  useEffect(() => {
+    // Only auto-check missions if user is in active session
+    if (!isInActiveSession) {
+      return
+    }
+    
     const checkMissions = async () => {
       // const checkStartTime = Date.now()
       // console.log('[AUTO-CHECK] Starting mission check at', new Date().toISOString())
@@ -1009,19 +1083,37 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                 </button>
               </div>
             </div>
-            <button onClick={handleLogout} className="logout-button button-min">
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              {((alias1 === 'Swift' && alias2 === 'Spider') || (firstName === 'David' && lastName === 'Daw')) && (
+                <button 
+                  onClick={() => navigate('/admin')} 
+                  className="admin-button button-min"
+                  style={{ marginRight: '10px' }}
+                >
+                  ADMIN
+                </button>
+              )}
+              <button onClick={handleLogout} className="logout-button button-min">
                 LOGOUT
               </button>
+            </div>
           </div>
         )}
 
         {activeTab === 'missions' && (
           <div className="tab-content">
-            <div className="reassignment-countdown-header">
-              <span className="countdown-label">NEW MISSIONS IN:</span>
-              <span className="countdown-time">{nextReassignmentCountdown}</span>
-            </div>
-            <div className="missions-grid">
+            {!isInActiveSession ? (
+              <div className="no-session-message">
+                <h2>THE PARTY HASN'T STARTED YET</h2>
+                <p>Wait for the host to start a session. Once a session is active, your missions will appear here.</p>
+              </div>
+            ) : (
+              <>
+                <div className="reassignment-countdown-header">
+                  <span className="countdown-label">NEW MISSIONS IN:</span>
+                  <span className="countdown-time">{nextReassignmentCountdown}</span>
+                </div>
+                <div className="missions-grid">
               {missions
                 .filter(mission => !completedMissions.has(mission.id))
                 .map((mission, index) => (
@@ -1096,15 +1188,24 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
               </div>
             )}
             
-            <button onClick={() => fetchRandomMissions(true)} className="refresh-button button-min">
-              Refresh missions
-            </button>
+            {isInActiveSession && (
+              <button onClick={() => fetchRandomMissions(true)} className="refresh-button button-min">
+                Refresh missions
+              </button>
+            )}
+              </>
+            )}
           </div>
         )}
 
         {activeTab === 'intel' && (
           <div className="tab-content">
-            {intelLoading ? (
+            {!isInActiveSession ? (
+              <div className="no-session-message">
+                <h2>THE PARTY HASN'T STARTED YET</h2>
+                <p>Wait for the host to start a session. Once a session is active, you'll be able to access intel.</p>
+              </div>
+            ) : intelLoading ? (
               <div className="loading-spinner">
                 <div className="spinner"></div>
                 <p>LOADING INTEL...</p>

@@ -634,8 +634,15 @@ export const neonApi = {
   ,
 
   // Reset all missions (book, passphrase, and object) and assign until each user has 3 missions total
+  // NOTE: Only works if there's an active session
   async resetAndAssignAllMissions() {
     try {
+      // Check if there's an active session
+      const activeSession = await this.getActiveSession()
+      if (!activeSession) {
+        throw new Error('No active session. Cannot assign missions.')
+      }
+      
       // Reset book missions
       await sql`
         UPDATE book_missions
@@ -1307,8 +1314,16 @@ export const neonApi = {
   ,
 
   // Get all missions (both book, passphrase, and object) for a specific agent
+  // Only returns missions if agent is in an active session
   async getAllMissionsForAgent(agentId) {
     try {
+      // Check if there's an active session and if user is in it
+      const activeSession = await this.getActiveSession()
+      if (!activeSession || !activeSession.participant_user_ids?.includes(agentId)) {
+        // User is not in active session - return empty array
+        return []
+      }
+      
       const bookMissions = await this.getBookMissionsForAgent(agentId)
       const passphraseMissions = await this.getPassphraseMissionsForAgent(agentId)
       const objectMissions = await this.getObjectMissionsForAgent(agentId)
@@ -1747,6 +1762,12 @@ export const neonApi = {
   // Check if missions should be reassigned (1 minute for testing, normally 15 minutes)
   async shouldReassignMissions() {
     try {
+      // Check if there's an active session - missions can only be reassigned during active sessions
+      const activeSession = await this.getActiveSession()
+      if (!activeSession) {
+        return false
+      }
+      
       // console.log('[SHOULD-REASSIGN] Checking last assignment timestamp...');
       const lastAssigned = await this.getLastAssignmentTimestamp();
       
@@ -1824,6 +1845,526 @@ export const neonApi = {
       // console.error('[SHOULD-REASSIGN] Error stack:', error.stack);
       // On error, default to should reassign
       return true;
+    }
+  },
+
+  // Create a new session (draft status - missions not assigned yet)
+  async createSession({ name, userIds, createdBy }) {
+    try {
+      if (!name || !userIds || userIds.length === 0) {
+        throw new Error('Session name and at least one user ID required')
+      }
+
+      const userIdsArray = userIds.map(id => Number(id))
+      
+      // Create session record in database
+      const result = await sql`
+        INSERT INTO sessions (name, status, participant_user_ids, created_by)
+        VALUES (${name.trim()}, 'draft', ${userIdsArray}::integer[], ${createdBy || null})
+        RETURNING *
+      `
+      
+      return {
+        success: true,
+        session: result[0]
+      }
+    } catch (error) {
+      console.error('Error creating session:', error)
+      throw error
+    }
+  },
+
+  // Get all sessions
+  async getAllSessions() {
+    try {
+      const sessions = await sql`
+        SELECT * FROM sessions ORDER BY created_at DESC
+      `
+      return sessions
+    } catch (error) {
+      console.error('Error fetching sessions:', error)
+      throw error
+    }
+  },
+
+  // Get active session
+  async getActiveSession() {
+    try {
+      const result = await sql`
+        SELECT * FROM sessions WHERE status = 'active' LIMIT 1
+      `
+      return result.length > 0 ? result[0] : null
+    } catch (error) {
+      console.error('Error fetching active session:', error)
+      throw error
+    }
+  },
+
+  // Start a session (changes status to active and assigns missions)
+  async startSession(sessionId) {
+    try {
+      // Check if session exists and is in draft status
+      const session = await sql`
+        SELECT * FROM sessions WHERE id = ${sessionId}
+      `
+      
+      if (session.length === 0) {
+        throw new Error('Session not found')
+      }
+      
+      if (session[0].status !== 'draft') {
+        throw new Error(`Session is already ${session[0].status}`)
+      }
+
+      // Check if there's already an active session
+      const activeSession = await this.getActiveSession()
+      if (activeSession) {
+        throw new Error('There is already an active session. End it before starting a new one.')
+      }
+
+      const userIdsArray = session[0].participant_user_ids
+      
+      // First, clear missions for users NOT in this session
+      await this.clearMissionsForNonSessionUsers()
+      
+      // Update session status to active and set started_at
+      await sql`
+        UPDATE sessions
+        SET status = 'active', started_at = NOW()
+        WHERE id = ${sessionId}
+      `
+
+      // Now assign missions to the selected users
+      await this.assignMissionsToSessionUsers(userIdsArray)
+      
+      // Get updated session
+      const updatedSession = await sql`
+        SELECT * FROM sessions WHERE id = ${sessionId}
+      `
+      
+      return {
+        success: true,
+        session: updatedSession[0]
+      }
+    } catch (error) {
+      console.error('Error starting session:', error)
+      throw error
+    }
+  },
+
+  // Assign missions to users (internal helper function)
+  async assignMissionsToSessionUsers(userIdsArray) {
+    try {
+      
+      // Reset book missions for selected users
+      await sql`
+        UPDATE book_missions
+        SET assigned_red = CASE WHEN assigned_red = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_red END,
+            assigned_blue = CASE WHEN assigned_blue = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_blue END,
+            previous_reds = array(SELECT unnest(previous_reds) EXCEPT SELECT unnest(${userIdsArray}::integer[])),
+            previous_blues = array(SELECT unnest(previous_blues) EXCEPT SELECT unnest(${userIdsArray}::integer[]))
+        WHERE assigned_red = ANY(${userIdsArray}::integer[]) OR assigned_blue = ANY(${userIdsArray}::integer[])
+      `
+      
+      // Reset passphrase missions for selected users
+      await sql`
+        UPDATE passphrase_missions
+        SET assigned_receiver = CASE WHEN assigned_receiver = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_receiver END,
+            assigned_sender_1 = CASE WHEN assigned_sender_1 = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_sender_1 END,
+            assigned_sender_2 = CASE WHEN assigned_sender_2 = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_sender_2 END,
+            previous_receivers = array(SELECT unnest(previous_receivers) EXCEPT SELECT unnest(${userIdsArray}::integer[])),
+            previous_senders = array(SELECT unnest(previous_senders) EXCEPT SELECT unnest(${userIdsArray}::integer[]))
+        WHERE assigned_receiver = ANY(${userIdsArray}::integer[]) 
+           OR assigned_sender_1 = ANY(${userIdsArray}::integer[])
+           OR assigned_sender_2 = ANY(${userIdsArray}::integer[])
+      `
+      
+      // Reset object missions for selected users
+      await sql`
+        UPDATE object_missions
+        SET assigned_agent = CASE WHEN assigned_agent = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_agent END,
+            past_assigned_agents = array(SELECT unnest(past_assigned_agents) EXCEPT SELECT unnest(${userIdsArray}::integer[])),
+            assigned_now = CASE WHEN assigned_agent = ANY(${userIdsArray}::integer[]) THEN false ELSE assigned_now END
+        WHERE assigned_agent = ANY(${userIdsArray}::integer[])
+      `
+
+      // Get users with their teams
+      const users = await sql`
+        SELECT id, team FROM users WHERE id = ANY(${userIdsArray}::integer[]) AND ishere = true
+      `
+      
+      if (users.length === 0) {
+        throw new Error('No valid users selected')
+      }
+
+      const redUsers = users.filter(u => u.team === 'red').map(u => u.id)
+      const blueUsers = users.filter(u => u.team === 'blue').map(u => u.id)
+      const allSelectedUsers = users.map(u => u.id)
+
+      // Track mission counts per user (max 3 total)
+      const missionCounts = new Map()
+      const missionTypesByUser = new Map()
+      allSelectedUsers.forEach(userId => {
+        missionCounts.set(userId, 0)
+        missionTypesByUser.set(userId, [])
+      })
+
+      const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
+
+      // Helper to determine which mission type user needs (same logic as resetAndAssignAllMissions)
+      const getNeededMissionType = (userId) => {
+        const userMissions = missionTypesByUser.get(userId) || []
+        const uniqueTypes = new Set(userMissions)
+        
+        if (userMissions.length === 0) {
+          return pick(['book', 'passphrase', 'object'])
+        } else if (userMissions.length === 1) {
+          const usedType = userMissions[0]
+          const available = ['book', 'passphrase', 'object'].filter(t => t !== usedType)
+          return pick(available)
+        } else if (userMissions.length === 2) {
+          if (uniqueTypes.size === 1) {
+            const currentType = userMissions[0]
+            const available = ['book', 'passphrase', 'object'].filter(t => t !== currentType)
+            return pick(available)
+          } else {
+            return pick(['book', 'passphrase', 'object'])
+          }
+        }
+        return null
+      }
+
+      // Assign book missions (one red, one blue per mission)
+      const bookMissions = await sql`
+        SELECT id, previous_reds, previous_blues FROM book_missions 
+        WHERE (assigned_red IS NULL OR assigned_red = ANY(${userIdsArray}::integer[]))
+          AND (assigned_blue IS NULL OR assigned_blue = ANY(${userIdsArray}::integer[]))
+        ORDER BY id
+      `
+      
+      for (const m of bookMissions) {
+        if (redUsers.length === 0 || blueUsers.length === 0) break
+        
+        const prevReds = Array.isArray(m.previous_reds) ? m.previous_reds : []
+        const prevBlues = Array.isArray(m.previous_blues) ? m.previous_blues : []
+        
+        const eligibleReds = redUsers.filter(id => 
+          !prevReds.includes(id) && (missionCounts.get(id) || 0) < 3
+        )
+        const eligibleBlues = blueUsers.filter(id => 
+          !prevBlues.includes(id) && (missionCounts.get(id) || 0) < 3
+        )
+        
+        if (eligibleReds.length > 0 && eligibleBlues.length > 0) {
+          const redId = pick(eligibleReds)
+          const blueId = pick(eligibleBlues)
+          
+          await sql`
+            UPDATE book_missions
+            SET assigned_red = ${redId},
+                assigned_blue = ${blueId},
+                previous_reds = array_append(COALESCE(previous_reds, ARRAY[]::integer[]), ${redId}),
+                previous_blues = array_append(COALESCE(previous_blues, ARRAY[]::integer[]), ${blueId})
+            WHERE id = ${m.id}
+          `
+          
+          missionCounts.set(redId, (missionCounts.get(redId) || 0) + 1)
+          missionCounts.set(blueId, (missionCounts.get(blueId) || 0) + 1)
+          missionTypesByUser.set(redId, [...(missionTypesByUser.get(redId) || []), 'book'])
+          missionTypesByUser.set(blueId, [...(missionTypesByUser.get(blueId) || []), 'book'])
+        }
+      }
+
+      // Assign passphrase and object missions to reach 3 missions per user
+      // First passphrase missions
+      const passphraseMissions = await sql`
+        SELECT id, previous_receivers, previous_senders FROM passphrase_missions
+        WHERE assigned_receiver IS NULL OR assigned_receiver = ANY(${userIdsArray}::integer[])
+        ORDER BY id
+      `
+      
+      for (const userId of allSelectedUsers) {
+        while ((missionCounts.get(userId) || 0) < 3) {
+          const neededType = getNeededMissionType(userId)
+          if (!neededType) break
+          
+          if (neededType === 'passphrase') {
+            const prevReceivers = []
+            const eligibleMissions = passphraseMissions.filter(m => {
+              const prev = Array.isArray(m.previous_receivers) ? m.previous_receivers : []
+              return !prev.includes(userId) && !m.assigned_receiver
+            })
+            
+            if (eligibleMissions.length > 0) {
+              const mission = pick(eligibleMissions)
+              await sql`
+                UPDATE passphrase_missions
+                SET assigned_receiver = ${userId},
+                    previous_receivers = array_append(COALESCE(previous_receivers, ARRAY[]::integer[]), ${userId})
+                WHERE id = ${mission.id}
+              `
+              missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
+              missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'passphrase'])
+            } else {
+              break
+            }
+          } else if (neededType === 'object') {
+            const objectMissions = await sql`
+              SELECT id, past_assigned_agents FROM object_missions
+              WHERE assigned_agent IS NULL OR assigned_agent = ANY(${userIdsArray}::integer[])
+              ORDER BY id
+            `
+            
+            const eligible = objectMissions.filter(m => {
+              const prev = Array.isArray(m.past_assigned_agents) ? m.past_assigned_agents : []
+              return !prev.includes(userId) && !m.assigned_agent
+            })
+            
+            if (eligible.length > 0) {
+              const mission = pick(eligible)
+              await sql`
+                UPDATE object_missions
+                SET assigned_agent = ${userId},
+                    past_assigned_agents = array_append(COALESCE(past_assigned_agents, ARRAY[]::integer[]), ${userId}),
+                    assigned_now = true
+                WHERE id = ${mission.id}
+              `
+              missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
+              missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'object'])
+            } else {
+              break
+            }
+          } else {
+            break
+          }
+        }
+      }
+
+      // If users still need missions, assign any available type
+      for (const userId of allSelectedUsers) {
+        while ((missionCounts.get(userId) || 0) < 3) {
+          // Try object missions first (simpler)
+          const objectMissions = await sql`
+            SELECT id, past_assigned_agents FROM object_missions
+            WHERE assigned_agent IS NULL
+            ORDER BY id
+          `
+          
+          const eligible = objectMissions.filter(m => {
+            const prev = Array.isArray(m.past_assigned_agents) ? m.past_assigned_agents : []
+            return !prev.includes(userId)
+          })
+          
+          if (eligible.length > 0) {
+            const mission = pick(eligible)
+            await sql`
+              UPDATE object_missions
+              SET assigned_agent = ${userId},
+                  past_assigned_agents = array_append(COALESCE(past_assigned_agents, ARRAY[]::integer[]), ${userId}),
+                  assigned_now = true
+              WHERE id = ${mission.id}
+            `
+            missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
+            missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'object'])
+          } else {
+            break
+          }
+        }
+      }
+
+      return {
+        success: true,
+        usersAssigned: allSelectedUsers.length,
+        missionsAssigned: Array.from(missionCounts.values()).reduce((sum, count) => sum + count, 0)
+      }
+    } catch (error) {
+      console.error('Error assigning missions to session users:', error)
+      throw error
+    }
+  },
+
+  // Pause a session
+  async pauseSession(sessionId) {
+    try {
+      const session = await sql`
+        SELECT * FROM sessions WHERE id = ${sessionId}
+      `
+      
+      if (session.length === 0) {
+        throw new Error('Session not found')
+      }
+      
+      if (session[0].status !== 'active') {
+        throw new Error(`Session is not active (current status: ${session[0].status})`)
+      }
+
+      await sql`
+        UPDATE sessions
+        SET status = 'paused', paused_at = NOW()
+        WHERE id = ${sessionId}
+      `
+      
+      return { success: true }
+    } catch (error) {
+      console.error('Error pausing session:', error)
+      throw error
+    }
+  },
+
+  // Resume a paused session
+  async resumeSession(sessionId) {
+    try {
+      const session = await sql`
+        SELECT * FROM sessions WHERE id = ${sessionId}
+      `
+      
+      if (session.length === 0) {
+        throw new Error('Session not found')
+      }
+      
+      if (session[0].status !== 'paused') {
+        throw new Error(`Session is not paused (current status: ${session[0].status})`)
+      }
+
+      await sql`
+        UPDATE sessions
+        SET status = 'active', paused_at = NULL
+        WHERE id = ${sessionId}
+      `
+      
+      return { success: true }
+    } catch (error) {
+      console.error('Error resuming session:', error)
+      throw error
+    }
+  },
+
+  // Clear missions for users not in the active session
+  async clearMissionsForNonSessionUsers() {
+    try {
+      const activeSession = await this.getActiveSession()
+      
+      if (!activeSession) {
+        // No active session - clear missions for all users
+        await sql`
+          UPDATE book_missions
+          SET assigned_red = NULL,
+              assigned_blue = NULL,
+              previous_reds = ARRAY[]::integer[],
+              previous_blues = ARRAY[]::integer[],
+              red_completed = false,
+              blue_completed = false
+        `
+        
+        await sql`
+          UPDATE passphrase_missions
+          SET assigned_receiver = NULL,
+              assigned_sender_1 = NULL,
+              assigned_sender_2 = NULL,
+              previous_receivers = ARRAY[]::integer[],
+              previous_senders = ARRAY[]::integer[],
+              completed = false
+        `
+        
+        await sql`
+          UPDATE object_missions
+          SET assigned_agent = NULL,
+              past_assigned_agents = ARRAY[]::integer[],
+              assigned_now = false,
+              completed = false
+        `
+        
+        return { success: true, cleared: 'all' }
+      }
+      
+      // Clear missions for users NOT in the active session
+      const sessionUserIds = activeSession.participant_user_ids || []
+      const allUsers = (await sql`SELECT id FROM users WHERE ishere = true`).map(u => u.id)
+      const nonSessionUsers = allUsers.filter(id => !sessionUserIds.includes(id))
+      
+      if (nonSessionUsers.length === 0) {
+        return { success: true, cleared: 'none' }
+      }
+      
+      // Clear book missions
+      await sql`
+        UPDATE book_missions
+        SET assigned_red = CASE WHEN assigned_red = ANY(${nonSessionUsers}::integer[]) THEN NULL ELSE assigned_red END,
+            assigned_blue = CASE WHEN assigned_blue = ANY(${nonSessionUsers}::integer[]) THEN NULL ELSE assigned_blue END,
+            previous_reds = array(SELECT unnest(previous_reds) EXCEPT SELECT unnest(${nonSessionUsers}::integer[])),
+            previous_blues = array(SELECT unnest(previous_blues) EXCEPT SELECT unnest(${nonSessionUsers}::integer[]))
+        WHERE assigned_red = ANY(${nonSessionUsers}::integer[]) OR assigned_blue = ANY(${nonSessionUsers}::integer[])
+      `
+      
+      // Clear passphrase missions
+      await sql`
+        UPDATE passphrase_missions
+        SET assigned_receiver = CASE WHEN assigned_receiver = ANY(${nonSessionUsers}::integer[]) THEN NULL ELSE assigned_receiver END,
+            assigned_sender_1 = CASE WHEN assigned_sender_1 = ANY(${nonSessionUsers}::integer[]) THEN NULL ELSE assigned_sender_1 END,
+            assigned_sender_2 = CASE WHEN assigned_sender_2 = ANY(${nonSessionUsers}::integer[]) THEN NULL ELSE assigned_sender_2 END,
+            previous_receivers = array(SELECT unnest(previous_receivers) EXCEPT SELECT unnest(${nonSessionUsers}::integer[])),
+            previous_senders = array(SELECT unnest(previous_senders) EXCEPT SELECT unnest(${nonSessionUsers}::integer[]))
+        WHERE assigned_receiver = ANY(${nonSessionUsers}::integer[]) 
+           OR assigned_sender_1 = ANY(${nonSessionUsers}::integer[])
+           OR assigned_sender_2 = ANY(${nonSessionUsers}::integer[])
+      `
+      
+      // Clear object missions
+      await sql`
+        UPDATE object_missions
+        SET assigned_agent = CASE WHEN assigned_agent = ANY(${nonSessionUsers}::integer[]) THEN NULL ELSE assigned_agent END,
+            past_assigned_agents = array(SELECT unnest(past_assigned_agents) EXCEPT SELECT unnest(${nonSessionUsers}::integer[])),
+            assigned_now = CASE WHEN assigned_agent = ANY(${nonSessionUsers}::integer[]) THEN false ELSE assigned_now END
+        WHERE assigned_agent = ANY(${nonSessionUsers}::integer[])
+      `
+      
+      return { success: true, cleared: nonSessionUsers.length }
+    } catch (error) {
+      console.error('Error clearing missions for non-session users:', error)
+      throw error
+    }
+  },
+
+  // End a session
+  async endSession(sessionId) {
+    try {
+      const session = await sql`
+        SELECT * FROM sessions WHERE id = ${sessionId}
+      `
+      
+      if (session.length === 0) {
+        throw new Error('Session not found')
+      }
+      
+      if (session[0].status === 'ended') {
+        throw new Error('Session is already ended')
+      }
+
+      // Update session status to ended
+      await sql`
+        UPDATE sessions
+        SET status = 'ended', ended_at = NOW()
+        WHERE id = ${sessionId}
+      `
+      
+      // Clear missions for all users (no active session exists now)
+      await this.clearMissionsForNonSessionUsers()
+      
+      return { success: true }
+    } catch (error) {
+      console.error('Error ending session:', error)
+      throw error
+    }
+  },
+
+  // Check if missions can be assigned (only if there's an active session)
+  async canAssignMissions() {
+    try {
+      const activeSession = await this.getActiveSession()
+      return activeSession !== null
+    } catch (error) {
+      console.error('Error checking if missions can be assigned:', error)
+      return false
     }
   }
 };

@@ -5,6 +5,7 @@ import './helpers.js'
 import Mission from './Mission'
 import Login from './Login'
 import Dashboard from './Dashboard'
+import AdminDashboard from './AdminDashboard'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -79,9 +80,29 @@ function App() {
                 agentId={currentUser?.id}
                 firstName={currentUser?.firstname}
                 lastName={currentUser?.lastname}
+                alias1={currentUser?.alias_1}
+                alias2={currentUser?.alias_2}
                 team={currentUser?.team}
                 onLogout={handleLogout}
               />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/admin" 
+          element={
+            isLoggedIn ? (
+              (currentUser?.alias_1 === 'Swift' && currentUser?.alias_2 === 'Spider') || 
+              (currentUser?.firstname === 'David' && currentUser?.lastname === 'Daw') ? (
+                <AdminDashboard 
+                  currentUser={currentUser}
+                  onLogout={handleLogout}
+                />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
             ) : (
               <Navigate to="/" replace />
             )
