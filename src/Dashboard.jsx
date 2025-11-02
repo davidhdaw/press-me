@@ -27,6 +27,11 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
   const [dragOverId, setDragOverId] = useState(null)
   const [usedAliases, setUsedAliases] = useState(new Set())
   const [userFilter, setUserFilter] = useState('')
+  const [votingOpen, setVotingOpen] = useState(false)
+  const [hasSubmittedIntel, setHasSubmittedIntel] = useState(false)
+  const [intelScore, setIntelScore] = useState(null)
+  const [incorrectAliases, setIncorrectAliases] = useState({}) // { userId: [false, false] } - true if incorrect
+  const [incorrectTeams, setIncorrectTeams] = useState({}) // { userId: true/false } - true if incorrect
   
   // Touch drag state
   const [touchedElement, setTouchedElement] = useState(null)
@@ -39,6 +44,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
   const missionIdsRef = useRef(new Set())
   // Ref to store current completion status for comparison
   const completedStatusRef = useRef(new Map()) // Map<missionId, completed>
+  // Ref to track last session ID and started_at for detecting session changes
+  const lastSessionRef = useRef({ id: null, startedAt: null })
   
   // Countdown timer state
   const [nextReassignmentCountdown, setNextReassignmentCountdown] = useState('Calculating...')
@@ -317,6 +324,89 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
     }
   }, [activeTab, isInActiveSession])
 
+  // Check if voting is open and if user has submitted intel when intel tab is active
+  useEffect(() => {
+    const checkVotingStatus = async () => {
+      if (activeTab === 'intel' && isInActiveSession) {
+        try {
+          const activeSession = await neonApi.getActiveSession()
+          if (activeSession) {
+            const currentSessionId = activeSession.id
+            const currentStartedAt = activeSession.started_at ? String(activeSession.started_at) : null
+            const intelSessionKey = `intel_submitted_${currentSessionId}_${agentId}`
+            const intelTimestampKey = `intel_submitted_${currentSessionId}_${agentId}_started`
+            
+            // Check if session changed or was reset
+            const storedStartedAt = localStorage.getItem(intelTimestampKey)
+            const sessionChanged = lastSessionRef.current.id !== null && lastSessionRef.current.id !== currentSessionId
+            const sessionReset = storedStartedAt && currentStartedAt && storedStartedAt !== currentStartedAt
+            const sessionCleared = storedStartedAt && currentStartedAt === null
+            
+            // Clear localStorage if session changed or was reset
+            if (sessionChanged || sessionReset || sessionCleared) {
+              console.log('[INTEL-SUBMIT] Session changed or reset, clearing submission localStorage')
+              localStorage.removeItem(intelSessionKey)
+              localStorage.removeItem(intelTimestampKey)
+              setHasSubmittedIntel(false)
+              setIntelScore(null)
+            }
+            
+            // Update tracked session info
+            lastSessionRef.current.id = currentSessionId
+            lastSessionRef.current.startedAt = currentStartedAt
+            
+            const votingStatus = activeSession.voting_open || false
+            setVotingOpen(votingStatus)
+            
+            // Check if user has already submitted intel for this session
+            if (votingStatus) {
+              const submitted = localStorage.getItem(intelSessionKey) === 'true'
+              
+              if (submitted && !sessionChanged && !sessionReset && !sessionCleared) {
+                // User has submitted, fetch their score
+                const score = await neonApi.getUserScore(agentId)
+                setHasSubmittedIntel(true)
+                setIntelScore(score)
+              } else {
+                setHasSubmittedIntel(false)
+                setIntelScore(null)
+              }
+            } else {
+              // Voting not open, reset submission status
+              setHasSubmittedIntel(false)
+              setIntelScore(null)
+            }
+          } else {
+            setVotingOpen(false)
+            setHasSubmittedIntel(false)
+            setIntelScore(null)
+            lastSessionRef.current.id = null
+            lastSessionRef.current.startedAt = null
+          }
+        } catch (error) {
+          console.error('Error checking voting status:', error)
+          setVotingOpen(false)
+          setHasSubmittedIntel(false)
+          setIntelScore(null)
+        }
+      }
+    }
+    
+    checkVotingStatus()
+    
+    // Poll for voting status changes every 2 seconds when on intel tab
+    let interval
+    if (activeTab === 'intel' && isInActiveSession) {
+      interval = setInterval(checkVotingStatus, 2000)
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval)
+      }
+    }
+  }, [activeTab, isInActiveSession, agentId])
+
   // Show initial intel modal when intel tab is first accessed
   useEffect(() => {
     const checkInitialIntel = async () => {
@@ -463,14 +553,17 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
             }
           }
           
-          // Also check if session was reset (for initial intel clearing)
+          // Also check if session was reset (for initial intel and intel submission clearing)
           if (userInSession && activeSession.id) {
             const sessionTimestampKey = `initialIntel_${activeSession.id}_${agentId}_started`
             const sessionStatusKey = `initialIntel_${activeSession.id}_${agentId}_status`
             const sessionKey = `initialIntel_${activeSession.id}_${agentId}`
+            const intelSessionKey = `intel_submitted_${activeSession.id}_${agentId}`
+            const intelTimestampKey = `intel_submitted_${activeSession.id}_${agentId}_started`
             
             const storedStartedAt = localStorage.getItem(sessionTimestampKey)
             const storedStatus = localStorage.getItem(sessionStatusKey)
+            const storedIntelStartedAt = localStorage.getItem(intelTimestampKey)
             const currentStartedAt = activeSession.started_at ? String(activeSession.started_at) : null
             const currentStatus = activeSession.status
             
@@ -480,13 +573,26 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                                                    storedStartedAt && currentStartedAt && storedStartedAt !== currentStartedAt
             const startedAtChanged = storedStartedAt && currentStartedAt && storedStartedAt !== currentStartedAt
             const startedAtCleared = storedStartedAt && currentStartedAt === null
+            const intelStartedAtChanged = storedIntelStartedAt && currentStartedAt && storedIntelStartedAt !== currentStartedAt
+            const intelStartedAtCleared = storedIntelStartedAt && currentStartedAt === null
             
             if (statusChangedToDraft || statusChangedFromActiveToActive || startedAtChanged || startedAtCleared) {
-              console.log('[SESSION-CHECK] Detected session reset, clearing initial intel localStorage')
+              console.log('[SESSION-CHECK] Detected session reset, clearing initial intel and intel submission localStorage')
               localStorage.removeItem(sessionKey)
               localStorage.removeItem(sessionTimestampKey)
               localStorage.removeItem(sessionStatusKey)
+              localStorage.removeItem(intelSessionKey)
+              localStorage.removeItem(intelTimestampKey)
               setHasSeenInitialIntel(false)
+              setHasSubmittedIntel(false)
+              setIntelScore(null)
+            } else if (intelStartedAtChanged || intelStartedAtCleared) {
+              // Session reset detected via intel submission timestamp
+              console.log('[SESSION-CHECK] Detected session reset via intel timestamp, clearing intel submission localStorage')
+              localStorage.removeItem(intelSessionKey)
+              localStorage.removeItem(intelTimestampKey)
+              setHasSubmittedIntel(false)
+              setIntelScore(null)
             }
           }
         } else {
@@ -776,13 +882,13 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
       // Get agent's intel
       const agentIntel = await neonApi.getAgentIntel(agentId)
       
-      // Initialize user selections with their actual teams (only for session users)
+      // Initialize user selections with 'unknown' for all teams (only for session users)
       const selections = {}
       const knownAliases = {} // { userId: [alias1, alias2] }
       const lockedPositions = {} // { userId: [position0, position1] - true if locked }
       
       sessionUsers.forEach(user => {
-        selections[user.id] = user.team
+        selections[user.id] = 'unknown'
         knownAliases[user.id] = [null, null]
         lockedPositions[user.id] = [false, false]
       })
@@ -832,6 +938,14 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
       ...prev,
       [userId]: team
     }))
+    // Clear incorrect status for this user's team when they change their guess
+    setIncorrectTeams(prev => {
+      const updated = { ...prev }
+      if (updated[userId]) {
+        delete updated[userId]
+      }
+      return updated
+    })
   }
 
   const handleDragStart = (e, alias) => {
@@ -894,6 +1008,17 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
     
     // Mark the new alias as used
     setUsedAliases(prev => new Set([...prev, alias]))
+    
+    // Clear incorrect status for this alias position when user changes their guess
+    setIncorrectAliases(prev => {
+      const updated = { ...prev }
+      if (updated[userId] && updated[userId][targetIndex]) {
+        updated[userId] = [...(updated[userId] || [false, false])]
+        updated[userId][targetIndex] = false
+      }
+      return updated
+    })
+    
     setDragOverId(null)
   }
 
@@ -922,6 +1047,16 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
       setUsedAliases(prev => {
         const updated = new Set(prev)
         updated.delete(aliasToRemove)
+        return updated
+      })
+      
+      // Clear incorrect status for this alias position when user removes their guess
+      setIncorrectAliases(prev => {
+        const updated = { ...prev }
+        if (updated[userId] && updated[userId][targetIndex]) {
+          updated[userId] = [...(updated[userId] || [false, false])]
+          updated[userId][targetIndex] = false
+        }
         return updated
       })
     }
@@ -1057,6 +1192,16 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
         
         // Mark the new alias as used
         setUsedAliases(prev => new Set([...prev, alias]))
+        
+        // Clear incorrect status for this alias position when user changes their guess
+        setIncorrectAliases(prev => {
+          const updated = { ...prev }
+          if (updated[userId] && updated[userId][targetIndex]) {
+            updated[userId] = [...(updated[userId] || [false, false])]
+            updated[userId][targetIndex] = false
+          }
+          return updated
+        })
       }
     }
     
@@ -1186,6 +1331,86 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
     // Clear error when user starts typing
     if (missionErrors[missionId]) {
       setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
+    }
+  }
+
+  const handleSubmitIntel = async () => {
+    try {
+      // Prevent multiple submissions
+      if (hasSubmittedIntel) {
+        return
+      }
+
+      // Confirm submission
+      if (!window.confirm('Submit your intel guesses? This will calculate your score based on correct answers. You can only submit once.')) {
+        return
+      }
+
+      // Collect all guesses
+      const guesses = {}
+      
+      // For each user in the session, collect their guesses
+      users.forEach(user => {
+        const userAliasGuesses = userAliases[user.id] || [null, null]
+        const teamGuess = userSelections[user.id] || 'unknown'
+        
+        guesses[user.id] = {
+          aliases: [
+            userAliasGuesses[0] || null,
+            userAliasGuesses[1] || null
+          ],
+          team: teamGuess
+        }
+      })
+
+      // Submit intel
+      const result = await neonApi.submitIntel(agentId, guesses)
+      
+      // Mark as submitted in localStorage and store session timestamp
+      const activeSession = await neonApi.getActiveSession()
+      if (activeSession) {
+        const sessionKey = `intel_submitted_${activeSession.id}_${agentId}`
+        const timestampKey = `intel_submitted_${activeSession.id}_${agentId}_started`
+        localStorage.setItem(sessionKey, 'true')
+        if (activeSession.started_at) {
+          localStorage.setItem(timestampKey, String(activeSession.started_at))
+        }
+      }
+      
+      // Update state to show submission
+      setHasSubmittedIntel(true)
+      setIntelScore(result.newScore)
+      
+      // Process result to track incorrect guesses
+      const incorrectAliasMap = {}
+      const incorrectTeamMap = {}
+      
+      // Initialize all users as no incorrect guesses
+      users.forEach(user => {
+        incorrectAliasMap[user.id] = [false, false]
+        incorrectTeamMap[user.id] = false
+      })
+      
+      // Mark incorrect guesses based on result details
+      if (result.details) {
+        result.details.forEach(detail => {
+          if (detail.type === 'alias' && !detail.correct) {
+            if (!incorrectAliasMap[detail.userId]) {
+              incorrectAliasMap[detail.userId] = [false, false]
+            }
+            incorrectAliasMap[detail.userId][detail.position] = true
+          } else if (detail.type === 'team' && !detail.correct) {
+            incorrectTeamMap[detail.userId] = true
+          }
+        })
+      }
+      
+      // Update state to show red borders
+      setIncorrectAliases(incorrectAliasMap)
+      setIncorrectTeams(incorrectTeamMap)
+    } catch (error) {
+      console.error('Error submitting intel:', error)
+      alert(`Error submitting intel: ${error.message || 'Please try again.'}`)
     }
   }
 
@@ -1573,6 +1798,38 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
               </div>
             ) : (
               <>
+                {votingOpen && (
+                  <div style={{ 
+                    marginBottom: 'var(--unit-base)', 
+                    padding: 'var(--unit-base)',
+                    backgroundColor: '#f0f8ff',
+                    border: '2px solid var(--color-black)',
+                    borderRadius: '4px',
+                    textAlign: 'center'
+                  }}>
+                    {hasSubmittedIntel ? (
+                      <div style={{
+                        fontSize: '1.5em',
+                        fontWeight: 'bold',
+                        color: 'var(--color-black)'
+                      }}>
+                        Your Score: {intelScore !== null ? intelScore : 0} points
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={handleSubmitIntel}
+                        className="button-primary"
+                        style={{
+                          fontSize: '1.2em',
+                          padding: '12px 24px',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        Submit Intel
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="intel-container">
                   <div className="intel-section">
                     <div className="guest-list-header">
@@ -1643,7 +1900,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                                 onDrop={(e) => handleDrop(e, user.id, 0)}
                                 data-user-id={user.id}
                                 data-target-index="0"
-                                className={`drop-zone ${dragOverId === `${user.id}-0` ? 'drag-over' : ''} ${userAliases[user.id]?.[0] ? 'filled' : ''} ${lockedAliases[user.id]?.[0] ? 'locked' : ''}`}
+                                className={`drop-zone ${dragOverId === `${user.id}-0` ? 'drag-over' : ''} ${userAliases[user.id]?.[0] ? 'filled' : ''} ${lockedAliases[user.id]?.[0] ? 'locked' : ''} ${incorrectAliases[user.id]?.[0] ? 'incorrect-guess' : ''}`}
+                                style={incorrectAliases[user.id]?.[0] ? { border: '3px solid #d32f2f' } : {}}
                               >
                                 <span className={`alias-text ${aliasTeams[userAliases[user.id]?.[0]] ? `team-${aliasTeams[userAliases[user.id]?.[0]]}` : ''}`}>
                                   {userAliases[user.id]?.[0] || 'AKA...'}
@@ -1666,7 +1924,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                                 onDrop={(e) => handleDrop(e, user.id, 1)}
                                 data-user-id={user.id}
                                 data-target-index="1"
-                                className={`drop-zone ${dragOverId === `${user.id}-1` ? 'drag-over' : ''} ${userAliases[user.id]?.[1] ? 'filled' : ''} ${lockedAliases[user.id]?.[1] ? 'locked' : ''}`}
+                                className={`drop-zone ${dragOverId === `${user.id}-1` ? 'drag-over' : ''} ${userAliases[user.id]?.[1] ? 'filled' : ''} ${lockedAliases[user.id]?.[1] ? 'locked' : ''} ${incorrectAliases[user.id]?.[1] ? 'incorrect-guess' : ''}`}
+                                style={incorrectAliases[user.id]?.[1] ? { border: '3px solid #d32f2f' } : {}}
                               >
                                 <span className={`alias-text ${aliasTeams[userAliases[user.id]?.[1]] ? `team-${aliasTeams[userAliases[user.id]?.[1]]}` : ''}`}>
                                   {userAliases[user.id]?.[1] || 'AKA...'}
@@ -1687,7 +1946,10 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                           </td>
                           <td>
                             <div className="team-selector">
-                              <label className="radio-label">
+                              <label 
+                                className={`radio-label ${incorrectTeams[user.id] && userSelections[user.id] === 'red' ? 'incorrect-guess' : ''}`}
+                                style={incorrectTeams[user.id] && userSelections[user.id] === 'red' ? { border: '3px solid #d32f2f', borderRadius: '4px', padding: '2px' } : {}}
+                              >
                                 <input
                                   type="radio"
                                   name={`team-${user.id}`}
@@ -1711,7 +1973,10 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                                 </div>
                                 <span className="team-label">Red</span>
                               </label>
-                              <label className="radio-label">
+                              <label 
+                                className={`radio-label ${incorrectTeams[user.id] && userSelections[user.id] === 'blue' ? 'incorrect-guess' : ''}`}
+                                style={incorrectTeams[user.id] && userSelections[user.id] === 'blue' ? { border: '3px solid #d32f2f', borderRadius: '4px', padding: '2px' } : {}}
+                              >
                                 <input
                                   type="radio"
                                   name={`team-${user.id}`}
