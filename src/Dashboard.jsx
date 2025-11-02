@@ -1264,7 +1264,10 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
               </div>
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              {((alias1 === 'Swift' && alias2 === 'Spider') || (firstName === 'David' && lastName === 'Daw')) && (
+              {((alias1 === 'Swift' && alias2 === 'Spider') || 
+                (firstName === 'David' && lastName === 'Daw') ||
+                (alias1 === 'Normal' && alias2 === 'Hawk') ||
+                (firstName === 'Nikki' && lastName === 'Thayer')) && (
                 <button 
                   onClick={() => navigate('/admin')} 
                   className="admin-button button-min"

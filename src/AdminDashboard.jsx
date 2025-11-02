@@ -108,7 +108,9 @@ function AdminDashboard({ currentUser, onLogout }) {
   
   // Check if user is admin
   const isAdmin = (currentUser?.alias_1 === 'Swift' && currentUser?.alias_2 === 'Spider') || 
-                  (currentUser?.firstname === 'David' && currentUser?.lastname === 'Daw')
+                  (currentUser?.firstname === 'David' && currentUser?.lastname === 'Daw') ||
+                  (currentUser?.alias_1 === 'Normal' && currentUser?.alias_2 === 'Hawk') ||
+                  (currentUser?.firstname === 'Nikki' && currentUser?.lastname === 'Thayer')
 
   useEffect(() => {
     if (!isAdmin) {
