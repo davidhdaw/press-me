@@ -1334,11 +1334,27 @@
 }
 
 /* ADMIN DASHBOARD STYLES */
+body:has(.admin-dashboard) {
+  display: block !important;
+  height: auto !important;
+  min-height: 100vh;
+  place-items: unset !important;
+}
+
+#root:has(.admin-dashboard) {
+  width: 100%;
+  height: auto;
+  min-height: 100vh;
+}
+
 .admin-dashboard {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   background-color: var(--black);
+  position: relative;
+  width: 100%;
+  align-self: flex-start; /* Ensure it starts at the top */
 }
 
 .admin-header {
@@ -1350,6 +1366,12 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--unit-sm);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-header h1 {
@@ -1407,19 +1429,40 @@
   border-left: 4px solid var(--black);
   border-right: 4px solid var(--black);
   border-bottom: 4px solid var(--black);
+  overflow-y: visible;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: calc(100vh - 100px); /* Account for header height */
 }
 
 .admin-section {
   background-color: var(--white);
   padding: var(--unit-base);
   margin-bottom: var(--unit-base);
+  margin-top: 10px; /* Top margin to account for rotation extending upward */
   border: 4px solid var(--black);
   box-shadow: 5px 5px 0px 0 var(--black);
-  transform: rotate(1deg);
+  transform: rotate(0.5deg);
+  width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.admin-section:first-child {
+  margin-top: 0; /* First section doesn't need top margin */
+}
+
+/* Active session section - push down to account for rotation (second admin-section) */
+.admin-content > .admin-section:nth-child(2) {
+  margin-top: var(--unit-base) !important; /* Normal spacing like other sections */
+  transform-origin: center center; /* Ensure rotation happens from center */
+  position: relative; /* Make sure positioning is correct */
+  top: 0; /* Ensure no upward positioning */
 }
 
 .admin-section:nth-child(even) {
-  transform: rotate(-1deg);
+  transform: rotate(-0.5deg);
   box-shadow: -5px 5px 0px 0 var(--black);
 }
 

@@ -37,6 +37,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
 
   // Ref to store current mission IDs for comparison (avoid recreating interval on every change)
   const missionIdsRef = useRef(new Set())
+  // Ref to store current completion status for comparison
+  const completedStatusRef = useRef(new Map()) // Map<missionId, completed>
   
   // Countdown timer state
   const [nextReassignmentCountdown, setNextReassignmentCountdown] = useState('Calculating...')
@@ -118,6 +120,91 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
     setMissionFailedMessage(null) // Clear failed message
   }
 
+  const openCompletedMissionModal = async (missionId) => {
+    try {
+      // Get active session to filter intel to only session users
+      const activeSession = await neonApi.getActiveSession()
+      if (!activeSession || !activeSession.participant_user_ids) {
+        return // No active session
+      }
+      
+      const sessionUserIds = new Set(activeSession.participant_user_ids.map(id => Number(id)))
+      
+      // Fetch all intel for this agent
+      const agentIntel = await neonApi.getAgentIntel(agentId)
+      
+      // Fetch all users to get user names for user intel
+      const allUsers = await neonApi.getUsers()
+      
+      // Filter users to only session participants
+      const sessionUsers = allUsers.filter(user => sessionUserIds.has(user.id))
+      
+      // Build set of all aliases belonging to session users
+      const sessionAliases = new Set()
+      sessionUsers.forEach(user => {
+        sessionAliases.add(user.alias_1)
+        sessionAliases.add(user.alias_2)
+      })
+      
+      // Format intel similar to missionIntel format, but only for session users
+      const formattedIntel = []
+      
+      if (agentIntel && agentIntel.length > 0) {
+        for (const intel of agentIntel) {
+          // For user intel, only include if the user is in the session
+          if (intel.intel_type === 'user') {
+            const userId = Number(intel.intel_value)
+            if (!sessionUserIds.has(userId)) {
+              // Skip intel about users not in the session
+              continue
+            }
+          }
+          
+          // For team intel, only include if the alias belongs to a session user
+          if (intel.intel_type === 'team') {
+            if (!sessionAliases.has(intel.alias)) {
+              // Skip team intel about aliases not in the session
+              continue
+            }
+          }
+          
+          let user_name = null
+          if (intel.intel_type === 'user') {
+            const userInfo = sessionUsers.find(u => u.id === Number(intel.intel_value))
+            if (userInfo) {
+              user_name = `${userInfo.firstname} ${userInfo.lastname}`
+            }
+          }
+          
+          formattedIntel.push({
+            alias: intel.alias,
+            intel_type: intel.intel_type,
+            intel_value: intel.intel_value,
+            position: intel.position,
+            user_name: user_name
+          })
+        }
+      }
+      
+      // Open mission modal to show intel
+      setSelectedMissionId(missionId)
+      setShowMissionModal(true)
+      setShowMissionSuccess(true)
+      setShowMissionFailed(false)
+      
+      // Store formatted intel (we'll modify the modal to show all intel)
+      // For now, we'll store it as an array in missionIntel
+      setMissionIntel(formattedIntel.length > 0 ? formattedIntel : null)
+      
+      // Refresh intel tab data if it's already loaded
+      if (users.length > 0) {
+        fetchUsers()
+      }
+    } catch (error) {
+      console.error('Error fetching intel:', error)
+    }
+  }
+
   const closeMissionModal = () => {
     setIsMissionClosing(true)
     setTimeout(() => {
@@ -184,7 +271,6 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
     // Only fetch missions if user is in active session
     if (isInActiveSession && !sessionCheckLoading) {
       fetchRandomMissions()
-      updateCountdown()
     }
   }, [agentId, isInActiveSession, sessionCheckLoading])
 
@@ -225,8 +311,13 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
 
   // Auto-check every 10 seconds for mission reassignments and updates
   useEffect(() => {
-    // Update the ref whenever missions change
+    // Update the refs whenever missions change
     missionIdsRef.current = new Set(missions.map(m => m.id))
+    const completedMap = new Map()
+    missions.forEach(m => {
+      completedMap.set(m.id, m.completed || false)
+    })
+    completedStatusRef.current = completedMap
   }, [missions])
 
   // Periodically check if user is still in active session
@@ -263,8 +354,10 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
     }
     
     const checkMissions = async () => {
-      // const checkStartTime = Date.now()
-      // console.log('[AUTO-CHECK] Starting mission check at', new Date().toISOString())
+      console.log('[AUTO-CHECK] Starting mission check at', new Date().toISOString())
+      console.log('[AUTO-CHECK] Current missions state:', missions.length, 'missions')
+      console.log('[AUTO-CHECK] Current missionIdsRef:', Array.from(missionIdsRef.current))
+      console.log('[AUTO-CHECK] Current completedStatusRef size:', completedStatusRef.current.size)
       
       try {
         // Check if missions should be reassigned (1 minute for testing)
@@ -284,33 +377,92 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
         const newMissions = await neonApi.getAllMissionsForAgent(agentId)
         // console.log('[AUTO-CHECK] Fetched missions:', newMissions.length, 'missions')
         
-        // Compare mission IDs to detect changes using ref
-        const currentMissionIds = missionIdsRef.current
+        // Compare mission IDs and completion status to detect changes
+        // Use both refs and current state to handle race conditions during refreshes
+        const currentMissionIdsFromRef = missionIdsRef.current
+        const currentMissionIdsFromState = new Set(missions.map(m => m.id))
         const newMissionIds = new Set(newMissions.map(m => m.id))
         
-        // console.log('[AUTO-CHECK] Current mission IDs:', Array.from(currentMissionIds))
-        // console.log('[AUTO-CHECK] New mission IDs:', Array.from(newMissionIds))
+        // Check if there's a mismatch between state and refs (indicates refresh in progress)
+        const stateRefMismatch = currentMissionIdsFromRef.size !== currentMissionIdsFromState.size ||
+          [...currentMissionIdsFromState].some(id => !currentMissionIdsFromRef.has(id)) ||
+          [...currentMissionIdsFromRef].some(id => !currentMissionIdsFromState.has(id))
         
-        // Check if missions have changed (different IDs or count)
-        const missionsChanged = 
-          currentMissionIds.size !== newMissionIds.size ||
-          [...newMissionIds].some(id => !currentMissionIds.has(id)) ||
-          [...currentMissionIds].some(id => !newMissionIds.has(id))
+        // Check if mission IDs have changed (compare new missions against both state and refs)
+        const missionIdsChangedFromState = 
+          currentMissionIdsFromState.size !== newMissionIds.size ||
+          [...newMissionIds].some(id => !currentMissionIdsFromState.has(id)) ||
+          [...currentMissionIdsFromState].some(id => !newMissionIds.has(id))
         
-        // console.log('[AUTO-CHECK] Missions changed?', missionsChanged)
+        const missionIdsChangedFromRef = 
+          currentMissionIdsFromRef.size !== newMissionIds.size ||
+          [...newMissionIds].some(id => !currentMissionIdsFromRef.has(id)) ||
+          [...currentMissionIdsFromRef].some(id => !newMissionIds.has(id))
         
-        // Only update if missions have actually changed
-        if (missionsChanged && newMissions.length > 0) {
-          // console.log('[AUTO-CHECK] Updating missions in UI...')
-          setMissions(newMissions)
-          // Update ref with new mission IDs
+        // If state and refs don't match, or if either shows a change, consider it changed
+        const missionIdsChanged = missionIdsChangedFromState || missionIdsChangedFromRef || stateRefMismatch
+        
+        // Check if completion status has changed
+        // Build current status from actual missions state (more reliable than ref during refresh)
+        const currentCompletedStatusFromState = new Map()
+        missions.forEach(m => {
+          currentCompletedStatusFromState.set(m.id, m.completed || false)
+        })
+        const currentCompletedStatusFromRef = completedStatusRef.current
+        
+        let completionStatusChanged = false
+        
+        // Check all new missions for completion status changes
+        for (const newMission of newMissions) {
+          const currentCompletedFromState = currentCompletedStatusFromState.get(newMission.id) ?? false
+          const currentCompletedFromRef = currentCompletedStatusFromRef.get(newMission.id) ?? false
+          const newCompleted = newMission.completed || false
+          
+          // Check if completion status has changed (check both state and ref)
+          if (currentCompletedFromState !== newCompleted || currentCompletedFromRef !== newCompleted) {
+            completionStatusChanged = true
+            break
+          }
+        }
+        
+        // Also check if any missions in state or refs are missing from new missions
+        for (const currentId of currentMissionIdsFromState) {
+          if (!newMissionIds.has(currentId)) {
+            missionIdsChanged = true
+            break
+          }
+        }
+        
+        console.log('[AUTO-CHECK] Current mission IDs (ref):', Array.from(currentMissionIdsFromRef))
+        console.log('[AUTO-CHECK] Current mission IDs (state):', Array.from(currentMissionIdsFromState))
+        console.log('[AUTO-CHECK] New mission IDs:', Array.from(newMissionIds))
+        console.log('[AUTO-CHECK] State/Ref mismatch?', stateRefMismatch)
+        console.log('[AUTO-CHECK] Mission IDs changed?', missionIdsChanged)
+        console.log('[AUTO-CHECK] Completion status changed?', completionStatusChanged)
+        console.log('[AUTO-CHECK] Should reassign?', shouldReassign)
+        console.log('[AUTO-CHECK] Current missions count (state):', missions.length)
+        console.log('[AUTO-CHECK] New missions count:', newMissions.length)
+        
+        // Always update if missions have changed (IDs, count, or completion status) or after reassignment
+        // This ensures old missions disappear when they're unassigned and completion status updates
+        if (missionIdsChanged || completionStatusChanged || shouldReassign) {
+          console.log('[AUTO-CHECK] Updating missions in UI...')
+          console.log('[AUTO-CHECK] New missions:', newMissions.map(m => ({ id: m.id, completed: m.completed })))
+          setMissions([...newMissions]) // Use spread to ensure new array reference
+          // Update refs with new mission IDs and completion status
           missionIdsRef.current = newMissionIds
-          // Clear completed missions state when new missions arrive
-          setCompletedMissions(new Set())
+          const newCompletedMap = new Map()
+          newMissions.forEach(m => {
+            newCompletedMap.set(m.id, m.completed || false)
+          })
+          completedStatusRef.current = newCompletedMap
+          // Update completed missions state based on new mission data
+          const completedSet = new Set(newMissions.filter(m => m.completed).map(m => m.id))
+          setCompletedMissions(completedSet)
           setSuccessKeys({})
-          // console.log('[AUTO-CHECK] Missions updated in UI')
+          console.log('[AUTO-CHECK] Missions updated in UI, completed set:', Array.from(completedSet))
         } else {
-          // console.log('[AUTO-CHECK] No changes detected, skipping UI update')
+          console.log('[AUTO-CHECK] No changes detected, skipping UI update')
         }
         
         // const checkDuration = Date.now() - checkStartTime
@@ -341,7 +493,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
       clearTimeout(initialTimer)
       clearInterval(interval)
     }
-  }, [agentId]) // Only depend on agentId, not missions
+  }, [agentId, isInActiveSession]) // Depend on agentId and isInActiveSession
 
   // Countdown timer for next mission reassignment
   useEffect(() => {
@@ -372,8 +524,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
           diffMinutes = Math.abs(diffMinutes)
         }
         
-        // Calculate time until next reassignment (1 minute for testing, normally 15 minutes)
-        const reassignmentIntervalMinutes = 1 // Testing - change to 15 for production
+        // Get the refresh interval from the active session (default to 15 minutes if not set)
+        const activeSession = await neonApi.getActiveSession()
+        const reassignmentIntervalMinutes = activeSession?.mission_refresh_interval_minutes || 15
         const elapsedMinutes = diffMinutes
         const remainingMinutes = Math.max(0, reassignmentIntervalMinutes - elapsedMinutes)
         
@@ -384,22 +537,27 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
           if (!hasTriggeredCheck) {
             hasTriggeredCheck = true
             setTimeout(async () => {
-              try {
-                const shouldReassign = await neonApi.shouldReassignMissions()
-                if (shouldReassign) {
-                  await neonApi.resetAndAssignAllMissions()
-                  // Fetch updated missions for this agent
-                  const newMissions = await neonApi.getAllMissionsForAgent(agentId)
-                  if (newMissions.length > 0) {
-                    setMissions(newMissions)
-                    missionIdsRef.current = new Set(newMissions.map(m => m.id))
-                    setCompletedMissions(new Set())
-                    setSuccessKeys({})
+                  try {
+                    const shouldReassign = await neonApi.shouldReassignMissions()
+                    if (shouldReassign) {
+                      await neonApi.resetAndAssignAllMissions()
+                      // Fetch updated missions for this agent (always update, even if empty)
+                      const newMissions = await neonApi.getAllMissionsForAgent(agentId)
+                      setMissions(newMissions || [])
+                      missionIdsRef.current = new Set((newMissions || []).map(m => m.id))
+                      const completedMap = new Map()
+                      (newMissions || []).forEach(m => {
+                        completedMap.set(m.id, m.completed || false)
+                      })
+                      completedStatusRef.current = completedMap
+                      // Update completed missions state based on new mission data
+                      const completedSet = new Set((newMissions || []).filter(m => m.completed).map(m => m.id))
+                      setCompletedMissions(completedSet)
+                      setSuccessKeys({})
+                    }
+                  } catch (error) {
+                    // Silently fail
                   }
-                }
-              } catch (error) {
-                // Silently fail
-              }
               // Reset the flag after a delay to allow for next cycle
               setTimeout(() => {
                 hasTriggeredCheck = false
@@ -442,18 +600,32 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
   const fetchUsers = async () => {
     try {
       setIntelLoading(true)
+      
+      // Get active session to filter users
+      const activeSession = await neonApi.getActiveSession()
+      if (!activeSession || !activeSession.participant_user_ids) {
+        setUsers([])
+        setRandomizedAliases([])
+        setIntelLoading(false)
+        return
+      }
+      
+      const sessionUserIds = new Set(activeSession.participant_user_ids.map(id => Number(id)))
+      
+      // Get all users and filter to only those in the active session
       const allUsers = await neonApi.getUsers()
-      setUsers(allUsers)
+      const sessionUsers = allUsers.filter(user => sessionUserIds.has(user.id))
+      setUsers(sessionUsers)
       
       // Get agent's intel
       const agentIntel = await neonApi.getAgentIntel(agentId)
       
-      // Initialize user selections with their actual teams
+      // Initialize user selections with their actual teams (only for session users)
       const selections = {}
       const knownAliases = {} // { userId: [alias1, alias2] }
       const lockedPositions = {} // { userId: [position0, position1] - true if locked }
       
-      allUsers.forEach(user => {
+      sessionUsers.forEach(user => {
         selections[user.id] = user.team
         knownAliases[user.id] = [null, null]
         lockedPositions[user.id] = [false, false]
@@ -462,11 +634,11 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
       // Track team intel for aliases
       const aliasTeamMap = {}
       
-      // Process agent intel to populate known aliases
+      // Process agent intel to populate known aliases (only for session users)
       agentIntel.forEach(intel => {
         if (intel.intel_type === 'user' && intel.position) {
-          // Find the user this intel is about
-          const userInfo = allUsers.find(u => u.id === Number(intel.intel_value))
+          // Find the user this intel is about (only if they're in the session)
+          const userInfo = sessionUsers.find(u => u.id === Number(intel.intel_value))
           if (userInfo) {
             const positionIndex = intel.position - 1 // position is 1 or 2, array index is 0 or 1
             knownAliases[userInfo.id][positionIndex] = intel.alias
@@ -483,8 +655,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
       setLockedAliases(lockedPositions)
       setAliasTeams(aliasTeamMap)
       
-      // Randomize aliases, excluding known ones
-      const allAliases = allUsers.flatMap(user => [user.alias_1, user.alias_2])
+      // Randomize aliases, excluding known ones (only from session users)
+      const allAliases = sessionUsers.flatMap(user => [user.alias_1, user.alias_2])
       const knownAliasSet = new Set(Object.values(knownAliases).flat().filter(a => a !== null))
       const unknownAliases = allAliases.filter(alias => !knownAliasSet.has(alias))
       const shuffled = [...unknownAliases].sort(() => Math.random() - 0.5)
@@ -791,8 +963,16 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
         assignedMissions = await neonApi.getAllMissionsForAgent(agentId)
       }
       setMissions(assignedMissions)
-      // Clear completed missions state when refreshing
-      setCompletedMissions(new Set())
+      // Update refs with mission IDs and completion status
+      missionIdsRef.current = new Set(assignedMissions.map(m => m.id))
+      const completedMap = new Map()
+      assignedMissions.forEach(m => {
+        completedMap.set(m.id, m.completed || false)
+      })
+      completedStatusRef.current = completedMap
+      // Set completed missions state based on mission data
+      const completedSet = new Set(assignedMissions.filter(m => m.completed).map(m => m.id))
+      setCompletedMissions(completedSet)
       setSuccessKeys({})
       // Clear any existing errors when refreshing
       setMissionErrors({})
@@ -1175,7 +1355,11 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                   {missions
                     .filter(mission => completedMissions.has(mission.id))
                     .map((mission, index) => (
-                      <li key={mission.id}>
+                      <li 
+                        key={mission.id}
+                        onClick={() => openCompletedMissionModal(mission.id)}
+                        style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      >
                         {mission.type === 'passphrase' 
                           ? mission.title 
                           : mission.type === 'object'
@@ -1186,12 +1370,6 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                     ))}
                 </ul>
               </div>
-            )}
-            
-            {isInActiveSession && (
-              <button onClick={() => fetchRandomMissions(true)} className="refresh-button button-min">
-                Refresh missions
-              </button>
             )}
               </>
             )}
@@ -1632,24 +1810,54 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                       </h2>
                       {missionIntel && (
                         <div className="success-intel">
-                          <h3>New intel:</h3>
-                          {missionIntel.intel_type === 'team' ? (
-                            <p>
-                              <span className="alias-container filled">{missionIntel.alias}</span>
-                              {' is on the '}
-                              <span className={`team-${missionIntel.intel_value}`}>{missionIntel.intel_value}</span>
-                              {' team.'}
-                            </p>
-                          ) : missionIntel.intel_type === 'user' && missionIntel.user_name ? (
-                            <p>
-                              {missionIntel.user_name}
-                              {' uses the '}
-                              <span className="alias-container filled">{missionIntel.position === 1 ? 'first' : 'second'}</span>
-                              {' alias '}
-                              <span className="alias-container filled">{missionIntel.alias}</span>
-                              {'.'}
-                            </p>
-                          ) : null}
+                          <h3>{Array.isArray(missionIntel) ? 'Your Intel:' : 'New intel:'}</h3>
+                          {Array.isArray(missionIntel) ? (
+                            // Display all intel
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {missionIntel.map((intel, idx) => (
+                                <div key={idx}>
+                                  {intel.intel_type === 'team' ? (
+                                    <p>
+                                      <span className="alias-container filled">{intel.alias}</span>
+                                      {' is on the '}
+                                      <span className={`team-${intel.intel_value}`}>{intel.intel_value}</span>
+                                      {' team.'}
+                                    </p>
+                                  ) : intel.intel_type === 'user' && intel.user_name ? (
+                                    <p>
+                                      {intel.user_name}
+                                      {' uses the '}
+                                      <span className="alias-container filled">{intel.position === 1 ? 'first' : 'second'}</span>
+                                      {' alias '}
+                                      <span className="alias-container filled">{intel.alias}</span>
+                                      {'.'}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            // Display single intel (from new mission completion)
+                            <>
+                              {missionIntel.intel_type === 'team' ? (
+                                <p>
+                                  <span className="alias-container filled">{missionIntel.alias}</span>
+                                  {' is on the '}
+                                  <span className={`team-${missionIntel.intel_value}`}>{missionIntel.intel_value}</span>
+                                  {' team.'}
+                                </p>
+                              ) : missionIntel.intel_type === 'user' && missionIntel.user_name ? (
+                                <p>
+                                  {missionIntel.user_name}
+                                  {' uses the '}
+                                  <span className="alias-container filled">{missionIntel.position === 1 ? 'first' : 'second'}</span>
+                                  {' alias '}
+                                  <span className="alias-container filled">{missionIntel.alias}</span>
+                                  {'.'}
+                                </p>
+                              ) : null}
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
