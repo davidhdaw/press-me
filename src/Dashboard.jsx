@@ -59,6 +59,14 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
   const [missionFailedMessage, setMissionFailedMessage] = useState(null)
   const [isInActiveSession, setIsInActiveSession] = useState(false)
   const [sessionCheckLoading, setSessionCheckLoading] = useState(true)
+  // Initial secret intel modal state
+  const [showInitialIntelModal, setShowInitialIntelModal] = useState(false)
+  const [initialIntelRed, setInitialIntelRed] = useState(null)
+  const [initialIntelBlue, setInitialIntelBlue] = useState(null)
+  const [redRevealed, setRedRevealed] = useState(false)
+  const [blueRevealed, setBlueRevealed] = useState(false)
+  const [countdown, setCountdown] = useState(null)
+  const [hasSeenInitialIntel, setHasSeenInitialIntel] = useState(false)
  
   // Data arrays for relationships and alibis
   const relationships = [
@@ -309,6 +317,127 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
     }
   }, [activeTab, isInActiveSession])
 
+  // Show initial intel modal when intel tab is first accessed
+  useEffect(() => {
+    const checkInitialIntel = async () => {
+      if (activeTab === 'intel' && isInActiveSession && users.length > 0) {
+        // Check if we've seen initial intel for this session in localStorage
+        const activeSession = await neonApi.getActiveSession()
+        if (activeSession) {
+          const sessionKey = `initialIntel_${activeSession.id}_${agentId}`
+          const sessionTimestampKey = `initialIntel_${activeSession.id}_${agentId}_started`
+          const seen = localStorage.getItem(sessionKey)
+          const storedStartedAt = localStorage.getItem(sessionTimestampKey)
+          
+          // Get current session started_at timestamp and status
+          const currentStartedAt = activeSession.started_at ? String(activeSession.started_at) : null
+          const currentStatus = activeSession.status
+          
+          // Store status along with timestamp for better detection
+          const sessionStatusKey = `initialIntel_${activeSession.id}_${agentId}_status`
+          const storedStatus = localStorage.getItem(sessionStatusKey)
+          
+          // Check if session was reset:
+          // 1. If session status is 'draft' but we had seen it when it was 'active'/'paused'/'ended' (reset back to draft)
+          // 2. If we had a stored started_at but now it's null (session was reset)
+          // 3. If the current started_at is different from stored (session restarted with new timestamp)
+          // 4. If stored status was NOT 'draft' but current status is 'active' with different started_at (reset and restarted)
+          const statusChangedToDraft = storedStatus && storedStatus !== 'draft' && currentStatus === 'draft'
+          const statusChangedFromActiveToActive = storedStatus === 'active' && currentStatus === 'active' && 
+                                                   storedStartedAt && currentStartedAt && storedStartedAt !== currentStartedAt
+          const startedAtChanged = storedStartedAt && currentStartedAt && storedStartedAt !== currentStartedAt
+          const startedAtCleared = storedStartedAt && currentStartedAt === null
+          
+          const sessionWasReset = statusChangedToDraft || statusChangedFromActiveToActive || startedAtChanged || startedAtCleared
+          
+          console.log('[INITIAL-INTEL] Session check:', {
+            sessionId: activeSession.id,
+            storedStartedAt,
+            currentStartedAt,
+            storedStatus,
+            currentStatus,
+            statusChangedToDraft,
+            statusChangedFromActiveToActive,
+            startedAtChanged,
+            startedAtCleared,
+            sessionWasReset,
+            seen
+          })
+          
+          // Clear localStorage if session was reset
+          if (sessionWasReset) {
+            console.log('[INITIAL-INTEL] Session was reset, clearing localStorage')
+            localStorage.removeItem(sessionKey)
+            localStorage.removeItem(sessionTimestampKey)
+            localStorage.removeItem(sessionStatusKey)
+            setHasSeenInitialIntel(false)
+          }
+          
+          // Show modal if not seen (or was reset)
+          if (!seen || sessionWasReset) {
+            // Get one red and one blue team member (exclude current user)
+            const redUsers = users.filter(u => u.team === 'red' && u.id !== agentId)
+            const blueUsers = users.filter(u => u.team === 'blue' && u.id !== agentId)
+            
+            if (redUsers.length > 0 && blueUsers.length > 0) {
+              // Pick random users
+              const redUser = redUsers[Math.floor(Math.random() * redUsers.length)]
+              const blueUser = blueUsers[Math.floor(Math.random() * blueUsers.length)]
+              
+              setInitialIntelRed(`${redUser.firstname} ${redUser.lastname}`)
+              setInitialIntelBlue(`${blueUser.firstname} ${blueUser.lastname}`)
+              setShowInitialIntelModal(true)
+              setRedRevealed(false)
+              setBlueRevealed(false)
+              setCountdown(null)
+              
+              // Mark as seen immediately to prevent duplicate modals
+              setHasSeenInitialIntel(true)
+              localStorage.setItem(sessionKey, 'true')
+              // Store the started_at timestamp and status to detect resets
+              if (currentStartedAt) {
+                localStorage.setItem(sessionTimestampKey, currentStartedAt)
+              }
+              if (currentStatus) {
+                localStorage.setItem(sessionStatusKey, currentStatus)
+              }
+            }
+          } else {
+            // Already seen for this session
+            setHasSeenInitialIntel(true)
+            // Update stored timestamp and status if they exist and are different (session restarted)
+            if (currentStartedAt && storedStartedAt !== currentStartedAt) {
+              localStorage.setItem(sessionTimestampKey, currentStartedAt)
+            }
+            if (currentStatus && storedStatus !== currentStatus) {
+              localStorage.setItem(sessionStatusKey, currentStatus)
+            }
+          }
+        }
+      }
+    }
+    
+    checkInitialIntel()
+  }, [activeTab, isInActiveSession, users, agentId])
+
+  // Handle countdown after reveal
+  useEffect(() => {
+    if (countdown !== null && countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1)
+      }, 1000)
+      return () => clearTimeout(timer)
+    } else if (countdown === 0) {
+      // Close modal
+      setShowInitialIntelModal(false)
+      setCountdown(null)
+      setRedRevealed(false)
+      setBlueRevealed(false)
+      setInitialIntelRed(null)
+      setInitialIntelBlue(null)
+    }
+  }, [countdown])
+
   // Auto-check every 10 seconds for mission reassignments and updates
   useEffect(() => {
     // Update the refs whenever missions change
@@ -331,6 +460,33 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
             setIsInActiveSession(userInSession)
             if (!userInSession) {
               setMissions([])
+            }
+          }
+          
+          // Also check if session was reset (for initial intel clearing)
+          if (userInSession && activeSession.id) {
+            const sessionTimestampKey = `initialIntel_${activeSession.id}_${agentId}_started`
+            const sessionStatusKey = `initialIntel_${activeSession.id}_${agentId}_status`
+            const sessionKey = `initialIntel_${activeSession.id}_${agentId}`
+            
+            const storedStartedAt = localStorage.getItem(sessionTimestampKey)
+            const storedStatus = localStorage.getItem(sessionStatusKey)
+            const currentStartedAt = activeSession.started_at ? String(activeSession.started_at) : null
+            const currentStatus = activeSession.status
+            
+            // Check if session was reset
+            const statusChangedToDraft = storedStatus && storedStatus !== 'draft' && currentStatus === 'draft'
+            const statusChangedFromActiveToActive = storedStatus === 'active' && currentStatus === 'active' && 
+                                                   storedStartedAt && currentStartedAt && storedStartedAt !== currentStartedAt
+            const startedAtChanged = storedStartedAt && currentStartedAt && storedStartedAt !== currentStartedAt
+            const startedAtCleared = storedStartedAt && currentStartedAt === null
+            
+            if (statusChangedToDraft || statusChangedFromActiveToActive || startedAtChanged || startedAtCleared) {
+              console.log('[SESSION-CHECK] Detected session reset, clearing initial intel localStorage')
+              localStorage.removeItem(sessionKey)
+              localStorage.removeItem(sessionTimestampKey)
+              localStorage.removeItem(sessionStatusKey)
+              setHasSeenInitialIntel(false)
             }
           }
         } else {
@@ -986,6 +1142,30 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
 
   const handleLogout = () => {
     onLogout()
+  }
+
+  const handleRevealRed = () => {
+    // Reveal both names when either bar is clicked
+    if (!redRevealed || !blueRevealed) {
+      setRedRevealed(true)
+      setBlueRevealed(true)
+      // Start countdown if it hasn't started yet
+      if (countdown === null) {
+        setCountdown(5)
+      }
+    }
+  }
+
+  const handleRevealBlue = () => {
+    // Reveal both names when either bar is clicked
+    if (!redRevealed || !blueRevealed) {
+      setRedRevealed(true)
+      setBlueRevealed(true)
+      // Start countdown if it hasn't started yet
+      if (countdown === null) {
+        setCountdown(5)
+      }
+    }
   }
 
   const handleTabChange = (tab) => {
@@ -1870,6 +2050,71 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
             </div>
           )
         })()}
+        
+        {/* Initial Secret Intel Modal */}
+        {showInitialIntelModal && (
+          <div className="initial-intel-modal-overlay">
+            <div className="initial-intel-modal">
+              <div className="initial-intel-modal-header">
+                <h2>🔒 CLASSIFIED INTEL 🔒</h2>
+              </div>
+              <div className="initial-intel-modal-content">
+                <div style={{ marginBottom: '20px', padding: 'var(--unit-sm)', backgroundColor: '#fff3cd', border: '2px dashed var(--black)', borderRadius: '4px' }}>
+                  <p style={{ fontWeight: 'bold', marginBottom: '8px', color: '#d32f2f' }}>
+                    ⚠️ WARNING
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.9em' }}>
+                    Clicking a black bar will reveal both names. You will only have <strong>5 seconds</strong> to view them before this message self-destructs.
+                  </p>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '20px' }}>
+                  <div>
+                    <p style={{ marginBottom: '8px', fontSize: '0.9em', color: '#666' }}>Red Team Member:</p>
+                    {redRevealed ? (
+                      <div className="initial-intel-revealed red-team">
+                        {initialIntelRed}
+                      </div>
+                    ) : (
+                      <div 
+                        className="initial-intel-censor-bar"
+                        onClick={handleRevealRed}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <p style={{ marginBottom: '8px', fontSize: '0.9em', color: '#666' }}>Blue Team Member:</p>
+                    {blueRevealed ? (
+                      <div className="initial-intel-revealed blue-team">
+                        {initialIntelBlue}
+                      </div>
+                    ) : (
+                      <div 
+                        className="initial-intel-censor-bar"
+                        onClick={handleRevealBlue}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {(redRevealed || blueRevealed) && countdown !== null && (
+                  <div className="initial-intel-countdown">
+                    <p style={{ fontWeight: 'bold', color: '#d32f2f', marginBottom: '8px' }}>
+                      ⚠️ This message will self-destruct in {countdown} seconds...
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   )
 }
