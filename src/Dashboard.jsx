@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { neonApi } from './neonApi'
 
 function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) {
@@ -32,6 +32,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   // New state for relationship and alibi
   const [relationship, setRelationship] = useState('')
   const [alibi, setAlibi] = useState('')
+
+  // Ref to store current mission IDs for comparison (avoid recreating interval on every change)
+  const missionIdsRef = useRef(new Set())
   
   // Modal state
   const [showModal, setShowModal] = useState(false)
@@ -174,6 +177,94 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       fetchUsers()
     }
   }, [activeTab])
+
+  // Auto-check every 10 seconds for mission reassignments and updates
+  useEffect(() => {
+    // Update the ref whenever missions change
+    missionIdsRef.current = new Set(missions.map(m => m.id))
+  }, [missions])
+
+  useEffect(() => {
+    const checkMissions = async () => {
+      // const checkStartTime = Date.now()
+      // console.log('[AUTO-CHECK] Starting mission check at', new Date().toISOString())
+      
+      try {
+        // Check if missions should be reassigned (1 minute for testing)
+        // console.log('[AUTO-CHECK] Checking shouldReassignMissions...')
+        const shouldReassign = await neonApi.shouldReassignMissions()
+        // console.log('[AUTO-CHECK] shouldReassignMissions result:', shouldReassign)
+        
+        if (shouldReassign) {
+          // console.log('[AUTO-CHECK] Triggering mission reassignment...')
+          // Trigger reassignment for all users
+          const reassignResult = await neonApi.resetAndAssignAllMissions()
+          // console.log('[AUTO-CHECK] Reassignment complete:', reassignResult)
+        }
+        
+        // Always check if this user's missions have been updated
+        // console.log('[AUTO-CHECK] Fetching missions for agent:', agentId)
+        const newMissions = await neonApi.getAllMissionsForAgent(agentId)
+        // console.log('[AUTO-CHECK] Fetched missions:', newMissions.length, 'missions')
+        
+        // Compare mission IDs to detect changes using ref
+        const currentMissionIds = missionIdsRef.current
+        const newMissionIds = new Set(newMissions.map(m => m.id))
+        
+        // console.log('[AUTO-CHECK] Current mission IDs:', Array.from(currentMissionIds))
+        // console.log('[AUTO-CHECK] New mission IDs:', Array.from(newMissionIds))
+        
+        // Check if missions have changed (different IDs or count)
+        const missionsChanged = 
+          currentMissionIds.size !== newMissionIds.size ||
+          [...newMissionIds].some(id => !currentMissionIds.has(id)) ||
+          [...currentMissionIds].some(id => !newMissionIds.has(id))
+        
+        // console.log('[AUTO-CHECK] Missions changed?', missionsChanged)
+        
+        // Only update if missions have actually changed
+        if (missionsChanged && newMissions.length > 0) {
+          // console.log('[AUTO-CHECK] Updating missions in UI...')
+          setMissions(newMissions)
+          // Update ref with new mission IDs
+          missionIdsRef.current = newMissionIds
+          // Clear completed missions state when new missions arrive
+          setCompletedMissions(new Set())
+          setSuccessKeys({})
+          // console.log('[AUTO-CHECK] Missions updated in UI')
+        } else {
+          // console.log('[AUTO-CHECK] No changes detected, skipping UI update')
+        }
+        
+        // const checkDuration = Date.now() - checkStartTime
+        // console.log('[AUTO-CHECK] Check completed in', checkDuration, 'ms')
+      } catch (error) {
+        // console.error('[AUTO-CHECK] Error checking missions:', error)
+        // console.error('[AUTO-CHECK] Error stack:', error.stack)
+        // Silently fail - don't show errors to user
+      }
+    }
+    
+    // console.log('[AUTO-CHECK] Setting up auto-check interval (every 10 seconds)')
+    
+    // Initial check after 1 second (give time for initial load)
+    const initialTimer = setTimeout(() => {
+      // console.log('[AUTO-CHECK] Running initial check (after 1 second)')
+      checkMissions()
+    }, 1000)
+    
+    // Then check every 10 seconds
+    const interval = setInterval(() => {
+      // console.log('[AUTO-CHECK] Running periodic check (every 10 seconds)')
+      checkMissions()
+    }, 10000)
+    
+    return () => {
+      // console.log('[AUTO-CHECK] Cleaning up interval')
+      clearTimeout(initialTimer)
+      clearInterval(interval)
+    }
+  }, [agentId]) // Only depend on agentId, not missions
 
   const fetchUsers = async () => {
     try {
