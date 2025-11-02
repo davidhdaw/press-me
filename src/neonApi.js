@@ -434,6 +434,57 @@ export const neonApi = {
   }
   ,
 
+  // Assign object missions - similar pattern to book/passphrase missions
+  async assignObjectMissions() {
+    try {
+      // Get available agents
+      const users = (await sql`SELECT id FROM users WHERE ishere = true`).map(u => u.id)
+      if (users.length === 0) return { assigned: 0 }
+
+      // Fetch missions with previous assignments
+      const missions = await sql`SELECT id, past_assigned_agents FROM object_missions WHERE completed = false ORDER BY id`
+
+      // Current assignment counts per user (cap at 3 total across all mission types)
+      const objectCounts = await sql`SELECT assigned_agent AS user_id, COUNT(*)::int AS cnt FROM object_missions WHERE assigned_agent IS NOT NULL AND completed = false GROUP BY assigned_agent`
+      const objectCountMap = new Map(objectCounts.map(r => [r.user_id, Number(r.cnt)]))
+
+      const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
+      let updates = 0
+
+      for (const m of missions) {
+        const prevAssigned = Array.isArray(m.past_assigned_agents) ? m.past_assigned_agents : []
+        
+        // Check if mission is already assigned
+        const currentAssignment = await sql`SELECT assigned_agent FROM object_missions WHERE id = ${m.id}`
+        if (currentAssignment[0]?.assigned_agent) {
+          continue // Skip if already assigned
+        }
+
+        const eligibleUsers = users.filter(id => !prevAssigned.includes(id) && (objectCountMap.get(id) || 0) < 3)
+        
+        if (eligibleUsers.length > 0) {
+          const userId = pick(eligibleUsers)
+          
+          await sql`
+            UPDATE object_missions
+            SET assigned_agent = ${userId},
+                past_assigned_agents = array_append(COALESCE(past_assigned_agents, ARRAY[]::integer[]), ${userId}),
+                assigned_now = true
+            WHERE id = ${m.id}
+          `
+          updates++
+          objectCountMap.set(userId, (objectCountMap.get(userId) || 0) + 1)
+        }
+      }
+
+      return { assigned: updates }
+    } catch (error) {
+      console.error('Error assigning object missions (Neon):', error)
+      throw error
+    }
+  }
+  ,
+
   // Assign passphrase missions - EXACT same pattern as assignBookMissions
   async assignPassphraseMissions() {
     try {
@@ -520,7 +571,7 @@ export const neonApi = {
   }
   ,
 
-  // Reset all missions (both book and passphrase) and assign until each user has 3 missions total
+  // Reset all missions (book, passphrase, and object) and assign until each user has 3 missions total
   async resetAndAssignAllMissions() {
     try {
       // Reset book missions
@@ -534,7 +585,7 @@ export const neonApi = {
             blue_completed = false
       `
       
-      // Reset passphrase missions
+      // Reset passphrase missions - reset all missions regardless of completion status
       await sql`
         UPDATE passphrase_missions
         SET assigned_receiver = NULL,
@@ -545,6 +596,15 @@ export const neonApi = {
             completed = false
       `
       
+      // Reset object missions - reset all missions regardless of completion status
+      await sql`
+        UPDATE object_missions
+        SET assigned_agent = NULL,
+            past_assigned_agents = ARRAY[]::integer[],
+            assigned_now = false,
+            completed = false
+      `
+      
       // Get all users who are present
       const users = await sql`SELECT id, team FROM users WHERE ishere = true ORDER BY id`
       
@@ -552,9 +612,9 @@ export const neonApi = {
         return { assigned: 0, reason: 'No users available' }
       }
       
-      // Track mission counts per user
+      // Track mission counts per user (total across all types, max 3)
       const missionCounts = new Map()
-      const missionTypesByUser = new Map() // { userId: ['book', 'passphrase', ...] }
+      const missionTypesByUser = new Map() // { userId: ['book', 'passphrase', 'object', ...] }
       users.forEach(user => {
         missionCounts.set(user.id, 0)
         missionTypesByUser.set(user.id, [])
@@ -564,33 +624,78 @@ export const neonApi = {
       const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
       
       // Helper function to determine which mission type user needs
+      // Ensures: exactly 3 missions, at least 2 different types
       const getNeededMissionType = (userId) => {
         const userMissions = missionTypesByUser.get(userId) || []
+        const uniqueTypes = new Set(userMissions)
         const bookCount = userMissions.filter(t => t === 'book').length
         const passphraseCount = userMissions.filter(t => t === 'passphrase').length
-        
-        // If user has 0 missions, prefer giving them a book mission first (2-person)
-        // If user has 1 mission and it's book, give them passphrase
-        // If user has 1 mission and it's passphrase, give them book
-        // If user has 2 missions, give them the type they have fewer of
+        const objectCount = userMissions.filter(t => t === 'object').length
         
         if (userMissions.length === 0) {
-          return 'book' // Start with book missions
+          // First mission: any type
+          const types = ['book', 'passphrase', 'object']
+          return types[Math.floor(Math.random() * types.length)]
         } else if (userMissions.length === 1) {
-          return userMissions[0] === 'book' ? 'passphrase' : 'book'
+          // Second mission: MUST be a different type to ensure at least 2 types
+          const usedType = userMissions[0]
+          if (usedType === 'book') {
+            return Math.random() < 0.5 ? 'passphrase' : 'object'
+          } else if (usedType === 'passphrase') {
+            return Math.random() < 0.5 ? 'book' : 'object'
+          } else {
+            return Math.random() < 0.5 ? 'book' : 'passphrase'
+          }
         } else if (userMissions.length === 2) {
-          return bookCount < passphraseCount ? 'book' : 'passphrase'
+          // Third mission: if they already have 2 different types, any type is fine
+          // If they have 2 of the same type, MUST get a different type
+          if (uniqueTypes.size === 1) {
+            // They have 2 of the same type, need a different one
+            const currentType = userMissions[0]
+            if (currentType === 'book') {
+              return Math.random() < 0.5 ? 'passphrase' : 'object'
+            } else if (currentType === 'passphrase') {
+              return Math.random() < 0.5 ? 'book' : 'object'
+            } else {
+              return Math.random() < 0.5 ? 'book' : 'passphrase'
+            }
+          } else {
+            // They already have 2 different types, third can be any
+            const allTypes = ['book', 'passphrase', 'object']
+            return allTypes[Math.floor(Math.random() * allTypes.length)]
+          }
         }
         return null // User has 3 missions already
       }
       
-      // Get available missions
+      // Helper to check if user needs a specific type to meet requirements
+      const needsTypeForDiversity = (userId, type) => {
+        const userMissions = missionTypesByUser.get(userId) || []
+        const uniqueTypes = new Set(userMissions)
+        
+        // If user has less than 2 missions, they need different types
+        if (userMissions.length < 2) {
+          return !userMissions.includes(type)
+        }
+        
+        // If user has 2 missions of the same type, they need a different type
+        if (userMissions.length === 2 && uniqueTypes.size === 1) {
+          return !userMissions.includes(type)
+        }
+        
+        // Otherwise any type is fine
+        return true
+      }
+      
+      // Get available missions (excluding completed ones)
       const getAvailableMissions = async () => {
-        const bookResult = await sql`SELECT * FROM book_missions WHERE assigned_red IS NULL OR assigned_blue IS NULL`
-        const passphraseResult = await sql`SELECT * FROM passphrase_missions WHERE assigned_receiver IS NULL AND assigned_sender_1 IS NULL AND assigned_sender_2 IS NULL`
+        const bookResult = await sql`SELECT * FROM book_missions WHERE (assigned_red IS NULL OR assigned_blue IS NULL) AND (red_completed = false AND blue_completed = false)`
+        const passphraseResult = await sql`SELECT * FROM passphrase_missions WHERE assigned_receiver IS NULL AND assigned_sender_1 IS NULL AND assigned_sender_2 IS NULL AND completed = false`
+        const objectResult = await sql`SELECT * FROM object_missions WHERE assigned_agent IS NULL AND completed = false`
         return {
           book: bookResult,
-          passphrase: passphraseResult
+          passphrase: passphraseResult,
+          object: objectResult
         }
       }
       
@@ -606,47 +711,87 @@ export const neonApi = {
       const maxIterations = users.length * 10 // Safety limit
       let availableMissions = await getAvailableMissions()
       
-      // Main assignment loop - iterate until all users have 3 missions
+      // Main assignment loop - iterate until all users have exactly 3 missions
       while (iterations < maxIterations) {
         iterations++
         
-        // Find users who still need missions
-        const usersNeedingMissions = users.filter(u => (missionCounts.get(u.id) || 0) < 3)
+        // Find users who still need missions, prioritize those with fewer missions
+        const usersNeedingMissions = users
+          .filter(u => (missionCounts.get(u.id) || 0) < 3)
+          .sort((a, b) => {
+            const countA = missionCounts.get(a.id) || 0
+            const countB = missionCounts.get(b.id) || 0
+            // Prioritize users with fewer missions
+            return countA - countB
+          })
         
         if (usersNeedingMissions.length === 0) {
           break // All users have 3 missions
         }
         
         // Refresh available missions periodically
-        if (iterations % 5 === 0) {
+        if (iterations % 10 === 0) {
           availableMissions = await getAvailableMissions()
         }
         
-        // Try to assign a mission to a random user who needs one
-        const user = pick(usersNeedingMissions)
+        // Try to assign a mission - prioritize users with fewer missions
+        const user = usersNeedingMissions[0] // Start with user who needs most missions
         const neededType = getNeededMissionType(user.id)
         
         let assigned = false
         
-        // Randomly choose between book and passphrase if both are available and user could use either
-        const canUseBook = neededType === 'book' || (neededType !== 'passphrase' && availableMissions.book.length > 0)
-        const canUsePassphrase = neededType === 'passphrase' || (neededType !== 'book' && availableMissions.passphrase.length > 0)
+        // Prioritize the needed type, but consider available missions
+        let missionTypeToTry = null
         
-        let missionTypeToTry = neededType
+        // Check what types are actually available and needed
+        const availableTypes = []
+        if (neededType === 'book' && availableMissions.book.length > 0 && needsTypeForDiversity(user.id, 'book')) {
+          availableTypes.push('book')
+        }
+        if (neededType === 'passphrase' && availableMissions.passphrase.length > 0 && needsTypeForDiversity(user.id, 'passphrase')) {
+          availableTypes.push('passphrase')
+        }
+        if (neededType === 'object' && availableMissions.object.length > 0 && needsTypeForDiversity(user.id, 'object')) {
+          availableTypes.push('object')
+        }
         
-        // If user could use either type, randomly choose to ensure mix
-        if (canUseBook && canUsePassphrase && availableMissions.book.length > 0 && availableMissions.passphrase.length > 0) {
-          missionTypeToTry = Math.random() < 0.5 ? 'book' : 'passphrase'
-        } else if (canUsePassphrase && availableMissions.passphrase.length > 0) {
-          missionTypeToTry = 'passphrase'
-        } else if (canUseBook && availableMissions.book.length > 0) {
-          missionTypeToTry = 'book'
+        // If preferred type isn't available, try alternatives that meet diversity requirements
+        if (availableTypes.length === 0) {
+          if (availableMissions.book.length > 0 && needsTypeForDiversity(user.id, 'book')) {
+            availableTypes.push('book')
+          }
+          if (availableMissions.passphrase.length > 0 && needsTypeForDiversity(user.id, 'passphrase')) {
+            availableTypes.push('passphrase')
+          }
+          if (availableMissions.object.length > 0 && needsTypeForDiversity(user.id, 'object')) {
+            availableTypes.push('object')
+          }
+        }
+        
+        if (availableTypes.length > 0) {
+          // Prefer the needed type, but randomly pick from available if it's not in the list
+          if (availableTypes.includes(neededType)) {
+            missionTypeToTry = neededType
+          } else {
+            missionTypeToTry = pick(availableTypes)
+          }
+        } else {
+          missionTypeToTry = null // No available missions
         }
         
         // Try to assign book mission
         if (missionTypeToTry === 'book' && availableMissions.book.length > 0) {
+          // Filter out missions user has had before
+          const eligibleBookMissions = availableMissions.book.filter(m => {
+            const prevReds = Array.isArray(m.previous_reds) ? m.previous_reds : []
+            const prevBlues = Array.isArray(m.previous_blues) ? m.previous_blues : []
+            const userHadBefore = (user.team === 'red' && prevReds.includes(user.id)) || 
+                                  (user.team === 'blue' && prevBlues.includes(user.id))
+            return !userHadBefore && !m.red_completed && !m.blue_completed
+          })
+          
           // Find a book mission for this user's team
-          let bookMission = availableMissions.book.find(m => {
+          let bookMission = eligibleBookMissions.find(m => {
             if (user.team === 'red' && m.assigned_red === null) return true
             if (user.team === 'blue' && m.assigned_blue === null) return true
             return false
@@ -654,12 +799,28 @@ export const neonApi = {
           
           // If no team-specific match, find any book mission needing assignment
           if (!bookMission) {
-            bookMission = availableMissions.book.find(m => 
+            bookMission = eligibleBookMissions.find(m => 
               m.assigned_red === null || m.assigned_blue === null
             )
           }
           
           if (bookMission) {
+            // Verify mission is still available and not completed before assigning
+            const verifyMission = await sql`
+              SELECT id, assigned_red, assigned_blue, red_completed, blue_completed
+              FROM book_missions
+              WHERE id = ${bookMission.id}
+                AND (assigned_red IS NULL OR assigned_blue IS NULL)
+                AND red_completed = false
+                AND blue_completed = false
+            `
+            
+            if (verifyMission.length === 0) {
+              // Mission was completed or assigned, skip it
+              availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
+              continue
+            }
+            
             // Find a partner for the opposite team
             const oppositeTeam = user.team === 'red' ? 'blue' : 'red'
             const availableOppositeTeam = getAvailableUsers([user.id]).filter(u => u.team === oppositeTeam)
@@ -667,82 +828,206 @@ export const neonApi = {
             if (availableOppositeTeam.length > 0) {
               const partner = pick(availableOppositeTeam)
               
-              // Assign both users
+              // Assign both users - verify not completed before updating
+              let updateSuccess = false
               if (user.team === 'red') {
-                await sql`
+                const updateResult = await sql`
                   UPDATE book_missions 
                   SET assigned_red = ${user.id}, 
                       previous_reds = array_append(COALESCE(previous_reds, ARRAY[]::integer[]), ${user.id}),
                       assigned_blue = ${partner.id}, 
                       previous_blues = array_append(COALESCE(previous_blues, ARRAY[]::integer[]), ${partner.id})
                   WHERE id = ${bookMission.id}
+                    AND assigned_red IS NULL
+                    AND red_completed = false
+                    AND blue_completed = false
+                  RETURNING id
                 `
+                updateSuccess = updateResult.length > 0
               } else {
-                await sql`
+                const updateResult = await sql`
                   UPDATE book_missions 
                   SET assigned_blue = ${user.id}, 
                       previous_blues = array_append(COALESCE(previous_blues, ARRAY[]::integer[]), ${user.id}),
                       assigned_red = ${partner.id}, 
                       previous_reds = array_append(COALESCE(previous_reds, ARRAY[]::integer[]), ${partner.id})
                   WHERE id = ${bookMission.id}
+                    AND assigned_blue IS NULL
+                    AND red_completed = false
+                    AND blue_completed = false
+                  RETURNING id
                 `
+                updateSuccess = updateResult.length > 0
               }
               
-              missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
-              missionCounts.set(partner.id, (missionCounts.get(partner.id) || 0) + 1)
-              missionTypesByUser.get(user.id).push('book')
-              missionTypesByUser.get(partner.id).push('book')
-              
-              // Remove from available
-              availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
-              assigned = true
+              if (updateSuccess) {
+                missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
+                missionCounts.set(partner.id, (missionCounts.get(partner.id) || 0) + 1)
+                missionTypesByUser.get(user.id).push('book')
+                missionTypesByUser.get(partner.id).push('book')
+                
+                // Remove from available
+                availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
+                assigned = true
+              } else {
+                // Mission was completed or assigned while we were trying to assign, skip it
+                availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
+              }
             }
           }
         }
         
         // Try to assign passphrase mission
         if ((missionTypeToTry === 'passphrase' || !assigned) && availableMissions.passphrase.length > 0) {
-          const passphraseMission = availableMissions.passphrase[0]
-          const availableForSenders = getAvailableUsers([user.id])
+          // Filter out missions user has had before
+          const eligiblePassphraseMissions = availableMissions.passphrase.filter(m => {
+            const prevReceivers = Array.isArray(m.previous_receivers) ? m.previous_receivers : []
+            const prevSenders = Array.isArray(m.previous_senders) ? m.previous_senders : []
+            const userHadBefore = prevReceivers.includes(user.id) || prevSenders.includes(user.id)
+            return !userHadBefore && !m.completed
+          })
           
-          if (availableForSenders.length >= 2) {
-            const sender1 = pick(availableForSenders)
-            const remainingAfterSender1 = availableForSenders.filter(u => u.id !== sender1.id)
-            const sender2 = pick(remainingAfterSender1)
+          if (eligiblePassphraseMissions.length > 0) {
+            const passphraseMission = eligiblePassphraseMissions[0]
             
-            await sql`
-              UPDATE passphrase_missions 
-              SET assigned_receiver = ${user.id}, 
-                  assigned_sender_1 = ${sender1.id},
-                  assigned_sender_2 = ${sender2.id},
-                  previous_receivers = array_append(COALESCE(previous_receivers, ARRAY[]::integer[]), ${user.id}),
-                  previous_senders = array_append(array_append(COALESCE(previous_senders, ARRAY[]::integer[]), ${sender1.id}), ${sender2.id})
+            // Verify mission is still available and not completed before assigning
+            const verifyPassphrase = await sql`
+              SELECT id, assigned_receiver, assigned_sender_1, assigned_sender_2, completed
+              FROM passphrase_missions
               WHERE id = ${passphraseMission.id}
+                AND assigned_receiver IS NULL
+                AND assigned_sender_1 IS NULL
+                AND assigned_sender_2 IS NULL
+                AND completed = false
             `
             
-            missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
-            missionCounts.set(sender1.id, (missionCounts.get(sender1.id) || 0) + 1)
-            missionCounts.set(sender2.id, (missionCounts.get(sender2.id) || 0) + 1)
+            if (verifyPassphrase.length === 0) {
+              // Mission was completed or assigned, skip it
+              availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
+              continue
+            }
             
-            missionTypesByUser.get(user.id).push('passphrase')
-            missionTypesByUser.get(sender1.id).push('passphrase')
-            missionTypesByUser.get(sender2.id).push('passphrase')
+            const availableForSenders = getAvailableUsers([user.id])
             
-            availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
-            assigned = true
+            if (availableForSenders.length >= 2) {
+              const sender1 = pick(availableForSenders)
+              const remainingAfterSender1 = availableForSenders.filter(u => u.id !== sender1.id)
+              const sender2 = pick(remainingAfterSender1)
+              
+              const updateResult = await sql`
+                UPDATE passphrase_missions 
+                SET assigned_receiver = ${user.id}, 
+                    assigned_sender_1 = ${sender1.id},
+                    assigned_sender_2 = ${sender2.id},
+                    previous_receivers = array_append(COALESCE(previous_receivers, ARRAY[]::integer[]), ${user.id}),
+                    previous_senders = array_append(array_append(COALESCE(previous_senders, ARRAY[]::integer[]), ${sender1.id}), ${sender2.id})
+                WHERE id = ${passphraseMission.id}
+                  AND assigned_receiver IS NULL
+                  AND assigned_sender_1 IS NULL
+                  AND assigned_sender_2 IS NULL
+                  AND completed = false
+                RETURNING id
+              `
+              
+              if (updateResult.length > 0) {
+                missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
+                missionCounts.set(sender1.id, (missionCounts.get(sender1.id) || 0) + 1)
+                missionCounts.set(sender2.id, (missionCounts.get(sender2.id) || 0) + 1)
+                
+                missionTypesByUser.get(user.id).push('passphrase')
+                missionTypesByUser.get(sender1.id).push('passphrase')
+                missionTypesByUser.get(sender2.id).push('passphrase')
+                
+                availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
+                assigned = true
+              } else {
+                // Mission was completed or assigned while we were trying to assign, skip it
+                availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
+              }
+            }
           }
         }
         
-        // If no assignment was made this iteration, break to avoid infinite loop
-        if (!assigned && (availableMissions.book.length === 0 && availableMissions.passphrase.length === 0)) {
+        // Try to assign object mission
+        if ((missionTypeToTry === 'object' || !assigned) && availableMissions.object.length > 0) {
+          // Filter out missions user has had before and that are completed
+          const eligibleObjectMissions = availableMissions.object.filter(m => {
+            const pastAssigned = Array.isArray(m.past_assigned_agents) ? m.past_assigned_agents : []
+            return !pastAssigned.includes(user.id) && !m.completed
+          })
+          
+          if (eligibleObjectMissions.length > 0) {
+            const objectMission = pick(eligibleObjectMissions)
+            
+            // Verify mission is still available and not completed before assigning
+            const verifyObject = await sql`
+              SELECT id, assigned_agent, completed
+              FROM object_missions
+              WHERE id = ${objectMission.id}
+                AND assigned_agent IS NULL
+                AND completed = false
+            `
+            
+            if (verifyObject.length === 0) {
+              // Mission was completed or assigned, skip it
+              availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
+              continue
+            }
+            
+            const updateResult = await sql`
+              UPDATE object_missions 
+              SET assigned_agent = ${user.id},
+                  past_assigned_agents = array_append(COALESCE(past_assigned_agents, ARRAY[]::integer[]), ${user.id}),
+                  assigned_now = true
+              WHERE id = ${objectMission.id}
+                AND assigned_agent IS NULL
+                AND completed = false
+              RETURNING id
+            `
+            
+            if (updateResult.length > 0) {
+              missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
+              missionTypesByUser.get(user.id).push('object')
+              
+              availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
+              assigned = true
+            } else {
+              // Mission was completed or assigned while we were trying to assign, skip it
+              availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
+            }
+          }
+        }
+        
+        // If no assignment was made this iteration, try next user
+        if (!assigned) {
+          // If we've tried all users and no assignments, check if we're stuck
+          if (usersNeedingMissions.length > 0) {
+            // Try cycling through users instead of breaking
+            continue
+          }
+        }
+        
+        // If we can't make progress and all missions are exhausted, break
+        if (!assigned && (availableMissions.book.length === 0 && availableMissions.passphrase.length === 0 && availableMissions.object.length === 0)) {
           console.log('No more missions available and no assignments made')
           break
         }
       }
       
+      // Check final status
+      const usersWith3Missions = users.filter(u => (missionCounts.get(u.id) || 0) === 3)
+      const usersWithFewerMissions = users.filter(u => (missionCounts.get(u.id) || 0) < 3)
+      
+      console.log(`Assignment complete: ${usersWith3Missions.length}/${users.length} users have 3 missions`)
+      if (usersWithFewerMissions.length > 0) {
+        console.log(`Warning: ${usersWithFewerMissions.length} users have fewer than 3 missions`)
+      }
+      
       return { 
         assigned: Array.from(missionCounts.values()).reduce((sum, count) => sum + count, 0),
-        users_assigned: users.length
+        users_assigned: users.length,
+        users_with_3_missions: usersWith3Missions.length,
+        total_users: users.length
       }
     } catch (error) {
       console.error('Error resetting and assigning all missions (Neon):', error)
@@ -797,11 +1082,37 @@ export const neonApi = {
   }
   ,
 
-  // Get all missions (both book and passphrase) for a specific agent
+  // Get object missions for a specific agent
+  async getObjectMissionsForAgent(agentId) {
+    try {
+      const rows = await sql`
+        SELECT id, title, mission_body, success_key, completed, assigned_agent
+        FROM object_missions
+        WHERE assigned_agent = ${agentId} AND completed = false
+        ORDER BY id
+      `
+      // Normalize for UI consumption
+      return rows.map(r => ({
+        id: r.id,
+        type: 'object',
+        title: r.title,
+        mission_body: r.mission_body,
+        success_key: r.success_key,
+        completed: r.completed
+      }))
+    } catch (error) {
+      console.error('Error fetching object missions for agent:', error)
+      throw error
+    }
+  }
+  ,
+
+  // Get all missions (both book, passphrase, and object) for a specific agent
   async getAllMissionsForAgent(agentId) {
     try {
       const bookMissions = await this.getBookMissionsForAgent(agentId)
       const passphraseMissions = await this.getPassphraseMissionsForAgent(agentId)
+      const objectMissions = await this.getObjectMissionsForAgent(agentId)
       
       // Add type field to book missions if not present
       const bookMissionsWithType = bookMissions.map(m => ({
@@ -810,7 +1121,7 @@ export const neonApi = {
       }))
       
       // Combine and return
-      return [...bookMissionsWithType, ...passphraseMissions]
+      return [...bookMissionsWithType, ...passphraseMissions, ...objectMissions]
     } catch (error) {
       console.error('Error fetching all missions for agent:', error)
       throw error
@@ -1072,18 +1383,85 @@ export const neonApi = {
         WHERE id = ${missionId}
       `
 
-      // Generate and award random intel (even if they got it wrong, they completed it)
-      const newIntel = await this.generateRandomIntel(agentId)
+      // Only generate and award intel if they got the correct answer
+      let newIntel = null
+      if (isCorrect) {
+        newIntel = await this.generateRandomIntel(agentId)
+      }
 
       return { 
         message: isCorrect 
           ? 'Mission completed successfully! You chose the correct answer.'
-          : 'Mission completed! However, you chose the incorrect answer.',
+          : 'Mission failed. You\'ve been tricked! You fell for the false intel.',
         intel: newIntel,
         was_correct: isCorrect
       }
     } catch (error) {
       console.error('Error completing passphrase mission:', error)
+      throw error
+    }
+  }
+  ,
+
+  // Complete an object mission
+  async completeObjectMission(missionId, answer, agentId) {
+    try {
+      // Get the object mission
+      const missionResult = await sql`
+        SELECT id, success_key, assigned_agent, completed
+        FROM object_missions
+        WHERE id = ${missionId}
+      `
+
+      if (missionResult.length === 0) {
+        throw new Error('Mission not found')
+      }
+
+      const mission = missionResult[0]
+
+      // Check if mission is assigned to this agent
+      if (mission.assigned_agent !== agentId) {
+        throw new Error('Mission not assigned to you')
+      }
+
+      // Check if already completed
+      if (mission.completed) {
+        throw new Error('Mission already completed')
+      }
+
+      // Validate answer (case-insensitive, flexible matching)
+      const answerLower = answer?.toLowerCase().trim()
+      const correctAnswerLower = mission.success_key?.toLowerCase().trim()
+
+      if (!answerLower || !correctAnswerLower) {
+        throw new Error('Answer required')
+      }
+
+      const isCorrect = correctAnswerLower === answerLower ||
+                       correctAnswerLower.includes(answerLower) ||
+                       answerLower.includes(correctAnswerLower)
+
+      if (!isCorrect) {
+        throw new Error('Incorrect answer. Try again or talk to your handler.')
+      }
+
+      // Mark mission as completed
+      await sql`
+        UPDATE object_missions
+        SET completed = true,
+            assigned_now = false
+        WHERE id = ${missionId}
+      `
+
+      // Generate and award random intel
+      const newIntel = await this.generateRandomIntel(agentId)
+
+      return { 
+        message: 'Mission completed successfully',
+        intel: newIntel
+      }
+    } catch (error) {
+      console.error('Error completing object mission:', error)
       throw error
     }
   }

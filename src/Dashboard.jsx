@@ -45,6 +45,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
   const [selectedMissionId, setSelectedMissionId] = useState(null)
   const [showMissionSuccess, setShowMissionSuccess] = useState(false)
   const [missionIntel, setMissionIntel] = useState(null)
+  const [showMissionFailed, setShowMissionFailed] = useState(false)
+  const [missionFailedMessage, setMissionFailedMessage] = useState(null)
  
   // Data arrays for relationships and alibis
   const relationships = [
@@ -100,8 +102,10 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     setSelectedMissionId(missionId)
     setShowMissionModal(true)
     setShowMissionSuccess(false) // Reset success state when opening modal
+    setShowMissionFailed(false) // Reset failed state when opening modal
     setMissionErrors(prev => ({ ...prev, [missionId]: '' })) // Clear any previous errors
     setMissionIntel(null) // Clear any previous intel
+    setMissionFailedMessage(null) // Clear failed message
   }
 
   const closeMissionModal = () => {
@@ -112,6 +116,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       setSelectedMissionId(null)
       setShowMissionSuccess(false)
       setMissionIntel(null) // Clear intel when closing
+      setShowMissionFailed(false)
+      setMissionFailedMessage(null)
     }, 300)
   }
 
@@ -585,19 +591,21 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
           throw new Error('Only the receiver can complete this passphrase mission')
         }
         result = await neonApi.completePassphraseMission(missionId, successKey, agentId)
+      } else if (mission.type === 'object') {
+        // Object missions
+        result = await neonApi.completeObjectMission(missionId, successKey, agentId)
       } else {
         // Book missions
         result = await neonApi.completeBookMission(missionId, successKey, agentId)
       }
       
-      // Mission completed successfully
+      // Mission completed (or failed) - mark as completed so they can't try again
       setCompletedMissions(prev => new Set([...prev, missionId]))
       setSuccessKeys(prev => {
         const newKeys = { ...prev }
         delete newKeys[missionId]
         return newKeys
       })
-      setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
       
       // Store the intel if provided
       if (result.intel) {
@@ -608,9 +616,21 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
         }
       }
       
-      // Show success state if modal is open
+      // Show success state only if answer was correct (or for non-passphrase missions)
+      // For passphrase missions with incorrect answer, was_correct will be false
       if (selectedMissionId === missionId) {
-        setShowMissionSuccess(true)
+        if (mission.type === 'passphrase' && result.was_correct === false) {
+          // They were tricked - show failed state instead of input field
+          setShowMissionSuccess(false)
+          setShowMissionFailed(true)
+          setMissionFailedMessage(result.message || 'Mission failed. You\'ve been tricked! You fell for the false intel.')
+          setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
+        } else {
+          // Correct answer or non-passphrase mission - show success
+          setShowMissionSuccess(true)
+          setShowMissionFailed(false)
+          setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
+        }
       }
     } catch (error) {
       console.error('Error completing mission:', error)
@@ -817,7 +837,14 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   onClick={() => openMissionModal(mission.id)}
                 >
                   <div className="mission-header">
-                    <h3>{mission.type === 'passphrase' ? mission.title : `Book Operation: ${mission.title}`}</h3>
+                    <h3>
+                      {mission.type === 'passphrase' 
+                        ? mission.title 
+                        : mission.type === 'object'
+                        ? `Operation ${mission.title}`
+                        : `Book Operation: ${mission.title}`
+                      }
+                    </h3>
                   </div>
                   
                     {mission.type === 'passphrase' ? (
@@ -863,7 +890,12 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                     .filter(mission => completedMissions.has(mission.id))
                     .map((mission, index) => (
                       <li key={mission.id}>
-                        {mission.type === 'passphrase' ? mission.title : `Book Operation: ${mission.title}`}
+                        {mission.type === 'passphrase' 
+                          ? mission.title 
+                          : mission.type === 'object'
+                          ? mission.title
+                          : `Book Operation: ${mission.title}`
+                        }
                       </li>
                     ))}
                 </ul>
@@ -1184,7 +1216,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
           
           return (
             <div className={`modal ${isMissionClosing ? 'closing' : ''}`}>
-              {!showMissionSuccess ? (
+              {!showMissionSuccess && !showMissionFailed ? (
                 <>
                   <div className="modal-header">
                     <button onClick={closeMissionModal} className="close-button">
@@ -1193,7 +1225,14 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   </div>
 
                   <div className="modal-content">
-                    <h2>{mission.type === 'passphrase' ? mission.title : `Book Operation: ${mission.title}`}</h2>
+                    <h2>
+                      {mission.type === 'passphrase' 
+                        ? mission.title 
+                        : mission.type === 'object'
+                        ? `Operation ${mission.title}`
+                        : `Book Operation: ${mission.title}`
+                      }
+                    </h2>
                     {mission.type !== 'passphrase' && (
                       <p style={{ whiteSpace: 'pre-line' }}>{mission.mission_body}</p>
                     )}
@@ -1250,6 +1289,33 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                     )}
                   </div>
                 </>
+              ) : showMissionFailed ? (
+                <>
+                  <div className="modal-header">
+                    <button onClick={closeMissionModal} className="close-button">
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="modal-content">
+                    <div className="mission-failed">
+                      <p className="mission-failed-title">MISSION FAILED</p>
+                      <h2>
+                        {mission.type === 'passphrase' 
+                          ? mission.title 
+                          : mission.type === 'object'
+                          ? mission.title
+                          : `Book Operation: ${mission.title}`
+                        }
+                      </h2>
+                      {missionFailedMessage && (
+                        <p className="mission-failed-message">
+                          {missionFailedMessage.replace(/^Mission failed\.\s*/i, '')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </>
               ) : (
                 <>
                   <div className="modal-header">
@@ -1261,7 +1327,14 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   <div className="modal-content">
                     <div className="mission-success">
                       <p>Mission success</p>
-                      <h2>{mission.type === 'passphrase' ? mission.title : `Book Operation: ${mission.title}`}</h2>
+                      <h2>
+                        {mission.type === 'passphrase' 
+                          ? mission.title 
+                          : mission.type === 'object'
+                          ? mission.title
+                          : `Book Operation: ${mission.title}`
+                        }
+                      </h2>
                       {missionIntel && (
                         <div className="success-intel">
                           <h3>New intel:</h3>
