@@ -45,6 +45,16 @@ function App() {
           } 
         />
         <Route 
+          path="/login/:alias" 
+          element={
+            isLoggedIn ? (
+              <Navigate to="/mission" replace />
+            ) : (
+              <Login onLogin={handleLogin} />
+            )
+          } 
+        />
+        <Route 
           path="/mission" 
           element={
             isLoggedIn ? (

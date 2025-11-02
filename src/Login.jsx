@@ -1,46 +1,89 @@
 import { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { neonApi } from './neonApi'
 
 function Login({ onLogin }) {
-  const [screenname, setScreenname] = useState('')
-  const [alias1, setAlias1] = useState('')
-  const [alias2, setAlias2] = useState('')
+  const { alias: urlAlias } = useParams()
+  const navigate = useNavigate()
+  const [alias, setAlias] = useState('')
   const [password, setPassword] = useState('')
+  const [screenname, setScreenname] = useState('')
+  const [passphraseHint, setPassphraseHint] = useState('')
   const [showUnauthorizedMessage, setShowUnauthorizedMessage] = useState(false)
   const [failedAttempts, setFailedAttempts] = useState(0)
+  const [aliasError, setAliasError] = useState(false)
 
-  // Initialize agent name from database
+  // If we're on the passphrase step, decode alias and validate
   useEffect(() => {
-    fetchRandomAgent()
-  }, [])
+    if (urlAlias) {
+      try {
+        // Decode URL-encoded base64 string first, then decode base64
+        const base64Alias = decodeURIComponent(urlAlias)
+        const decodedAlias = decodeURIComponent(escape(atob(base64Alias)))
+        setAlias(decodedAlias)
+        // Validate alias and get codename
+        validateAliasForPassphrase(decodedAlias)
+      } catch (error) {
+        // If decoding fails, redirect back to home
+        console.error('Error decoding alias from URL:', error)
+        navigate('/', { replace: true })
+      }
+    }
+  }, [urlAlias])
 
-  const fetchRandomAgent = async () => {
-    console.log('fetchRandomAgent called - connecting to Neon database')
+  const validateAliasForPassphrase = async (aliasToValidate) => {
     try {
-      const data = await neonApi.getRandomUser()
-      const agentName = data.codename
-      setScreenname(agentName)
-      setAlias1(data.alias_1)
-      setAlias2(data.alias_2)
+      const data = await neonApi.validateAlias(aliasToValidate)
+      if (data.valid) {
+        setScreenname(data.user.codename)
+        setPassphraseHint(data.passphraseHint || '')
+        setAliasError(false)
+      } else {
+        // Invalid alias in URL, redirect back to home
+        navigate('/', { replace: true })
+      }
     } catch (error) {
-      console.error('Error fetching random agent:', error)
-      setScreenname('AGENT')
-      setAlias1('Unknown')
-      setAlias2('Agent')
+      console.error('Error validating alias:', error)
+      navigate('/', { replace: true })
     }
   }
 
-  const handleSubmit = async (e) => {
+  const handleAliasSubmit = async (e) => {
     e.preventDefault()
-    console.log('Access attempt:', { alias1, alias2, password })
+    setAliasError(false)
     
     try {
-      const data = await neonApi.authenticate(alias1, password, null, navigator.userAgent)
+      const data = await neonApi.validateAlias(alias)
+      
+      if (data.valid) {
+        // Generate unique login URL from alias (base64 encoded to obscure the alias)
+        const base64Alias = btoa(unescape(encodeURIComponent(alias)))
+        // URL-encode the base64 string to handle special characters in URLs
+        const encodedAlias = encodeURIComponent(base64Alias)
+        navigate(`/login/${encodedAlias}`, { replace: true })
+      } else {
+        setAliasError(true)
+        setAlias('')
+      }
+    } catch (error) {
+      console.error('Error validating alias:', error)
+      setAliasError(true)
+      setAlias('')
+    }
+  }
+
+  const handlePassphraseSubmit = async (e) => {
+    e.preventDefault()
+    console.log('Access attempt:', { alias, password })
+    
+    try {
+      const data = await neonApi.authenticate(alias, password, null, navigator.userAgent)
       
       if (data.success) {
         // Authentication successful
         setShowUnauthorizedMessage(false)
         onLogin(data.user)
+        navigate('/dashboard', { replace: true })
       } else {
         // Authentication failed
         setFailedAttempts(prev => prev + 1)
@@ -81,24 +124,17 @@ function Login({ onLogin }) {
     )
   }
 
-  return (
-    <div className="login-container">
+  // If we're on the passphrase step (has URL alias)
+  if (urlAlias) {
+    return (
+      <div className="login-container">
         <div className="logo">
           <h1>Press me, I talk!</h1>
           <p>A Daw Industries game product</p>
         </div>
-        <form onSubmit={handleSubmit} className="login-form">
+        <form onSubmit={handlePassphraseSubmit} className="login-form">
+          <h2 className="welcome-agent">WELCOME AGENT</h2>
           <div className="form-group">
-            <label htmlFor="username" style={{ display: 'none' }}>Username</label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              value={screenname}
-              readOnly
-              style={{ display: 'none' }}
-              autoComplete="username"
-            />
             <label htmlFor="password">Prove it's really you.</label>
             <input
               type="text"
@@ -106,20 +142,55 @@ function Login({ onLogin }) {
               name="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={screenname}
+              placeholder={passphraseHint}
               autoComplete="current-password"
               required
             />
-              {showUnauthorizedMessage && (
-                <div className="helper-error">
-                  That ain't it, chief.
-                </div>
-              )}
+            {showUnauthorizedMessage && (
+              <div className="helper-error">
+                That ain't it, chief.
+              </div>
+            )}
           </div>
           <button type="submit" className="login-button">
             Let the games begin!
           </button>
         </form>
+      </div>
+    )
+  }
+
+  // Alias entry step (home page)
+  return (
+    <div className="login-container">
+      <div className="logo">
+        <h1>Press me, I talk!</h1>
+        <p>A Daw Industries game product</p>
+      </div>
+      <form onSubmit={handleAliasSubmit} className="login-form">
+        <div className="form-group">
+          <label htmlFor="alias">Enter your alias</label>
+          <input
+            type="text"
+            id="alias"
+            name="alias"
+            value={alias}
+            onChange={(e) => setAlias(e.target.value)}
+            placeholder="Your alias"
+            autoComplete="username"
+            required
+            autoFocus
+          />
+          {aliasError && (
+            <div className="helper-error">
+              Invalid alias.
+            </div>
+          )}
+        </div>
+        <button type="submit" className="login-button">
+          Continue
+        </button>
+      </form>
     </div>
   )
 }
