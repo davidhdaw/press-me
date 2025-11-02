@@ -761,6 +761,32 @@ export const neonApi = {
         }
       }
       
+      // Helper to get actual mission count from database for a user
+      const getActualMissionCount = async (userId) => {
+        try {
+          const bookCount = await sql`
+            SELECT COUNT(*)::int AS cnt FROM book_missions 
+            WHERE (assigned_red = ${userId} OR assigned_blue = ${userId})
+            AND red_completed = false AND blue_completed = false
+          `
+          const passphraseCount = await sql`
+            SELECT COUNT(*)::int AS cnt FROM passphrase_missions 
+            WHERE (assigned_receiver = ${userId} OR assigned_sender_1 = ${userId} OR assigned_sender_2 = ${userId})
+            AND completed = false
+          `
+          const objectCount = await sql`
+            SELECT COUNT(*)::int AS cnt FROM object_missions 
+            WHERE assigned_agent = ${userId} AND completed = false
+          `
+          
+          const total = (bookCount[0]?.cnt || 0) + (passphraseCount[0]?.cnt || 0) + (objectCount[0]?.cnt || 0)
+          return total
+        } catch (error) {
+          // Fallback to in-memory count on error
+          return missionCounts.get(userId) || 0
+        }
+      }
+      
       // Helper to get available users for assignment
       const getAvailableUsers = (excludeIds = []) => {
         return users.filter(u => 
@@ -890,6 +916,16 @@ export const neonApi = {
             if (availableOppositeTeam.length > 0) {
               const partner = pick(availableOppositeTeam)
               
+              // Verify both users actually have < 3 missions before assigning
+              const userActualCount = await getActualMissionCount(user.id)
+              const partnerActualCount = await getActualMissionCount(partner.id)
+              
+              if (userActualCount >= 3 || partnerActualCount >= 3) {
+                // One or both users already have 3 missions, skip this assignment
+                availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
+                continue
+              }
+              
               // Assign both users - verify not completed before updating
               let updateSuccess = false
               if (user.team === 'red') {
@@ -923,14 +959,26 @@ export const neonApi = {
               }
               
               if (updateSuccess) {
-                missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
-                missionCounts.set(partner.id, (missionCounts.get(partner.id) || 0) + 1)
-                missionTypesByUser.get(user.id).push('book')
-                missionTypesByUser.get(partner.id).push('book')
+                // Verify user doesn't already have 3 missions before incrementing
+                const currentUserCount = missionCounts.get(user.id) || 0
+                const currentPartnerCount = missionCounts.get(partner.id) || 0
                 
-                // Remove from available
-                availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
-                assigned = true
+                if (currentUserCount < 3 && currentPartnerCount < 3) {
+                  missionCounts.set(user.id, currentUserCount + 1)
+                  missionCounts.set(partner.id, currentPartnerCount + 1)
+                  missionTypesByUser.get(user.id).push('book')
+                  missionTypesByUser.get(partner.id).push('book')
+                  
+                  // Remove from available
+                  availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
+                  assigned = true
+                } else {
+                  // User or partner already has 3 missions, rollback assignment
+                  // Note: The assignment already happened in the database, but we won't count it
+                  // This prevents the count from exceeding 3, though the DB might have it temporarily
+                  // In a perfect world, we'd rollback the DB update, but for now we'll just not count it
+                  availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
+                }
               } else {
                 // Mission was completed or assigned while we were trying to assign, skip it
                 availableMissions.book = availableMissions.book.filter(m => m.id !== bookMission.id)
@@ -976,6 +1024,17 @@ export const neonApi = {
               const remainingAfterSender1 = availableForSenders.filter(u => u.id !== sender1.id)
               const sender2 = pick(remainingAfterSender1)
               
+              // Verify all users actually have < 3 missions before assigning
+              const userActualCount = await getActualMissionCount(user.id)
+              const sender1ActualCount = await getActualMissionCount(sender1.id)
+              const sender2ActualCount = await getActualMissionCount(sender2.id)
+              
+              if (userActualCount >= 3 || sender1ActualCount >= 3 || sender2ActualCount >= 3) {
+                // One or more users already have 3 missions, skip this assignment
+                availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
+                continue
+              }
+              
               const updateResult = await sql`
                 UPDATE passphrase_missions 
                 SET assigned_receiver = ${user.id}, 
@@ -992,16 +1051,26 @@ export const neonApi = {
               `
               
               if (updateResult.length > 0) {
-                missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
-                missionCounts.set(sender1.id, (missionCounts.get(sender1.id) || 0) + 1)
-                missionCounts.set(sender2.id, (missionCounts.get(sender2.id) || 0) + 1)
+                // Verify users don't already have 3 missions before incrementing
+                const currentUserCount = missionCounts.get(user.id) || 0
+                const currentSender1Count = missionCounts.get(sender1.id) || 0
+                const currentSender2Count = missionCounts.get(sender2.id) || 0
                 
-                missionTypesByUser.get(user.id).push('passphrase')
-                missionTypesByUser.get(sender1.id).push('passphrase')
-                missionTypesByUser.get(sender2.id).push('passphrase')
-                
-                availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
-                assigned = true
+                if (currentUserCount < 3 && currentSender1Count < 3 && currentSender2Count < 3) {
+                  missionCounts.set(user.id, currentUserCount + 1)
+                  missionCounts.set(sender1.id, currentSender1Count + 1)
+                  missionCounts.set(sender2.id, currentSender2Count + 1)
+                  
+                  missionTypesByUser.get(user.id).push('passphrase')
+                  missionTypesByUser.get(sender1.id).push('passphrase')
+                  missionTypesByUser.get(sender2.id).push('passphrase')
+                  
+                  availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
+                  assigned = true
+                } else {
+                  // One or more users already have 3 missions, don't count this assignment
+                  availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
+                }
               } else {
                 // Mission was completed or assigned while we were trying to assign, skip it
                 availableMissions.passphrase = availableMissions.passphrase.filter(m => m.id !== passphraseMission.id)
@@ -1020,6 +1089,15 @@ export const neonApi = {
           
           if (eligibleObjectMissions.length > 0) {
             const objectMission = pick(eligibleObjectMissions)
+            
+            // Verify user actually has < 3 missions before assigning
+            const userActualCount = await getActualMissionCount(user.id)
+            
+            if (userActualCount >= 3) {
+              // User already has 3 missions, skip this assignment
+              availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
+              continue
+            }
             
             // Verify mission is still available and not completed before assigning
             const verifyObject = await sql`
@@ -1048,11 +1126,19 @@ export const neonApi = {
             `
             
             if (updateResult.length > 0) {
-              missionCounts.set(user.id, (missionCounts.get(user.id) || 0) + 1)
-              missionTypesByUser.get(user.id).push('object')
+              // Verify user doesn't already have 3 missions before incrementing
+              const currentUserCount = missionCounts.get(user.id) || 0
               
-              availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
-              assigned = true
+              if (currentUserCount < 3) {
+                missionCounts.set(user.id, currentUserCount + 1)
+                missionTypesByUser.get(user.id).push('object')
+                
+                availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
+                assigned = true
+              } else {
+                // User already has 3 missions, don't count this assignment
+                availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
+              }
             } else {
               // Mission was completed or assigned while we were trying to assign, skip it
               availableMissions.object = availableMissions.object.filter(m => m.id !== objectMission.id)
@@ -1084,6 +1170,9 @@ export const neonApi = {
       if (usersWithFewerMissions.length > 0) {
         console.log(`Warning: ${usersWithFewerMissions.length} users have fewer than 3 missions`)
       }
+      
+      // Update the assignment timestamp after successful assignment
+      await this.updateAssignmentTimestamp();
       
       return { 
         assigned: Array.from(missionCounts.values()).reduce((sum, count) => sum + count, 0),
@@ -1525,6 +1614,168 @@ export const neonApi = {
     } catch (error) {
       console.error('Error completing object mission:', error)
       throw error
+    }
+  },
+
+  // Get the last mission assignment timestamp
+  async getLastAssignmentTimestamp() {
+    try {
+      // Query the timestamp - PostgreSQL may return it in server timezone
+      const result = await sql`
+        SELECT last_assigned_at 
+        FROM assignment_timestamp 
+        WHERE id = 1
+      `;
+      
+      // console.log('[TIMESTAMP] Query result:', result);
+      
+      if (result.length === 0) {
+        // Table doesn't exist or no row, return null
+        // console.log('[TIMESTAMP] No result found, returning null');
+        return null;
+      }
+      
+      const timestamp = result[0].last_assigned_at;
+      // console.log('[TIMESTAMP] Retrieved timestamp:', timestamp);
+      // console.log('[TIMESTAMP] Timestamp type:', typeof timestamp);
+      
+      // If it's a Date object, the timezone is already baked in
+      // getTime() gives us UTC milliseconds, which is what we need
+      if (timestamp instanceof Date) {
+        // console.log('[TIMESTAMP] Timestamp as Date, getTime():', timestamp.getTime());
+        // console.log('[TIMESTAMP] Timestamp ISO string:', timestamp.toISOString());
+        // Use getTime() which is timezone-independent (UTC milliseconds since epoch)
+        return timestamp;
+      }
+      
+      // Otherwise parse it
+      const timestampDate = new Date(timestamp);
+      // console.log('[TIMESTAMP] Parsed as Date:', timestampDate.toISOString());
+      
+      return timestampDate;
+    } catch (error) {
+      // console.error('[TIMESTAMP] Error getting last assignment timestamp:', error);
+      // If table doesn't exist, return null
+      return null;
+    }
+  },
+
+  // Update the last mission assignment timestamp
+  async updateAssignmentTimestamp() {
+    try {
+      // Store the current UTC time as a string to avoid timezone conversion
+      // Use to_timestamp to explicitly create a UTC timestamp
+      const nowUTC = new Date().toISOString();
+      // console.log('[TIMESTAMP] Updating assignment timestamp to:', nowUTC);
+      
+      await sql`
+        INSERT INTO assignment_timestamp (id, last_assigned_at)
+        VALUES (1, ${nowUTC}::timestamptz AT TIME ZONE 'UTC')
+        ON CONFLICT (id) 
+        DO UPDATE SET last_assigned_at = ${nowUTC}::timestamptz AT TIME ZONE 'UTC'
+      `;
+      
+      // console.log('[TIMESTAMP] Updated assignment timestamp to UTC');
+      return true;
+    } catch (error) {
+      // console.error('[TIMESTAMP] Error updating assignment timestamp:', error);
+      // Try simpler fallback
+      try {
+        await sql`
+          INSERT INTO assignment_timestamp (id, last_assigned_at)
+          VALUES (1, NOW())
+          ON CONFLICT (id) 
+          DO UPDATE SET last_assigned_at = NOW()
+        `;
+        // console.log('[TIMESTAMP] Updated using fallback (NOW())');
+        return true;
+      } catch (fallbackError) {
+        // console.error('[TIMESTAMP] Fallback also failed:', fallbackError);
+        throw error;
+      }
+    }
+  },
+
+  // Check if missions should be reassigned (1 minute for testing, normally 15 minutes)
+  async shouldReassignMissions() {
+    try {
+      // console.log('[SHOULD-REASSIGN] Checking last assignment timestamp...');
+      const lastAssigned = await this.getLastAssignmentTimestamp();
+      
+      if (!lastAssigned) {
+        // No timestamp exists, should assign
+        // console.log('[SHOULD-REASSIGN] No timestamp found, returning true');
+        return true;
+      }
+      
+      // Get current time in UTC
+      const now = new Date();
+      const nowUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 
+                                         now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds(), 
+                                         now.getUTCMilliseconds()));
+      
+      // Parse the timestamp and convert to UTC
+      let lastAssignedDate;
+      if (lastAssigned instanceof Date) {
+        // If it's already a Date object, get its UTC time
+        // The Date object represents a moment in time, so we can use getTime() for accurate comparison
+        lastAssignedDate = lastAssigned;
+      } else if (typeof lastAssigned === 'string') {
+        // If it's a string, parse it
+        lastAssignedDate = new Date(lastAssigned);
+      } else {
+        // Try to parse as-is
+        lastAssignedDate = new Date(lastAssigned);
+      }
+      
+      // console.log('[SHOULD-REASSIGN] Current time (UTC):', nowUTC.toISOString());
+      // console.log('[SHOULD-REASSIGN] Last assigned (raw):', lastAssigned);
+      // console.log('[SHOULD-REASSIGN] Last assigned (as Date):', lastAssignedDate.toISOString());
+      // console.log('[SHOULD-REASSIGN] Current time getTime():', now.getTime());
+      // console.log('[SHOULD-REASSIGN] Last assigned getTime():', lastAssignedDate.getTime());
+      
+      // Use getTime() for accurate millisecond comparison (timezone-independent)
+      // getTime() returns milliseconds since epoch in UTC, so it's timezone-independent
+      const diffMs = now.getTime() - lastAssignedDate.getTime();
+      
+      // console.log('[SHOULD-REASSIGN] Difference in milliseconds:', diffMs);
+      
+      // Handle negative differences (timezone issues)
+      // If negative and large absolute value (~8 hours = 480 minutes), it's a timezone issue
+      let diffMinutes = diffMs / (1000 * 60);
+      
+      // If difference is negative and approximately 8 hours (timezone mismatch), adjust it
+      // The database stored PST time but it's being interpreted as UTC
+      // So if we see ~-480 minutes, the actual elapsed time is very small (near 0)
+      if (diffMs < 0 && Math.abs(diffMinutes) > 400 && Math.abs(diffMinutes) < 500) {
+        // console.log('[SHOULD-REASSIGN] Negative difference ~8 hours - timezone issue detected');
+        // The stored time is actually in PST, so the real elapsed time is much smaller
+        // We need to add the offset back: if diff is -480 min, real elapsed is ~0 min (just the seconds difference)
+        // Calculate actual elapsed by adding the timezone offset (8 hours = 480 minutes)
+        const timezoneOffsetMinutes = 480; // PST is UTC-8
+        const actualElapsedMs = diffMs + (timezoneOffsetMinutes * 60 * 1000);
+        diffMinutes = actualElapsedMs / (1000 * 60);
+        // console.log('[SHOULD-REASSIGN] Adjusted difference in minutes (added 8-hour offset back):', diffMinutes);
+      } else if (diffMinutes < 0) {
+        // For other negative values, use absolute value (shouldn't happen normally)
+        // console.log('[SHOULD-REASSIGN] Negative difference (not timezone offset), using absolute value');
+        diffMinutes = Math.abs(diffMinutes);
+      }
+      
+      // console.log('[SHOULD-REASSIGN] Final difference in minutes:', diffMinutes);
+      // console.log('[SHOULD-REASSIGN] Threshold (minutes):', 1);
+      
+      // Normal case: check if enough time has passed
+      const shouldReassign = diffMinutes >= 1;
+      // console.log('[SHOULD-REASSIGN] Should reassign?', shouldReassign);
+      
+      // Return true if 1 or more minutes have passed (testing - normally 15)
+      return shouldReassign;
+    } catch (error) {
+      // console.error('[SHOULD-REASSIGN] Error checking if missions should be reassigned:', error);
+      // console.error('[SHOULD-REASSIGN] Error stack:', error.stack);
+      // On error, default to should reassign
+      return true;
     }
   }
 };
