@@ -1890,3 +1890,131 @@ body:has(.admin-dashboard) {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Initial Secret Intel Modal */
+.initial-intel-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+.initial-intel-modal {
+  background-color: var(--white);
+  border: 6px solid var(--black);
+  box-shadow: 12px 12px 0px 0 var(--black);
+  max-width: 500px;
+  width: 90%;
+  transform: rotate(-1deg);
+  position: relative;
+}
+
+.initial-intel-modal-header {
+  background-color: var(--yellow);
+  padding: var(--unit-base);
+  border-bottom: 4px solid var(--black);
+  text-align: center;
+}
+
+.initial-intel-modal-header h2 {
+  margin: 0;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.8em;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--black);
+}
+
+.initial-intel-modal-content {
+  padding: var(--unit-base);
+  text-align: center;
+}
+
+.initial-intel-censor-bar {
+  background-color: var(--black);
+  color: var(--black);
+  padding: var(--unit-base);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 1.2em;
+  letter-spacing: 2px;
+  user-select: none;
+  transition: background-color 0.2s;
+  text-align: center;
+  border: 2px solid var(--black);
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.initial-intel-censor-bar:hover {
+  background-color: #333;
+  cursor: pointer;
+}
+
+.initial-intel-revealed {
+  background-color: var(--white);
+  padding: var(--unit-base);
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 1.2em;
+  border: 3px solid var(--black);
+  text-align: center;
+  animation: reveal 0.3s ease-in;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.initial-intel-revealed.red-team {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.initial-intel-revealed.blue-team {
+  color: var(--blue);
+  border-color: var(--blue);
+}
+
+@keyframes reveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.initial-intel-countdown {
+  margin-top: var(--unit-base);
+  padding: var(--unit-sm);
+  background-color: #fff3cd;
+  border: 2px dashed var(--black);
+  border-radius: 4px;
+}
+
+.initial-intel-countdown p {
+  margin: 0;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.1em;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
