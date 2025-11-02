@@ -502,7 +502,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
       setLoading(true)
       // Optionally reset and reassign before fetching
       if (doReset) {
-        await neonApi.resetAndAssignBookMissions()
+        await neonApi.resetAndAssignAllMissions()
         // Clear all intel for this agent
         await neonApi.clearAgentIntel(agentId)
         // Reset intel tab state if users are loaded
@@ -513,12 +513,12 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
           setUsedAliases(new Set())
         }
       }
-      // Fetch book missions assigned to this agent directly from Neon
-      let assignedMissions = await neonApi.getBookMissionsForAgent(agentId)
+      // Fetch all missions (both book and passphrase) assigned to this agent
+      let assignedMissions = await neonApi.getAllMissionsForAgent(agentId)
       // If none assigned yet, attempt assignment then fetch again
       if (!assignedMissions || assignedMissions.length === 0) {
-        await neonApi.assignBookMissions()
-        assignedMissions = await neonApi.getBookMissionsForAgent(agentId)
+        await neonApi.resetAndAssignAllMissions()
+        assignedMissions = await neonApi.getAllMissionsForAgent(agentId)
       }
       setMissions(assignedMissions)
       // Clear completed missions state when refreshing
@@ -563,14 +563,32 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
     const successKey = successKeys[missionId]
     if (!successKey) return
 
+    // Find the mission to determine its type
+    const mission = missions.find(m => m.id === missionId)
+    if (!mission) {
+      setMissionErrors(prev => ({ ...prev, [missionId]: 'Mission not found' }))
+      return
+    }
+
     // Clear any existing error for this mission
     setMissionErrors(prev => ({ ...prev, [missionId]: '' }))
     setShowMissionSuccess(false) // Reset success state
     setMissionIntel(null)
 
     try {
-      // Book missions use completeBookMission which returns intel
-      const result = await neonApi.completeBookMission(missionId, successKey, agentId)
+      let result
+      
+      // Route to appropriate completion function based on mission type
+      if (mission.type === 'passphrase') {
+        // Only receivers can complete passphrase missions
+        if (mission.role !== 'receiver') {
+          throw new Error('Only the receiver can complete this passphrase mission')
+        }
+        result = await neonApi.completePassphraseMission(missionId, successKey, agentId)
+      } else {
+        // Book missions
+        result = await neonApi.completeBookMission(missionId, successKey, agentId)
+      }
       
       // Mission completed successfully
       setCompletedMissions(prev => new Set([...prev, missionId]))
@@ -799,10 +817,40 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   onClick={() => openMissionModal(mission.id)}
                 >
                   <div className="mission-header">
-                    <h3>Book Operation: {mission.title}</h3>
+                    <h3>{mission.type === 'passphrase' ? mission.title : `Book Operation: ${mission.title}`}</h3>
                   </div>
                   
-                    <p>{mission.mission_body}</p>
+                    {mission.type === 'passphrase' ? (
+                      (() => {
+                        const lines = mission.mission_body.split('\n').filter(line => line.trim() !== '')
+                        const displayLines = lines.slice(0, 3)
+                        return (
+                          <div>
+                            <p style={{ whiteSpace: 'pre-line', marginBottom: '0.5rem' }}>{displayLines[0] || ''}</p>
+                            {displayLines[1] && (
+                              <p 
+                                style={{ 
+                                  border: '2px solid var(--black)', 
+                                  borderRadius: '8px',
+                                  padding: '0.25rem', 
+                                  display: 'inline-block',
+                                  transform: 'rotate(0.5deg)',
+                                  margin: '0.5rem 0',
+                                  fontStyle: 'italic'
+                                }}
+                              >
+                                {displayLines[1]}
+                              </p>
+                            )}
+                            {displayLines[2] && (
+                              <p style={{ whiteSpace: 'pre-line', marginTop: '0.5rem' }}>{displayLines[2]}</p>
+                            )}
+                          </div>
+                        )
+                      })()
+                    ) : (
+                      <p style={{ whiteSpace: 'pre-line' }}>{mission.mission_body}</p>
+                    )}
               </div>
               ))}
             </div>
@@ -814,7 +862,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   {missions
                     .filter(mission => completedMissions.has(mission.id))
                     .map((mission, index) => (
-                      <li key={mission.id}>Book Operation: {mission.title}</li>
+                      <li key={mission.id}>
+                        {mission.type === 'passphrase' ? mission.title : `Book Operation: ${mission.title}`}
+                      </li>
                     ))}
                 </ul>
               </div>
@@ -1143,26 +1193,43 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   </div>
 
                   <div className="modal-content">
-                    <h2>Operation {mission.title}</h2>
-                    <p>{mission.mission_body}</p>
+                    <h2>{mission.type === 'passphrase' ? mission.title : `Book Operation: ${mission.title}`}</h2>
+                    {mission.type !== 'passphrase' && (
+                      <p style={{ whiteSpace: 'pre-line' }}>{mission.mission_body}</p>
+                    )}
                     
-                    <div className="field-group">
-                      <label htmlFor="mission-success-key">Success Key</label>
-                      <div className="input-with-clear">
-                        <input
-                          id="mission-success-key"
-                          type="text"
-                          value={successKeys[selectedMissionId] || ''}
-                          onChange={(e) => handleSuccessKeyChange(selectedMissionId, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && successKeys[selectedMissionId]) {
-                              handleSubmitMission(selectedMissionId)
-                            }
-                          }}
-                          placeholder="Enter success key..."
-                        />
+                    {/* Only show input for book missions or passphrase receivers */}
+                    {(mission.type !== 'passphrase' || mission.role === 'receiver') && (
+                      <div className="field-group">
+                        <label htmlFor="mission-success-key">
+                          {mission.type === 'passphrase' ? 'Your Answer' : 'Success Key'}
+                        </label>
+                        <div className="input-with-clear">
+                          <input
+                            id="mission-success-key"
+                            type="text"
+                            value={successKeys[selectedMissionId] || ''}
+                            onChange={(e) => handleSuccessKeyChange(selectedMissionId, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && successKeys[selectedMissionId]) {
+                                handleSubmitMission(selectedMissionId)
+                              }
+                            }}
+                            placeholder={mission.type === 'passphrase' 
+                              ? 'Enter the word you received...' 
+                              : 'Enter success key...'}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
+
+                    {mission.type === 'passphrase' && mission.role !== 'receiver' && (
+                      <div className="field-group">
+                        <p className="info-text">
+                          You are a SENDER for this mission. You'll get credit for completing this mission if the receiver enters your intel.
+                        </p>
+                      </div>
+                    )}
 
                     {missionErrors[selectedMissionId] && (
                       <div className="mission-error">
@@ -1172,13 +1239,15 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   </div>
 
                   <div className="modal-footer">
-                    <button 
-                      onClick={() => handleSubmitMission(selectedMissionId)}
-                      disabled={!successKeys[selectedMissionId]}
-                      className="save-button"
-                    >
-                      Submit
-                    </button>
+                    {(mission.type !== 'passphrase' || mission.role === 'receiver') && (
+                      <button 
+                        onClick={() => handleSubmitMission(selectedMissionId)}
+                        disabled={!successKeys[selectedMissionId]}
+                        className="save-button"
+                      >
+                        Submit
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -1192,7 +1261,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, team, onLogout }) 
                   <div className="modal-content">
                     <div className="mission-success">
                       <p>Mission success</p>
-                      <h2>Book Operation: {mission.title}</h2>
+                      <h2>{mission.type === 'passphrase' ? mission.title : `Book Operation: ${mission.title}`}</h2>
                       {missionIntel && (
                         <div className="success-intel">
                           <h3>New intel:</h3>
