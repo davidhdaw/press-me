@@ -275,14 +275,64 @@ export const neonApi = {
     }
   },
 
+  // Validate alias (check if it exists without requiring passphrase)
+  // ONLY accepts: "alias_1 alias_2" (with space, underscore, or concatenated) in that order
+  // Case-insensitive comparison
+  // Returns passphrase hint (all words except last word)
+  async validateAlias(alias) {
+    try {
+      // Check for alias_1 followed by alias_2 with space, underscore, or no separator (case-insensitive)
+      const userResult = await sql`
+        SELECT id, firstname, lastname, team, alias_1, alias_2, passphrase
+        FROM users 
+        WHERE (
+          LOWER(alias_1 || ' ' || alias_2) = LOWER(${alias})
+          OR LOWER(alias_1 || '_' || alias_2) = LOWER(${alias})
+          OR LOWER(alias_1 || alias_2) = LOWER(${alias})
+        ) AND ishere = true
+      `;
+      
+      if (userResult.length === 0) {
+        return { valid: false, message: 'Alias not found' };
+      }
+      
+      // Get passphrase hint (all words except last word)
+      const passphrase = userResult[0].passphrase || '';
+      const passphraseWords = passphrase.trim().split(/\s+/);
+      const passphraseHint = passphraseWords.length > 1 
+        ? passphraseWords.slice(0, -1).join(' ')
+        : '';
+      
+      return {
+        valid: true,
+        user: {
+          alias_1: userResult[0].alias_1,
+          alias_2: userResult[0].alias_2,
+          codename: `${userResult[0].alias_1} ${userResult[0].alias_2}`
+        },
+        passphraseHint
+      };
+    } catch (error) {
+      console.error('Error validating alias:', error);
+      throw error;
+    }
+  }
+  ,
+
   // Authentication
+  // ONLY accepts: "alias_1 alias_2" (with space, underscore, or concatenated) in that order
+  // Case-insensitive comparison
   async authenticate(alias, passphrase, ipAddress, userAgent) {
     try {
-      // Get user from database - fix parameter binding
+      // Check for alias_1 followed by alias_2 with space, underscore, or no separator (case-insensitive)
       const userResult = await sql`
-        SELECT id, firstname, lastname, team, alias_1, alias_2, passphrase 
+        SELECT id, firstname, lastname, team, alias_1, alias_2, passphrase
         FROM users 
-        WHERE (alias_1 = ${alias} OR alias_2 = ${alias}) AND ishere = true
+        WHERE (
+          LOWER(alias_1 || ' ' || alias_2) = LOWER(${alias})
+          OR LOWER(alias_1 || '_' || alias_2) = LOWER(${alias})
+          OR LOWER(alias_1 || alias_2) = LOWER(${alias})
+        ) AND ishere = true
       `;
       
       if (userResult.length === 0) {
@@ -293,8 +343,20 @@ export const neonApi = {
       
       const user = userResult[0];
       
-      // Check passphrase (case-insensitive)
-      if (user.passphrase.toLowerCase().trim() === passphrase.toLowerCase().trim()) {
+      // Normalize passphrases (remove punctuation, lowercase, trim whitespace)
+      const normalizePassphrase = (phrase) => {
+        return phrase.toLowerCase().trim().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ');
+      };
+      
+      const storedPassphrase = normalizePassphrase(user.passphrase);
+      const enteredPassphrase = normalizePassphrase(passphrase);
+      
+      // Get last word from stored passphrase
+      const storedWords = storedPassphrase.split(/\s+/);
+      const lastWord = storedWords.length > 0 ? storedWords[storedWords.length - 1] : '';
+      
+      // Check if entered passphrase matches full passphrase or just the last word
+      if (enteredPassphrase === storedPassphrase || enteredPassphrase === lastWord) {
         // Passphrase correct
         await this.logLogin(alias, true, ipAddress, userAgent);
         return {
