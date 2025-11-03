@@ -747,26 +747,54 @@ export const neonApi = {
     }
 
     // Helper to check if user needs a specific type for diversity
+    // Returns array of types that should be prioritized to ensure diversity
     const needsTypeForDiversity = (userId) => {
       const assignments = userAssignments.get(userId)
-      const types = []
-      if (assignments.books.length > 0) types.push('book')
-      if (assignments.passphrases.length > 0) types.push('passphrase')
-      if (assignments.objects.length > 0) types.push('object')
-      const uniqueTypes = new Set(types)
+      const total = assignments.books.length + assignments.passphrases.length + assignments.objects.length
+      const bookCount = assignments.books.length
+      const passphraseCount = assignments.passphrases.length
+      const objectCount = assignments.objects.length
       
-      // If user has less than 2 missions, they need different types
-      if (types.length < 2) {
-        return ['book', 'passphrase', 'object'].filter(t => !types.includes(t))
+      // Count unique types
+      const uniqueTypes = new Set()
+      if (bookCount > 0) uniqueTypes.add('book')
+      if (passphraseCount > 0) uniqueTypes.add('passphrase')
+      if (objectCount > 0) uniqueTypes.add('object')
+      
+      // If user has 0 missions, any type is fine
+      if (total === 0) {
+        return ['book', 'passphrase', 'object']
       }
       
-      // If user has 2 missions of the same type, they need a different type
-      if (types.length === 2 && uniqueTypes.size === 1) {
-        return ['book', 'passphrase', 'object'].filter(t => t !== types[0])
+      // If user has 1 mission, they need a different type
+      if (total === 1) {
+        if (bookCount > 0) return ['passphrase', 'object']
+        if (passphraseCount > 0) return ['book', 'object']
+        if (objectCount > 0) return ['book', 'passphrase']
       }
       
-      // Otherwise any type is fine
-      return ['book', 'passphrase', 'object']
+      // If user has 2 missions
+      if (total === 2) {
+        // If they have 2 of the same type, they MUST get a different type
+        if (uniqueTypes.size === 1) {
+          if (bookCount === 2) return ['passphrase', 'object']
+          if (passphraseCount === 2) return ['book', 'object']
+          if (objectCount === 2) return ['book', 'passphrase']
+        }
+        // If they have 2 different types, any type is fine (will still have 2+ types)
+        if (uniqueTypes.size === 2) {
+          return ['book', 'passphrase', 'object']
+        }
+      }
+      
+      // User has 3 missions, shouldn't be called
+      return []
+    }
+    
+    // Helper to count missions for a user (all roles count)
+    const countUserMissions = (userId) => {
+      const assignments = userAssignments.get(userId)
+      return assignments.books.length + assignments.passphrases.length + assignments.objects.length
     }
     
     // Assign missions until all users have exactly 3 missions
@@ -778,8 +806,7 @@ export const neonApi = {
       // Get users who still need missions, sorted by how many they have (fewest first)
       const usersNeedingMissions = allUsers
         .map(userId => {
-          const assignments = userAssignments.get(userId)
-          const total = assignments.books.length + assignments.passphrases.length + assignments.objects.length
+          const total = countUserMissions(userId)
           return { userId, total }
         })
         .filter(u => u.total < 3)
@@ -794,7 +821,7 @@ export const neonApi = {
       // Try to assign to each user needing missions
       for (const { userId } of usersNeedingMissions) {
         const assignments = userAssignments.get(userId)
-        let total = assignments.books.length + assignments.passphrases.length + assignments.objects.length
+        let total = countUserMissions(userId)
         
         // Re-check total - user might have gotten missions from partner assignments
         if (total >= 3) continue
@@ -813,7 +840,7 @@ export const neonApi = {
         // Try each type in order, but only assign ONE mission per user per iteration
         for (const typeToTry of typesToTry) {
           // Re-check total before each assignment attempt
-          total = assignments.books.length + assignments.passphrases.length + assignments.objects.length
+          total = countUserMissions(userId)
           if (total >= 3) break
           
           if (assigned) break
@@ -846,8 +873,7 @@ export const neonApi = {
                 // Find available partner (prioritize those with fewer missions)
                 const availablePartners = partnerPool
                   .map(partnerId => {
-                    const partnerAssignments = userAssignments.get(partnerId)
-                    const partnerTotal = partnerAssignments.books.length + partnerAssignments.passphrases.length + partnerAssignments.objects.length
+                    const partnerTotal = countUserMissions(partnerId)
                     return { partnerId, total: partnerTotal }
                   })
                   .filter(p => {
@@ -864,8 +890,8 @@ export const neonApi = {
                 
                 if (availablePartners.length > 0) {
                   const partner = availablePartners[0].partnerId
+                  const partnerTotal = countUserMissions(partner)
                   const partnerAssignments = userAssignments.get(partner)
-                  const partnerTotal = partnerAssignments.books.length + partnerAssignments.passphrases.length + partnerAssignments.objects.length
                   
                   // Only assign if both users have less than 3 missions
                   if (total < 3 && partnerTotal < 3) {
@@ -901,8 +927,7 @@ export const neonApi = {
               for (const mission of availableMissions) {
                 const availableSenders = allUsers
                   .map(senderId => {
-                    const senderAssignments = userAssignments.get(senderId)
-                    const senderTotal = senderAssignments.books.length + senderAssignments.passphrases.length + senderAssignments.objects.length
+                    const senderTotal = countUserMissions(senderId)
                     return { senderId, total: senderTotal }
                   })
                   .filter(p => {
@@ -947,7 +972,7 @@ export const neonApi = {
               
               const mission = availableMissions[0]
               // Double-check user still has less than 3 missions
-              total = assignments.books.length + assignments.passphrases.length + assignments.objects.length
+              total = countUserMissions(userId)
               if (total < 3) {
                 assignments.objects.push({ missionId: mission.id })
                 mission.assigned_agent = userId
@@ -960,9 +985,8 @@ export const neonApi = {
       }
       
       // Check if all users have 3 missions
-      const allHaveThree = [...userAssignments.values()].every(assignments => {
-        const total = assignments.books.length + assignments.passphrases.length + assignments.objects.length
-        return total >= 3
+      const allHaveThree = [...userAssignments.keys()].every(userId => {
+        return countUserMissions(userId) >= 3
       })
       
       if (allHaveThree) break
@@ -971,139 +995,155 @@ export const neonApi = {
       if (!anyAssignment && usersNeedingMissions.length > 0) {
         // Try assigning any available mission type to users who need missions
         // This handles edge cases where strict diversity requirements can't be met
+        // But we still try to maintain diversity when possible
         for (const { userId } of usersNeedingMissions) {
           const assignments = userAssignments.get(userId)
-          const total = assignments.books.length + assignments.passphrases.length + assignments.objects.length
+          const total = countUserMissions(userId)
           
           if (total >= 3) continue
           
-          // Try to assign any available mission (relaxed constraints)
+          // Get diversity requirements for this user
+          const neededTypes = needsTypeForDiversity(userId)
+          
+          // Try to assign any available mission, but prioritize diversity
           let assigned = false
           
-          // Try object missions first (simplest, no partner needed)
-          if (!assigned) {
-            const availableMissions = objectMissions.filter(m => {
-              if (userHadObjectMission(userId, m)) return false
-              if (m.assigned_agent) return false
-              return true
-            })
+          // Try types in diversity order first
+          for (const typeToTry of neededTypes) {
+            if (assigned) break
             
-            if (availableMissions.length > 0) {
-              availableMissions.sort((a, b) => {
-                const aPrev = Array.isArray(a.past_assigned_agents) ? a.past_assigned_agents.length : 0
-                const bPrev = Array.isArray(b.past_assigned_agents) ? b.past_assigned_agents.length : 0
-                return aPrev - bPrev
-              })
-              
-              const mission = availableMissions[0]
-              // Double-check user still has less than 3 missions
-              if (total < 3) {
-                assignments.objects.push({ missionId: mission.id })
-                mission.assigned_agent = userId
-                assigned = true
-                anyAssignment = true
-              }
-            }
-          }
-          
-          // Try book missions
-          if (!assigned) {
-            const userTeam = users.find(u => u.id === userId)?.team
-            if (userTeam) {
-              const availableMissions = bookMissions.filter(m => {
-                if (userHadBookMission(userId, m)) return false
-                if (m.assigned_red || m.assigned_blue) return false
+            if (typeToTry === 'object') {
+              const availableMissions = objectMissions.filter(m => {
+                if (userHadObjectMission(userId, m)) return false
+                if (m.assigned_agent) return false
                 return true
               })
               
               if (availableMissions.length > 0) {
-                for (const mission of availableMissions) {
-                  const partnerTeam = userTeam === 'red' ? 'blue' : 'red'
-                  const partnerPool = partnerTeam === 'red' ? redUsers : blueUsers
+                availableMissions.sort((a, b) => {
+                  const aPrev = Array.isArray(a.past_assigned_agents) ? a.past_assigned_agents.length : 0
+                  const bPrev = Array.isArray(b.past_assigned_agents) ? b.past_assigned_agents.length : 0
+                  return aPrev - bPrev
+                })
+                
+                const mission = availableMissions[0]
+                total = countUserMissions(userId)
+                if (total < 3) {
+                  assignments.objects.push({ missionId: mission.id })
+                  mission.assigned_agent = userId
+                  assigned = true
+                  anyAssignment = true
+                }
+              }
+            } else if (typeToTry === 'book') {
+              const userTeam = users.find(u => u.id === userId)?.team
+              if (userTeam) {
+                const availableMissions = bookMissions.filter(m => {
+                  if (userHadBookMission(userId, m)) return false
+                  if (m.assigned_red || m.assigned_blue) return false
+                  return true
+                })
+                
+                if (availableMissions.length > 0) {
+                  availableMissions.sort((a, b) => {
+                    const aPrev = (Array.isArray(a.previous_reds) ? a.previous_reds.length : 0) + 
+                                  (Array.isArray(a.previous_blues) ? a.previous_blues.length : 0)
+                    const bPrev = (Array.isArray(b.previous_reds) ? b.previous_reds.length : 0) + 
+                                  (Array.isArray(b.previous_blues) ? b.previous_blues.length : 0)
+                    return aPrev - bPrev
+                  })
                   
-                  const availablePartners = partnerPool
-                    .map(partnerId => {
-                      const partnerAssignments = userAssignments.get(partnerId)
-                      const partnerTotal = partnerAssignments.books.length + partnerAssignments.passphrases.length + partnerAssignments.objects.length
-                      return { partnerId, total: partnerTotal }
-                    })
-                    .filter(p => {
-                      if (p.total >= 3) return false
-                      if (userTeam === 'red') {
-                        const prevBlues = Array.isArray(mission.previous_blues) ? mission.previous_blues : []
-                        return !prevBlues.includes(p.partnerId)
-                      } else {
-                        const prevReds = Array.isArray(mission.previous_reds) ? mission.previous_reds : []
-                        return !prevReds.includes(p.partnerId)
-                      }
-                    })
-                    .sort((a, b) => a.total - b.total)
-                  
-                  if (availablePartners.length > 0) {
-                    const partner = availablePartners[0].partnerId
-                    const partnerAssignments = userAssignments.get(partner)
-                    const partnerTotal = partnerAssignments.books.length + partnerAssignments.passphrases.length + partnerAssignments.objects.length
+                  for (const mission of availableMissions) {
+                    const partnerTeam = userTeam === 'red' ? 'blue' : 'red'
+                    const partnerPool = partnerTeam === 'red' ? redUsers : blueUsers
                     
-                    // Only assign if both users have less than 3 missions
-                    if (total < 3 && partnerTotal < 3) {
-                      assignments.books.push({ missionId: mission.id, partnerId: partner })
-                      partnerAssignments.books.push({ missionId: mission.id, partnerId: userId })
-                      mission.assigned_red = userTeam === 'red' ? userId : partner
-                      mission.assigned_blue = userTeam === 'blue' ? userId : partner
-                      assigned = true
-                      anyAssignment = true
-                      break
+                    const availablePartners = partnerPool
+                      .map(partnerId => {
+                        const partnerTotal = countUserMissions(partnerId)
+                        return { partnerId, total: partnerTotal }
+                      })
+                      .filter(p => {
+                        if (p.total >= 3) return false
+                        if (userTeam === 'red') {
+                          const prevBlues = Array.isArray(mission.previous_blues) ? mission.previous_blues : []
+                          return !prevBlues.includes(p.partnerId)
+                        } else {
+                          const prevReds = Array.isArray(mission.previous_reds) ? mission.previous_reds : []
+                          return !prevReds.includes(p.partnerId)
+                        }
+                      })
+                      .sort((a, b) => a.total - b.total)
+                    
+                    if (availablePartners.length > 0) {
+                      const partner = availablePartners[0].partnerId
+                      const partnerTotal = countUserMissions(partner)
+                      const partnerAssignments = userAssignments.get(partner)
+                      
+                      total = countUserMissions(userId)
+                      if (total < 3 && partnerTotal < 3) {
+                        assignments.books.push({ missionId: mission.id, partnerId: partner })
+                        partnerAssignments.books.push({ missionId: mission.id, partnerId: userId })
+                        mission.assigned_red = userTeam === 'red' ? userId : partner
+                        mission.assigned_blue = userTeam === 'blue' ? userId : partner
+                        assigned = true
+                        anyAssignment = true
+                        break
+                      }
                     }
                   }
                 }
               }
-            }
-          }
-          
-          // Try passphrase missions
-          if (!assigned) {
-            const availableMissions = passphraseMissions.filter(m => {
-              if (userHadPassphraseMission(userId, m)) return false
-              if (m.assigned_receiver || m.assigned_sender_1 || m.assigned_sender_2) return false
-              return true
-            })
-            
-            if (availableMissions.length > 0) {
-              for (const mission of availableMissions) {
-                const availableSenders = allUsers
-                  .map(senderId => {
-                    const senderAssignments = userAssignments.get(senderId)
-                    const senderTotal = senderAssignments.books.length + senderAssignments.passphrases.length + senderAssignments.objects.length
-                    return { senderId, total: senderTotal }
-                  })
-                  .filter(p => {
-                    if (p.senderId === userId) return false
-                    if (p.total >= 3) return false
-                    const prevReceivers = Array.isArray(mission.previous_receivers) ? mission.previous_receivers : []
-                    const prevSenders = Array.isArray(mission.previous_senders) ? mission.previous_senders : []
-                    return !prevReceivers.includes(p.senderId) && !prevSenders.includes(p.senderId)
-                  })
-                  .sort((a, b) => a.total - b.total)
+            } else if (typeToTry === 'passphrase') {
+              const availableMissions = passphraseMissions.filter(m => {
+                if (userHadPassphraseMission(userId, m)) return false
+                if (m.assigned_receiver || m.assigned_sender_1 || m.assigned_sender_2) return false
+                return true
+              })
+              
+              if (availableMissions.length > 0) {
+                availableMissions.sort((a, b) => {
+                  const aPrev = (Array.isArray(a.previous_receivers) ? a.previous_receivers.length : 0) + 
+                                (Array.isArray(a.previous_senders) ? a.previous_senders.length : 0)
+                  const bPrev = (Array.isArray(b.previous_receivers) ? b.previous_receivers.length : 0) + 
+                                (Array.isArray(b.previous_senders) ? b.previous_senders.length : 0)
+                  return aPrev - bPrev
+                })
                 
+                for (const mission of availableMissions) {
+                  const availableSenders = allUsers
+                    .map(senderId => {
+                      const senderTotal = countUserMissions(senderId)
+                      return { senderId, total: senderTotal }
+                    })
+                    .filter(p => {
+                      if (p.senderId === userId) return false
+                      if (p.total >= 3) return false
+                      const prevReceivers = Array.isArray(mission.previous_receivers) ? mission.previous_receivers : []
+                      const prevSenders = Array.isArray(mission.previous_senders) ? mission.previous_senders : []
+                      return !prevReceivers.includes(p.senderId) && !prevSenders.includes(p.senderId)
+                    })
+                    .sort((a, b) => a.total - b.total)
+                  
                 if (availableSenders.length >= 2) {
                   const sender1 = availableSenders[0].senderId
                   const sender2 = availableSenders[1].senderId
-                  const sender1Assignments = userAssignments.get(sender1)
-                  const sender2Assignments = userAssignments.get(sender2)
-                  const sender1Total = sender1Assignments.books.length + sender1Assignments.passphrases.length + sender1Assignments.objects.length
-                  const sender2Total = sender2Assignments.books.length + sender2Assignments.passphrases.length + sender2Assignments.objects.length
+                  const sender1Total = countUserMissions(sender1)
+                  const sender2Total = countUserMissions(sender2)
                   
-                  // Only assign if receiver and both senders have less than 3 missions
+                  total = countUserMissions(userId)
                   if (total < 3 && sender1Total < 3 && sender2Total < 3) {
-                    assignments.passphrases.push({ missionId: mission.id, sender1Id: sender1, sender2Id: sender2 })
-                    sender1Assignments.passphrases.push({ missionId: mission.id, receiverId: userId, isSender: true })
-                    sender2Assignments.passphrases.push({ missionId: mission.id, receiverId: userId, isSender: true })
-                    mission.assigned_receiver = userId
-                    mission.assigned_sender_1 = sender1
-                    mission.assigned_sender_2 = sender2
-                    assigned = true
-                    anyAssignment = true
-                    break
+                      assignments.passphrases.push({ missionId: mission.id, sender1Id: sender1, sender2Id: sender2 })
+                      const sender1Assignments = userAssignments.get(sender1)
+                      const sender2Assignments = userAssignments.get(sender2)
+                      sender1Assignments.passphrases.push({ missionId: mission.id, receiverId: userId, isSender: true })
+                      sender2Assignments.passphrases.push({ missionId: mission.id, receiverId: userId, isSender: true })
+                      mission.assigned_receiver = userId
+                      mission.assigned_sender_1 = sender1
+                      mission.assigned_sender_2 = sender2
+                      assigned = true
+                      anyAssignment = true
+                      break
+                    }
                   }
                 }
               }
@@ -1269,16 +1309,51 @@ export const neonApi = {
   /**
    * Executes an assignment plan atomically using CTE-based batch updates
    * This ensures all assignments for each mission type are executed in a single query
+   * @param {Object} plan - The assignment plan with books, passphrases, objects arrays
+   * @param {number[]} userIdsArray - Array of user IDs being assigned
+   * @param {Date|null} expectedTimestamp - Optional timestamp to verify assignments haven't changed
    */
-  async executeAssignmentPlan(plan, userIdsArray) {
+  async executeAssignmentPlan(plan, userIdsArray, expectedTimestamp = null) {
+    const execId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    console.log(`[${execId}] executeAssignmentPlan called with ${plan.books.length} books, ${plan.passphrases.length} passphrases, ${plan.objects.length} objects`)
+    
+    // Verify lock is still held
+    const lockCheck = await sql`
+      SELECT currently_updating FROM assignment_timestamp WHERE id = 1
+    `
+    if (!lockCheck.length || !lockCheck[0].currently_updating) {
+      console.error(`[${execId}] Lock not held!`)
+      throw new Error('Lock not held - another process may be updating assignments')
+    }
+    
+    console.log(`[${execId}] Lock verified, proceeding with assignments`)
+    
+    // Verify timestamp hasn't changed
+    if (expectedTimestamp !== null) {
+      const currentTimestamp = await sql`
+        SELECT last_assigned_at FROM assignment_timestamp WHERE id = 1
+      `
+      const currentValue = currentTimestamp.length > 0 ? currentTimestamp[0].last_assigned_at : null
+      
+      if (currentValue === null && expectedTimestamp !== null) {
+        throw new Error('Assignments were updated by another process before execution')
+      }
+      if (currentValue !== null && expectedTimestamp !== null) {
+        const currentTime = currentValue instanceof Date ? currentValue.getTime() : new Date(currentValue).getTime()
+        const expectedTime = expectedTimestamp instanceof Date ? expectedTimestamp.getTime() : new Date(expectedTimestamp).getTime()
+        if (currentTime !== expectedTime) {
+          throw new Error('Assignments were updated by another process before execution')
+        }
+      }
+    }
+    
     // Execute all book assignments atomically using CTE
     if (plan.books.length > 0) {
-      // Build VALUES clause for book assignments
       const bookValues = plan.books.map(book => 
         `(${book.missionId}::integer, ${book.redUserId}::integer, ${book.blueUserId}::integer)`
       ).join(', ')
       
-      await sql`
+      const bookResult = await sql`
         WITH assignment_plan AS (
           SELECT * FROM (VALUES ${sql.unsafe(bookValues)}) AS t(mission_id, red_user_id, blue_user_id)
         )
@@ -1291,17 +1366,19 @@ export const neonApi = {
         WHERE book_missions.id = assignment_plan.mission_id
           AND book_missions.assigned_red IS NULL
           AND book_missions.assigned_blue IS NULL
+          AND EXISTS (SELECT 1 FROM assignment_timestamp WHERE id = 1 AND currently_updating = true)
+        RETURNING book_missions.id
       `
+      console.log(`[${execId}] Book assignments: attempted ${plan.books.length}, actually updated ${bookResult.length}`)
     }
     
     // Execute all passphrase assignments atomically using CTE
     if (plan.passphrases.length > 0) {
-      // Build VALUES clause for passphrase assignments
       const passphraseValues = plan.passphrases.map(p => 
         `(${p.missionId}::integer, ${p.receiverId}::integer, ${p.sender1Id}::integer, ${p.sender2Id}::integer)`
       ).join(', ')
       
-      await sql`
+      const passphraseResult = await sql`
         WITH assignment_plan AS (
           SELECT * FROM (VALUES ${sql.unsafe(passphraseValues)}) AS t(mission_id, receiver_id, sender1_id, sender2_id)
         )
@@ -1319,17 +1396,19 @@ export const neonApi = {
           AND passphrase_missions.assigned_receiver IS NULL
           AND passphrase_missions.assigned_sender_1 IS NULL
           AND passphrase_missions.assigned_sender_2 IS NULL
+          AND EXISTS (SELECT 1 FROM assignment_timestamp WHERE id = 1 AND currently_updating = true)
+        RETURNING passphrase_missions.id
       `
+      console.log(`[${execId}] Passphrase assignments: attempted ${plan.passphrases.length}, actually updated ${passphraseResult.length}`)
     }
     
     // Execute all object assignments atomically using CTE
     if (plan.objects.length > 0) {
-      // Build VALUES clause for object assignments
       const objectValues = plan.objects.map(obj => 
         `(${obj.missionId}::integer, ${obj.agentId}::integer)`
       ).join(', ')
       
-      await sql`
+      const objectResult = await sql`
         WITH assignment_plan AS (
           SELECT * FROM (VALUES ${sql.unsafe(objectValues)}) AS t(mission_id, agent_id)
         )
@@ -1340,156 +1419,343 @@ export const neonApi = {
         FROM assignment_plan
         WHERE object_missions.id = assignment_plan.mission_id
           AND object_missions.assigned_agent IS NULL
+          AND EXISTS (SELECT 1 FROM assignment_timestamp WHERE id = 1 AND currently_updating = true)
+        RETURNING object_missions.id
       `
+      console.log(`[${execId}] Object assignments: attempted ${plan.objects.length}, actually updated ${objectResult.length}`)
     }
+    
+    console.log(`[${execId}] All assignments completed successfully`)
   },
 
   // Reset all missions (book, passphrase, and object) and assign until each user has 3 missions total
   // NOTE: Only works if there's an active session
+  // Uses optimistic locking with retry logic to handle concurrent requests
   async resetAndAssignAllMissions() {
-    let lockAcquired = false // Track if we acquired the lock, so finally block can clear it
+    const functionCallId = `reset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    console.log(`[${functionCallId}] resetAndAssignAllMissions called`)
+    
+    let lockAcquired = false
+    const maxLockRetries = 5
+    const baseDelayMs = 100 // Start with 100ms delay
+    
     try {
-      // Atomically acquire the lock in a single operation
-      // This ensures only ONE tab can proceed, even if multiple tabs hit this simultaneously
-      // First ensure the row exists
-      await sql`
-        INSERT INTO assignment_timestamp (id, last_assigned_at, currently_updating)
-        VALUES (1, NOW(), false)
-        ON CONFLICT (id) DO NOTHING
+      // Quick early check - if lock is held, return immediately
+      const quickCheck = await sql`
+        SELECT currently_updating FROM assignment_timestamp WHERE id = 1
       `
-      
-      // Now atomically try to acquire the lock - only succeeds if currently_updating is false or NULL
-      const lockResult = await sql`
-        UPDATE assignment_timestamp 
-        SET currently_updating = true
-        WHERE id = 1 AND (currently_updating = false OR currently_updating IS NULL)
-        RETURNING id
-      `
-      
-      if (lockResult.length === 0) {
-        // Another tab already has the lock - fail silently
-        return { assigned: 0 }
+      if (quickCheck.length > 0 && quickCheck[0].currently_updating === true) {
+        console.log(`[${functionCallId}] Lock already held, returning early`)
+        return { assigned: 0, reason: 'Lock already held' }
       }
       
-      lockAcquired = true
-      
-      // Check if there's an active session
       const activeSession = await this.getActiveSession()
       if (!activeSession) {
-        await sql`UPDATE assignment_timestamp SET currently_updating = false WHERE id = 1`
         throw new Error('No active session. Cannot assign missions.')
       }
       
       const sessionUserIds = activeSession.participant_user_ids || []
       if (sessionUserIds.length === 0) {
-        await sql`UPDATE assignment_timestamp SET currently_updating = false WHERE id = 1`
         throw new Error('No participants in active session')
       }
       
-      // Unassign all missions for session users
-      await sql`
-        UPDATE book_missions
-        SET assigned_red = CASE WHEN assigned_red = ANY(${sessionUserIds}::integer[]) THEN NULL ELSE assigned_red END,
-            assigned_blue = CASE WHEN assigned_blue = ANY(${sessionUserIds}::integer[]) THEN NULL ELSE assigned_blue END,
-            red_completed = CASE WHEN book_missions.assigned_red = ANY(${sessionUserIds}::integer[]) THEN false ELSE red_completed END,
-            blue_completed = CASE WHEN book_missions.assigned_blue = ANY(${sessionUserIds}::integer[]) THEN false ELSE blue_completed END
-        WHERE assigned_red = ANY(${sessionUserIds}::integer[]) OR assigned_blue = ANY(${sessionUserIds}::integer[])
-      `
+      console.log(`[${functionCallId}] Attempting to acquire lock for ${sessionUserIds.length} users`)
       
-      await sql`
-        UPDATE passphrase_missions
-        SET assigned_receiver = CASE WHEN assigned_receiver = ANY(${sessionUserIds}::integer[]) THEN NULL ELSE assigned_receiver END,
-            assigned_sender_1 = CASE WHEN assigned_sender_1 = ANY(${sessionUserIds}::integer[]) THEN NULL ELSE assigned_sender_1 END,
-            assigned_sender_2 = CASE WHEN assigned_sender_2 = ANY(${sessionUserIds}::integer[]) THEN NULL ELSE assigned_sender_2 END,
-            completed = CASE WHEN passphrase_missions.assigned_receiver = ANY(${sessionUserIds}::integer[]) 
-                                OR passphrase_missions.assigned_sender_1 = ANY(${sessionUserIds}::integer[])
-                                OR passphrase_missions.assigned_sender_2 = ANY(${sessionUserIds}::integer[])
-                           THEN false ELSE completed END
-        WHERE assigned_receiver = ANY(${sessionUserIds}::integer[]) 
-           OR assigned_sender_1 = ANY(${sessionUserIds}::integer[])
-           OR assigned_sender_2 = ANY(${sessionUserIds}::integer[])
-      `
+      // Try to acquire lock with retry logic
+      let lockResult = null
+      let timestampValue = null
       
-      await sql`
-        UPDATE object_missions
-        SET assigned_agent = CASE WHEN assigned_agent = ANY(${sessionUserIds}::integer[]) THEN NULL ELSE assigned_agent END,
-            assigned_now = CASE WHEN object_missions.assigned_agent = ANY(${sessionUserIds}::integer[]) THEN false ELSE assigned_now END,
-            completed = CASE WHEN object_missions.assigned_agent = ANY(${sessionUserIds}::integer[]) THEN false ELSE completed END
-        WHERE assigned_agent = ANY(${sessionUserIds}::integer[])
-      `
-      
-      // Verify we still hold the lock before proceeding
-      const lockCheck = await sql`
-        SELECT currently_updating FROM assignment_timestamp WHERE id = 1
-      `
-      if (lockCheck.length === 0 || lockCheck[0].currently_updating !== true) {
-        throw new Error('Lost lock during assignment - another process may have taken over')
-      }
-      
-      // Build and validate assignment plan with retry logic
-      let plan = null
-      let validation = null
-      const maxRetries = 50 // Maximum attempts to build a valid plan
-      let retryCount = 0
-      
-      while (retryCount < maxRetries) {
-        // Re-check lock periodically during plan building
-        if (retryCount > 0 && retryCount % 10 === 0) {
-          const lockCheck = await sql`
-            SELECT currently_updating FROM assignment_timestamp WHERE id = 1
-          `
-          if (lockCheck.length === 0 || lockCheck[0].currently_updating !== true) {
-            throw new Error('Lost lock during assignment - another process may have taken over')
+      for (let attempt = 0; attempt < maxLockRetries; attempt++) {
+        // Get current timestamp and lock status atomically
+        const timestampCheck = await sql`
+          SELECT last_assigned_at, currently_updating FROM assignment_timestamp WHERE id = 1
+        `
+        
+        if (timestampCheck.length > 0 && timestampCheck[0].currently_updating === true) {
+          // Lock is held, wait and retry with exponential backoff
+          if (attempt < maxLockRetries - 1) {
+            const delayMs = baseDelayMs * Math.pow(2, attempt) + Math.random() * 50 // Add jitter
+            console.log(`[${functionCallId}] Lock held, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxLockRetries})`)
+            await new Promise(resolve => setTimeout(resolve, delayMs))
+            continue
+          } else {
+            console.log(`[${functionCallId}] Lock held after all retries, giving up`)
+            return { assigned: 0, reason: 'Lock held after retries' }
           }
         }
         
+        timestampValue = timestampCheck.length > 0 ? timestampCheck[0].last_assigned_at : null
+        
+        // Ensure row exists
+        await sql`
+          INSERT INTO assignment_timestamp (id, last_assigned_at, currently_updating)
+          VALUES (1, NOW(), false)
+          ON CONFLICT (id) DO NOTHING
+        `
+        
+        // Try to acquire lock atomically - check timestamp matches AND lock is free
+        lockResult = timestampValue 
+          ? await sql`
+              UPDATE assignment_timestamp 
+              SET currently_updating = true
+              WHERE id = 1 
+                AND currently_updating = false
+                AND last_assigned_at = ${timestampValue}
+              RETURNING id, last_assigned_at, currently_updating
+            `
+          : await sql`
+              UPDATE assignment_timestamp 
+              SET currently_updating = true
+              WHERE id = 1 
+                AND currently_updating = false
+                AND last_assigned_at IS NULL
+              RETURNING id, last_assigned_at, currently_updating
+            `
+        
+        if (lockResult.length > 0 && lockResult[0].currently_updating === true) {
+          lockAcquired = true
+          console.log(`[${functionCallId}] Lock acquired successfully on attempt ${attempt + 1}`)
+          break // Successfully acquired lock
+        }
+        
+        // Lock acquisition failed - another process got it first
+        if (attempt < maxLockRetries - 1) {
+          const delayMs = baseDelayMs * Math.pow(2, attempt) + Math.random() * 50
+          console.log(`[${functionCallId}] Lock acquisition failed, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxLockRetries})`)
+          await new Promise(resolve => setTimeout(resolve, delayMs))
+        }
+      }
+      
+      if (!lockAcquired || !lockResult || lockResult.length === 0) {
+        console.log(`[${functionCallId}] Failed to acquire lock after ${maxLockRetries} attempts`)
+        return { assigned: 0, reason: 'Failed to acquire lock after retries' }
+      }
+      
+      console.log(`[${functionCallId}] Unassigning missions for session users...`)
+      
+      // CRITICAL: Unassign all missions for session users BEFORE building plan
+      // The plan builder queries for missions where assigned_* IS NULL, so we must clear assignments first
+      const unassignBooks = await sql`
+        UPDATE book_missions
+        SET assigned_red = NULL,
+            assigned_blue = NULL,
+            red_completed = false,
+            blue_completed = false
+        WHERE assigned_red = ANY(${sessionUserIds}::integer[]) OR assigned_blue = ANY(${sessionUserIds}::integer[])
+        RETURNING id
+      `
+      
+      const unassignPassphrases = await sql`
+        UPDATE passphrase_missions
+        SET assigned_receiver = NULL,
+            assigned_sender_1 = NULL,
+            assigned_sender_2 = NULL,
+            completed = false
+        WHERE assigned_receiver = ANY(${sessionUserIds}::integer[]) 
+           OR assigned_sender_1 = ANY(${sessionUserIds}::integer[])
+           OR assigned_sender_2 = ANY(${sessionUserIds}::integer[])
+        RETURNING id
+      `
+      
+      const unassignObjects = await sql`
+        UPDATE object_missions
+        SET assigned_agent = NULL,
+            assigned_now = false,
+            completed = false
+        WHERE assigned_agent = ANY(${sessionUserIds}::integer[])
+        RETURNING id
+      `
+      
+      console.log(`[${functionCallId}] Unassigned: ${unassignBooks.length} books, ${unassignPassphrases.length} passphrases, ${unassignObjects.length} objects`)
+      
+      // Verify lock is still held after unassignment
+      const lockAfterUnassign = await sql`
+        SELECT currently_updating FROM assignment_timestamp WHERE id = 1
+      `
+      if (!lockAfterUnassign.length || !lockAfterUnassign[0].currently_updating) {
+        throw new Error('Lock lost after unassignment - aborting to prevent race condition')
+      }
+      
+      console.log(`[${functionCallId}] Building assignment plan...`)
+      
+      // Lock acquired AND missions unassigned - now build plan based on CURRENT database state
+      // This ensures we're working with fresh data after acquiring the lock and clearing assignments
+      let plan = null
+      let validation = null
+      const maxPlanRetries = 50
+      let retryCount = 0
+      
+      while (retryCount < maxPlanRetries) {
         plan = await this.buildAssignmentPlan(sessionUserIds)
         validation = this.validateAssignmentPlan(plan, sessionUserIds)
         
         if (validation.valid) {
-          break // Valid plan found, exit retry loop
+          break
         }
         
         retryCount++
-        if (retryCount < maxRetries) {
-          console.log(`Assignment plan validation failed (attempt ${retryCount}/${maxRetries}):`, validation.errors)
-          // Continue to retry
-        } else {
-          // Final attempt failed
-          console.error('Assignment plan validation failed after all retries:', validation.errors)
-          throw new Error(`Assignment plan invalid after ${maxRetries} attempts: ${validation.errors.join(', ')}`)
+        if (retryCount >= maxPlanRetries) {
+          throw new Error(`Assignment plan invalid after ${maxPlanRetries} attempts: ${validation.errors.join(', ')}`)
         }
       }
       
-      // Final lock check before executing
+      console.log(`[${functionCallId}] Plan built: ${plan.books.length} books, ${plan.passphrases.length} passphrases, ${plan.objects.length} objects`)
+      
+      // Log the plan (only the process that acquired the lock will log)
+      console.log('\n📋 MISSION REASSIGNMENT PLAN:')
+      console.log('═'.repeat(60))
+      
+      if (plan.books.length > 0) {
+        console.log(`\n📚 Book Missions (${plan.books.length}):`)
+        plan.books.forEach((book, idx) => {
+          console.log(`  ${idx + 1}. Mission ${book.missionId}: Red User ${book.redUserId} + Blue User ${book.blueUserId}`)
+        })
+      }
+      
+      if (plan.passphrases.length > 0) {
+        console.log(`\n🔐 Passphrase Missions (${plan.passphrases.length}):`)
+        plan.passphrases.forEach((p, idx) => {
+          console.log(`  ${idx + 1}. Mission ${p.missionId}: Receiver ${p.receiverId}, Senders ${p.sender1Id} & ${p.sender2Id}`)
+        })
+      }
+      
+      if (plan.objects.length > 0) {
+        console.log(`\n🎯 Object Missions (${plan.objects.length}):`)
+        plan.objects.forEach((obj, idx) => {
+          console.log(`  ${idx + 1}. Mission ${obj.missionId}: Agent ${obj.agentId}`)
+        })
+      }
+      
+      const totalMissions = plan.books.length + plan.passphrases.length + plan.objects.length
+      console.log(`\n📊 Total: ${totalMissions} missions`)
+      
+      // Log detailed per-user breakdown
+      console.log('\n📋 PER-USER BREAKDOWN:')
+      const userCounts = new Map()
+      const userTypes = new Map()
+      
+      // Count book assignments
+      for (const book of plan.books) {
+        if (book.redUserId) {
+          userCounts.set(book.redUserId, (userCounts.get(book.redUserId) || 0) + 1)
+          const types = userTypes.get(book.redUserId) || { books: 0, passphrases: 0, objects: 0 }
+          types.books++
+          userTypes.set(book.redUserId, types)
+        }
+        if (book.blueUserId) {
+          userCounts.set(book.blueUserId, (userCounts.get(book.blueUserId) || 0) + 1)
+          const types = userTypes.get(book.blueUserId) || { books: 0, passphrases: 0, objects: 0 }
+          types.books++
+          userTypes.set(book.blueUserId, types)
+        }
+      }
+      
+      // Count passphrase assignments
+      for (const p of plan.passphrases) {
+        if (p.receiverId) {
+          userCounts.set(p.receiverId, (userCounts.get(p.receiverId) || 0) + 1)
+          const types = userTypes.get(p.receiverId) || { books: 0, passphrases: 0, objects: 0 }
+          types.passphrases++
+          userTypes.set(p.receiverId, types)
+        }
+        if (p.sender1Id) {
+          userCounts.set(p.sender1Id, (userCounts.get(p.sender1Id) || 0) + 1)
+          const types = userTypes.get(p.sender1Id) || { books: 0, passphrases: 0, objects: 0 }
+          types.passphrases++
+          userTypes.set(p.sender1Id, types)
+        }
+        if (p.sender2Id) {
+          userCounts.set(p.sender2Id, (userCounts.get(p.sender2Id) || 0) + 1)
+          const types = userTypes.get(p.sender2Id) || { books: 0, passphrases: 0, objects: 0 }
+          types.passphrases++
+          userTypes.set(p.sender2Id, types)
+        }
+      }
+      
+      // Count object assignments
+      for (const obj of plan.objects) {
+        if (obj.agentId) {
+          userCounts.set(obj.agentId, (userCounts.get(obj.agentId) || 0) + 1)
+          const types = userTypes.get(obj.agentId) || { books: 0, passphrases: 0, objects: 0 }
+          types.objects++
+          userTypes.set(obj.agentId, types)
+        }
+      }
+      
+      // Log per-user breakdown
+      for (const userId of sessionUserIds.sort((a, b) => a - b)) {
+        const count = userCounts.get(userId) || 0
+        const types = userTypes.get(userId) || { books: 0, passphrases: 0, objects: 0 }
+        const typeCount = (types.books > 0 ? 1 : 0) + (types.passphrases > 0 ? 1 : 0) + (types.objects > 0 ? 1 : 0)
+        const status = count === 3 && typeCount >= 2 ? '✅' : '❌'
+        console.log(`  ${status} User ${userId}: ${count} missions (${types.books} books, ${types.passphrases} passphrases, ${types.objects} objects) - ${typeCount} types`)
+      }
+      
+      console.log('═'.repeat(60) + '\n')
+      
+      // Verify lock is still held before executing plan
+      const lockStillHeld = await sql`
+        SELECT currently_updating FROM assignment_timestamp WHERE id = 1
+      `
+      if (!lockStillHeld.length || !lockStillHeld[0].currently_updating) {
+        throw new Error('Lock lost before executing plan - aborting to prevent race condition')
+      }
+      
+      console.log(`[${functionCallId}] Executing assignment plan...`)
+      
+      // Execute plan
+      await this.executeAssignmentPlan(plan, sessionUserIds, timestampValue)
+      
+      console.log(`[${functionCallId}] Plan executed successfully`)
+      
+      // Verify assignments were made correctly
+      const verificationResult = await sql`
+        SELECT 
+          (SELECT COUNT(*) FROM book_missions WHERE assigned_red = ANY(${sessionUserIds}::integer[]) OR assigned_blue = ANY(${sessionUserIds}::integer[])) as book_count,
+          (SELECT COUNT(*) FROM passphrase_missions WHERE assigned_receiver = ANY(${sessionUserIds}::integer[]) OR assigned_sender_1 = ANY(${sessionUserIds}::integer[]) OR assigned_sender_2 = ANY(${sessionUserIds}::integer[])) as passphrase_count,
+          (SELECT COUNT(*) FROM object_missions WHERE assigned_agent = ANY(${sessionUserIds}::integer[])) as object_count
+      `
+      
+      console.log(`[${functionCallId}] Verification: ${verificationResult[0].book_count} books, ${verificationResult[0].passphrase_count} passphrases, ${verificationResult[0].object_count} objects`)
+      
+      // CRITICAL: Update timestamp BEFORE releasing lock to prevent race conditions
+      // This ensures other tabs see the updated timestamp immediately
+      await this.updateAssignmentTimestamp()
+      
+      console.log(`[${functionCallId}] Timestamp updated`)
+      
+      // Verify lock is still held after timestamp update
       const finalLockCheck = await sql`
         SELECT currently_updating FROM assignment_timestamp WHERE id = 1
       `
-      if (finalLockCheck.length === 0 || finalLockCheck[0].currently_updating !== true) {
-        throw new Error('Lost lock before execution - another process may have taken over')
+      if (!finalLockCheck.length || !finalLockCheck[0].currently_updating) {
+        throw new Error('Lock lost during timestamp update - aborting')
       }
       
-      // Execute plan
-      await this.executeAssignmentPlan(plan, sessionUserIds)
+      console.log(`[${functionCallId}] Completing successfully, releasing lock`)
       
-      // Update timestamp
-      await this.updateAssignmentTimestamp()
-      
-      const totalMissions = plan.books.length + plan.passphrases.length + plan.objects.length
       return {
         success: true,
         assigned: totalMissions,
-        usersAssigned: sessionUserIds.length
+        usersAssigned: sessionUserIds.length,
+        unassigned: {
+          books: unassignBooks.length,
+          passphrases: unassignPassphrases.length,
+          objects: unassignObjects.length
+        },
+        verification: verificationResult[0]
       }
     } catch (error) {
-      console.error('Error resetting and assigning all missions:', error)
+      console.error(`[${functionCallId}] Error in resetAndAssignAllMissions:`, error)
       throw error
     } finally {
       if (lockAcquired) {
         try {
+          console.log(`[${functionCallId}] Releasing lock`)
           await sql`UPDATE assignment_timestamp SET currently_updating = false WHERE id = 1`
+          console.log(`[${functionCallId}] Lock released`)
         } catch (clearError) {
-          console.error('Error clearing currently_updating flag:', clearError)
+          console.error(`[${functionCallId}] Error clearing currently_updating flag:`, clearError)
         }
       }
     }
@@ -1499,87 +1765,20 @@ export const neonApi = {
   async assignMissionsToSessionUsers(userIdsArray) {
     let lockAcquired = false // Track if we acquired the lock, so finally block can clear it
     try {
-      // Atomically acquire the lock in a single operation
-      // This ensures only ONE tab can proceed, even if multiple tabs hit this simultaneously
-      // First ensure the row exists
-      await sql`
-        INSERT INTO assignment_timestamp (id, last_assigned_at, currently_updating)
-        VALUES (1, NOW(), false)
-        ON CONFLICT (id) DO NOTHING
+      // STEP 1: Get the current assignment timestamp BEFORE building plan
+      // This allows multiple tabs to calculate plans in parallel
+      const timestampBefore = await sql`
+        SELECT last_assigned_at FROM assignment_timestamp WHERE id = 1
       `
+      const timestampValue = timestampBefore.length > 0 ? timestampBefore[0].last_assigned_at : null
       
-      // Now atomically try to acquire the lock - only succeeds if currently_updating is false or NULL
-      const lockResult = await sql`
-        UPDATE assignment_timestamp 
-        SET currently_updating = true
-        WHERE id = 1 AND (currently_updating = false OR currently_updating IS NULL)
-        RETURNING id
-      `
-      
-      if (lockResult.length === 0) {
-        // Another tab already has the lock - fail silently
-        return { success: false, assigned: 0 }
-      }
-      
-      lockAcquired = true
-      
-      // Unassign all missions for selected users
-      await sql`
-        UPDATE book_missions
-        SET assigned_red = CASE WHEN assigned_red = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_red END,
-            assigned_blue = CASE WHEN assigned_blue = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_blue END,
-            red_completed = CASE WHEN book_missions.assigned_red = ANY(${userIdsArray}::integer[]) THEN false ELSE red_completed END,
-            blue_completed = CASE WHEN book_missions.assigned_blue = ANY(${userIdsArray}::integer[]) THEN false ELSE blue_completed END
-        WHERE assigned_red = ANY(${userIdsArray}::integer[]) OR assigned_blue = ANY(${userIdsArray}::integer[])
-      `
-      
-      await sql`
-        UPDATE passphrase_missions
-        SET assigned_receiver = CASE WHEN assigned_receiver = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_receiver END,
-            assigned_sender_1 = CASE WHEN assigned_sender_1 = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_sender_1 END,
-            assigned_sender_2 = CASE WHEN assigned_sender_2 = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_sender_2 END,
-            completed = CASE WHEN passphrase_missions.assigned_receiver = ANY(${userIdsArray}::integer[]) 
-                                OR passphrase_missions.assigned_sender_1 = ANY(${userIdsArray}::integer[])
-                                OR passphrase_missions.assigned_sender_2 = ANY(${userIdsArray}::integer[])
-                           THEN false ELSE completed END
-        WHERE assigned_receiver = ANY(${userIdsArray}::integer[]) 
-           OR assigned_sender_1 = ANY(${userIdsArray}::integer[])
-           OR assigned_sender_2 = ANY(${userIdsArray}::integer[])
-      `
-      
-      await sql`
-        UPDATE object_missions
-        SET assigned_agent = CASE WHEN assigned_agent = ANY(${userIdsArray}::integer[]) THEN NULL ELSE assigned_agent END,
-            assigned_now = CASE WHEN object_missions.assigned_agent = ANY(${userIdsArray}::integer[]) THEN false ELSE assigned_now END,
-            completed = CASE WHEN object_missions.assigned_agent = ANY(${userIdsArray}::integer[]) THEN false ELSE completed END
-        WHERE assigned_agent = ANY(${userIdsArray}::integer[])
-      `
-      
-      // Verify we still hold the lock before proceeding
-      const lockCheck = await sql`
-        SELECT currently_updating FROM assignment_timestamp WHERE id = 1
-      `
-      if (lockCheck.length === 0 || lockCheck[0].currently_updating !== true) {
-        throw new Error('Lost lock during assignment - another process may have taken over')
-      }
-      
-      // Build and validate assignment plan with retry logic
+      // Build and validate assignment plan
       let plan = null
       let validation = null
       const maxRetries = 50 // Maximum attempts to build a valid plan
       let retryCount = 0
       
       while (retryCount < maxRetries) {
-        // Re-check lock periodically during plan building
-        if (retryCount > 0 && retryCount % 10 === 0) {
-          const lockCheck = await sql`
-            SELECT currently_updating FROM assignment_timestamp WHERE id = 1
-          `
-          if (lockCheck.length === 0 || lockCheck[0].currently_updating !== true) {
-            throw new Error('Lost lock during assignment - another process may have taken over')
-          }
-        }
-        
         plan = await this.buildAssignmentPlan(userIdsArray)
         validation = this.validateAssignmentPlan(plan, userIdsArray)
         
@@ -1588,31 +1787,114 @@ export const neonApi = {
         }
         
         retryCount++
-        if (retryCount < maxRetries) {
-          console.log(`Assignment plan validation failed (attempt ${retryCount}/${maxRetries}):`, validation.errors)
-          // Continue to retry
-        } else {
-          // Final attempt failed
-          console.error('Assignment plan validation failed after all retries:', validation.errors)
+        if (retryCount >= maxRetries) {
           throw new Error(`Assignment plan invalid after ${maxRetries} attempts: ${validation.errors.join(', ')}`)
         }
       }
       
-      // Final lock check before executing
-      const finalLockCheck = await sql`
-        SELECT currently_updating FROM assignment_timestamp WHERE id = 1
+      // Ensure the row exists first
+      await sql`
+        INSERT INTO assignment_timestamp (id, last_assigned_at, currently_updating)
+        VALUES (1, NOW(), false)
+        ON CONFLICT (id) DO NOTHING
       `
-      if (finalLockCheck.length === 0 || finalLockCheck[0].currently_updating !== true) {
-        throw new Error('Lost lock before execution - another process may have taken over')
+      
+      // Atomically acquire lock AND check timestamp hasn't changed
+      // Only succeeds if lock is free AND timestamp hasn't changed since we started
+      const lockResult = timestampValue 
+        ? await sql`
+          UPDATE assignment_timestamp 
+          SET currently_updating = true
+          WHERE id = 1 
+            AND currently_updating = false
+            AND last_assigned_at = ${timestampValue}
+          RETURNING id, last_assigned_at, currently_updating
+        `
+        : await sql`
+          UPDATE assignment_timestamp 
+          SET currently_updating = true
+          WHERE id = 1 
+            AND currently_updating = false
+            AND last_assigned_at IS NULL
+          RETURNING id, last_assigned_at, currently_updating
+        `
+      
+      if (lockResult.length === 0) {
+        // Another tab already updated assignments or has the lock - fail silently
+        return { success: false, assigned: 0 }
       }
       
-      // Execute plan
-      await this.executeAssignmentPlan(plan, userIdsArray)
+      if (!lockResult[0].currently_updating) {
+        return { success: false, assigned: 0 }
+      }
+      
+      lockAcquired = true
+      
+      // Only log the plan AFTER acquiring the lock (only the tab that wins will log)
+      console.log('\n📋 MISSION REASSIGNMENT PLAN:')
+      console.log('═'.repeat(60))
+      
+      if (plan.books.length > 0) {
+        console.log(`\n📚 Book Missions (${plan.books.length}):`)
+        plan.books.forEach((book, idx) => {
+          console.log(`  ${idx + 1}. Mission ${book.missionId}: Red User ${book.redUserId} + Blue User ${book.blueUserId}`)
+        })
+      }
+      
+      if (plan.passphrases.length > 0) {
+        console.log(`\n🔐 Passphrase Missions (${plan.passphrases.length}):`)
+        plan.passphrases.forEach((p, idx) => {
+          console.log(`  ${idx + 1}. Mission ${p.missionId}: Receiver ${p.receiverId}, Senders ${p.sender1Id} & ${p.sender2Id}`)
+        })
+      }
+      
+      if (plan.objects.length > 0) {
+        console.log(`\n🎯 Object Missions (${plan.objects.length}):`)
+        plan.objects.forEach((obj, idx) => {
+          console.log(`  ${idx + 1}. Mission ${obj.missionId}: Agent ${obj.agentId}`)
+        })
+      }
+      
+      const totalMissions = plan.books.length + plan.passphrases.length + plan.objects.length
+      console.log(`\n📊 Total: ${totalMissions} missions`)
+      console.log('═'.repeat(60) + '\n')
+      
+      // Unassign all missions for selected users
+      // Use simpler, more direct updates to ensure all assignments are cleared
+      await sql`
+        UPDATE book_missions
+        SET assigned_red = NULL,
+            assigned_blue = NULL,
+            red_completed = false,
+            blue_completed = false
+        WHERE assigned_red = ANY(${userIdsArray}::integer[]) OR assigned_blue = ANY(${userIdsArray}::integer[])
+      `
+      
+      await sql`
+        UPDATE passphrase_missions
+        SET assigned_receiver = NULL,
+            assigned_sender_1 = NULL,
+            assigned_sender_2 = NULL,
+            completed = false
+        WHERE assigned_receiver = ANY(${userIdsArray}::integer[]) 
+           OR assigned_sender_1 = ANY(${userIdsArray}::integer[])
+           OR assigned_sender_2 = ANY(${userIdsArray}::integer[])
+      `
+      
+      await sql`
+        UPDATE object_missions
+        SET assigned_agent = NULL,
+            assigned_now = false,
+            completed = false
+        WHERE assigned_agent = ANY(${userIdsArray}::integer[])
+      `
+      
+      // STEP 5: Execute plan (pass timestamp to verify nothing changed)
+      await this.executeAssignmentPlan(plan, userIdsArray, timestampValue)
       
       // Update timestamp
       await this.updateAssignmentTimestamp()
       
-      const totalMissions = plan.books.length + plan.passphrases.length + plan.objects.length
       return {
         success: true,
         usersAssigned: userIdsArray.length,
@@ -1709,15 +1991,54 @@ export const neonApi = {
   async getAllMissionsForAgent(agentId) {
     try {
       // Check if there's an active session and if user is in it
-      const activeSession = await this.getActiveSession()
-      if (!activeSession || !activeSession.participant_user_ids?.includes(agentId)) {
+      let activeSession = null
+      try {
+        activeSession = await this.getActiveSession()
+      } catch (error) {
+        // If getting active session fails, log but don't throw - just return empty array
+        console.error('Error fetching active session in getAllMissionsForAgent:', error)
+        return []
+      }
+      
+      if (!activeSession) {
+        // No active session - return empty array
+        return []
+      }
+      
+      // Convert agentId to number for comparison
+      const agentIdNum = Number(agentId)
+      const participantIds = (activeSession.participant_user_ids || []).map(id => Number(id))
+      
+      if (!participantIds.includes(agentIdNum)) {
         // User is not in active session - return empty array
         return []
       }
       
-      const bookMissions = await this.getBookMissionsForAgent(agentId)
-      const passphraseMissions = await this.getPassphraseMissionsForAgent(agentId)
-      const objectMissions = await this.getObjectMissionsForAgent(agentId)
+      // Fetch missions for each type, handling errors gracefully
+      let bookMissions = []
+      let passphraseMissions = []
+      let objectMissions = []
+      
+      try {
+        bookMissions = await this.getBookMissionsForAgent(agentId)
+      } catch (error) {
+        console.error('Error fetching book missions:', error)
+        // Continue with other mission types
+      }
+      
+      try {
+        passphraseMissions = await this.getPassphraseMissionsForAgent(agentId)
+      } catch (error) {
+        console.error('Error fetching passphrase missions:', error)
+        // Continue with other mission types
+      }
+      
+      try {
+        objectMissions = await this.getObjectMissionsForAgent(agentId)
+      } catch (error) {
+        console.error('Error fetching object missions:', error)
+        // Continue with other mission types
+      }
       
       // Add type field to book missions if not present
       const bookMissionsWithType = bookMissions.map(m => ({
@@ -1728,8 +2049,10 @@ export const neonApi = {
       // Combine and return
       return [...bookMissionsWithType, ...passphraseMissions, ...objectMissions]
     } catch (error) {
-      console.error('Error fetching all missions for agent:', error)
-      throw error
+      // This catch should rarely be hit now since we handle errors above
+      // But if something unexpected happens, log it and return empty array instead of throwing
+      console.error('Unexpected error in getAllMissionsForAgent:', error)
+      return []
     }
   },
 
@@ -2447,24 +2770,38 @@ export const neonApi = {
         return false
       }
       
-      // Check if missions are currently being updated - prevent concurrent updates
+      // IMPORTANT: Check if missions are currently being updated FIRST
+      // This prevents race conditions where multiple tabs all try to reassign
       const statusResult = await sql`
-        SELECT currently_updating 
+        SELECT currently_updating, last_assigned_at
         FROM assignment_timestamp 
         WHERE id = 1
       `
       
+      // If lock is held, definitely don't reassign
       if (statusResult.length > 0 && statusResult[0].currently_updating === true) {
-        // Currently updating, don't reassign
         return false
       }
       
-      // console.log('[SHOULD-REASSIGN] Checking last assignment timestamp...');
+      // Add cooldown period: if reassignment happened within last 5 seconds, don't reassign
+      // This prevents rapid-fire reassignments when multiple tabs check simultaneously
+      if (statusResult.length > 0 && statusResult[0].last_assigned_at) {
+        const lastAssigned = statusResult[0].last_assigned_at
+        const now = new Date()
+        const lastAssignedDate = lastAssigned instanceof Date ? lastAssigned : new Date(lastAssigned)
+        const diffMs = now.getTime() - lastAssignedDate.getTime()
+        const diffSeconds = diffMs / 1000
+        
+        // If reassignment happened within last 5 seconds, don't reassign (cooldown period)
+        if (diffSeconds < 5) {
+          return false
+        }
+      }
+      
       const lastAssigned = await this.getLastAssignmentTimestamp();
       
       if (!lastAssigned) {
         // No timestamp exists, should assign
-        // console.log('[SHOULD-REASSIGN] No timestamp found, returning true');
         return true;
       }
       
@@ -2477,68 +2814,35 @@ export const neonApi = {
       // Parse the timestamp and convert to UTC
       let lastAssignedDate;
       if (lastAssigned instanceof Date) {
-        // If it's already a Date object, get its UTC time
-        // The Date object represents a moment in time, so we can use getTime() for accurate comparison
         lastAssignedDate = lastAssigned;
       } else if (typeof lastAssigned === 'string') {
-        // If it's a string, parse it
         lastAssignedDate = new Date(lastAssigned);
       } else {
-        // Try to parse as-is
         lastAssignedDate = new Date(lastAssigned);
       }
       
-      // console.log('[SHOULD-REASSIGN] Current time (UTC):', nowUTC.toISOString());
-      // console.log('[SHOULD-REASSIGN] Last assigned (raw):', lastAssigned);
-      // console.log('[SHOULD-REASSIGN] Last assigned (as Date):', lastAssignedDate.toISOString());
-      // console.log('[SHOULD-REASSIGN] Current time getTime():', now.getTime());
-      // console.log('[SHOULD-REASSIGN] Last assigned getTime():', lastAssignedDate.getTime());
-      
       // Use getTime() for accurate millisecond comparison (timezone-independent)
-      // getTime() returns milliseconds since epoch in UTC, so it's timezone-independent
       const diffMs = now.getTime() - lastAssignedDate.getTime();
-      
-      // console.log('[SHOULD-REASSIGN] Difference in milliseconds:', diffMs);
-      
-      // Handle negative differences (timezone issues)
-      // If negative and large absolute value (~8 hours = 480 minutes), it's a timezone issue
       let diffMinutes = diffMs / (1000 * 60);
       
-      // If difference is negative and approximately 8 hours (timezone mismatch), adjust it
-      // The database stored PST time but it's being interpreted as UTC
-      // So if we see ~-480 minutes, the actual elapsed time is very small (near 0)
+      // Handle negative differences (timezone issues)
       if (diffMs < 0 && Math.abs(diffMinutes) > 400 && Math.abs(diffMinutes) < 500) {
-        // console.log('[SHOULD-REASSIGN] Negative difference ~8 hours - timezone issue detected');
-        // The stored time is actually in PST, so the real elapsed time is much smaller
-        // We need to add the offset back: if diff is -480 min, real elapsed is ~0 min (just the seconds difference)
-        // Calculate actual elapsed by adding the timezone offset (8 hours = 480 minutes)
         const timezoneOffsetMinutes = 480; // PST is UTC-8
         const actualElapsedMs = diffMs + (timezoneOffsetMinutes * 60 * 1000);
         diffMinutes = actualElapsedMs / (1000 * 60);
-        // console.log('[SHOULD-REASSIGN] Adjusted difference in minutes (added 8-hour offset back):', diffMinutes);
       } else if (diffMinutes < 0) {
-        // For other negative values, use absolute value (shouldn't happen normally)
-        // console.log('[SHOULD-REASSIGN] Negative difference (not timezone offset), using absolute value');
         diffMinutes = Math.abs(diffMinutes);
       }
       
-      // console.log('[SHOULD-REASSIGN] Final difference in minutes:', diffMinutes);
-      
       // Get the refresh interval from the active session (default to 15 minutes if not set)
       const refreshIntervalMinutes = activeSession.mission_refresh_interval_minutes || 15
-      // console.log('[SHOULD-REASSIGN] Threshold (minutes):', refreshIntervalMinutes);
-      
-      // Normal case: check if enough time has passed based on session's refresh interval
-      const shouldReassign = diffMinutes >= refreshIntervalMinutes;
-      // console.log('[SHOULD-REASSIGN] Should reassign?', shouldReassign);
       
       // Return true if enough minutes have passed based on session's refresh interval
-      return shouldReassign;
+      return diffMinutes >= refreshIntervalMinutes;
     } catch (error) {
-      // console.error('[SHOULD-REASSIGN] Error checking if missions should be reassigned:', error);
-      // console.error('[SHOULD-REASSIGN] Error stack:', error.stack);
-      // On error, default to should reassign
-      return true;
+      // On error, default to false (don't reassign) to prevent loops
+      console.error('[SHOULD-REASSIGN] Error checking if missions should be reassigned:', error);
+      return false;
     }
   },
 
@@ -3182,3 +3486,4 @@ export const neonApi = {
     }
   }
 };
+

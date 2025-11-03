@@ -418,10 +418,17 @@ function AdminDashboard({ currentUser, onLogout }) {
   }
 
   const handleRefreshMissions = async () => {
+    // Prevent multiple rapid clicks
+    if (refreshingMissions) {
+      console.log('Refresh already in progress, ignoring click')
+      return
+    }
+    
     if (!window.confirm('Refresh missions for all users in the active session? This will reassign missions.')) {
       return
     }
 
+    console.log('[AdminDashboard] handleRefreshMissions called')
     setRefreshingMissions(true)
     try {
       await neonApi.resetAndAssignAllMissions()

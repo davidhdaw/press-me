@@ -254,7 +254,10 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
         setSessionCheckLoading(true)
         const activeSession = await neonApi.getActiveSession()
         if (activeSession && activeSession.participant_user_ids) {
-          const userInSession = activeSession.participant_user_ids.includes(agentId)
+          // Convert both to numbers for comparison
+          const agentIdNum = Number(agentId)
+          const participantIds = activeSession.participant_user_ids.map(id => Number(id))
+          const userInSession = participantIds.includes(agentIdNum)
           setIsInActiveSession(userInSession)
           
           // If user is not in active session, clear any missions they might have
@@ -286,8 +289,18 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
     // Only fetch missions if user is in active session
     if (isInActiveSession && !sessionCheckLoading) {
       fetchRandomMissions()
+    } else if (!isInActiveSession) {
+      // If not in active session, clear any errors
+      setError(null)
     }
   }, [agentId, isInActiveSession, sessionCheckLoading])
+
+  // Clear error when missions are successfully loaded
+  useEffect(() => {
+    if (missions.length > 0 || (!loading && !sessionCheckLoading)) {
+      setError(null)
+    }
+  }, [missions, loading, sessionCheckLoading])
 
   // Auto-hide revealed items after 3 seconds
   useEffect(() => {
@@ -611,33 +624,19 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
 
   useEffect(() => {
     // Only auto-check missions if user is in active session
+    // NOTE: This only FETCHES missions, it does NOT reassign them
+    // Only admin panel can reassign missions
     if (!isInActiveSession) {
       return
     }
     
     const checkMissions = async () => {
-      console.log('[AUTO-CHECK] Starting mission check at', new Date().toISOString())
-      console.log('[AUTO-CHECK] Current missions state:', missions.length, 'missions')
-      console.log('[AUTO-CHECK] Current missionIdsRef:', Array.from(missionIdsRef.current))
-      console.log('[AUTO-CHECK] Current completedStatusRef size:', completedStatusRef.current.size)
-      
       try {
-        // Check if missions should be reassigned (1 minute for testing)
-        // console.log('[AUTO-CHECK] Checking shouldReassignMissions...')
-        const shouldReassign = await neonApi.shouldReassignMissions()
-        // console.log('[AUTO-CHECK] shouldReassignMissions result:', shouldReassign)
-        
-        if (shouldReassign) {
-          // console.log('[AUTO-CHECK] Triggering mission reassignment...')
-          // Trigger reassignment for all users
-          const reassignResult = await neonApi.resetAndAssignAllMissions()
-          // console.log('[AUTO-CHECK] Reassignment complete:', reassignResult)
-        }
-        
-        // Always check if this user's missions have been updated
-        // console.log('[AUTO-CHECK] Fetching missions for agent:', agentId)
+        // Just fetch missions - don't trigger reassignment
         const newMissions = await neonApi.getAllMissionsForAgent(agentId)
-        // console.log('[AUTO-CHECK] Fetched missions:', newMissions.length, 'missions')
+        
+        // Clear error if missions fetch succeeds (getAllMissionsForAgent never throws, so success)
+        setError(null)
         
         // Compare mission IDs and completion status to detect changes
         // Use both refs and current state to handle race conditions during refreshes
@@ -695,21 +694,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
           }
         }
         
-        console.log('[AUTO-CHECK] Current mission IDs (ref):', Array.from(currentMissionIdsFromRef))
-        console.log('[AUTO-CHECK] Current mission IDs (state):', Array.from(currentMissionIdsFromState))
-        console.log('[AUTO-CHECK] New mission IDs:', Array.from(newMissionIds))
-        console.log('[AUTO-CHECK] State/Ref mismatch?', stateRefMismatch)
-        console.log('[AUTO-CHECK] Mission IDs changed?', missionIdsChanged)
-        console.log('[AUTO-CHECK] Completion status changed?', completionStatusChanged)
-        console.log('[AUTO-CHECK] Should reassign?', shouldReassign)
-        console.log('[AUTO-CHECK] Current missions count (state):', missions.length)
-        console.log('[AUTO-CHECK] New missions count:', newMissions.length)
-        
-        // Always update if missions have changed (IDs, count, or completion status) or after reassignment
+        // Always update if missions have changed (IDs, count, or completion status)
         // This ensures old missions disappear when they're unassigned and completion status updates
-        if (missionIdsChanged || completionStatusChanged || shouldReassign) {
-          console.log('[AUTO-CHECK] Updating missions in UI...')
-          console.log('[AUTO-CHECK] New missions:', newMissions.map(m => ({ id: m.id, completed: m.completed })))
+        if (missionIdsChanged || completionStatusChanged) {
           setMissions([...newMissions]) // Use spread to ensure new array reference
           // Update refs with new mission IDs and completion status
           missionIdsRef.current = newMissionIds
@@ -722,45 +709,36 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
           const completedSet = new Set(newMissions.filter(m => m.completed).map(m => m.id))
           setCompletedMissions(completedSet)
           setSuccessKeys({})
-          console.log('[AUTO-CHECK] Missions updated in UI, completed set:', Array.from(completedSet))
-        } else {
-          console.log('[AUTO-CHECK] No changes detected, skipping UI update')
         }
-        
-        // const checkDuration = Date.now() - checkStartTime
-        // console.log('[AUTO-CHECK] Check completed in', checkDuration, 'ms')
       } catch (error) {
         // console.error('[AUTO-CHECK] Error checking missions:', error)
         // console.error('[AUTO-CHECK] Error stack:', error.stack)
         // Silently fail - don't show errors to user
+        // Only log if it's a real error (not just empty missions)
+        if (error && error.message && !error.message.includes('session')) {
+          console.error('[AUTO-CHECK] Error checking missions:', error)
+        }
       }
     }
     
-    // console.log('[AUTO-CHECK] Setting up auto-check interval (every 10 seconds)')
-    
     // Initial check after 1 second (give time for initial load)
     const initialTimer = setTimeout(() => {
-      // console.log('[AUTO-CHECK] Running initial check (after 1 second)')
       checkMissions()
     }, 1000)
     
-    // Then check every 10 seconds
+    // Then check every 10 seconds (just to refresh mission state, not reassign)
     const interval = setInterval(() => {
-      // console.log('[AUTO-CHECK] Running periodic check (every 10 seconds)')
       checkMissions()
     }, 10000)
     
     return () => {
-      // console.log('[AUTO-CHECK] Cleaning up interval')
       clearTimeout(initialTimer)
       clearInterval(interval)
     }
   }, [agentId, isInActiveSession]) // Depend on agentId and isInActiveSession
 
-  // Countdown timer for next mission reassignment
+  // Countdown timer for next mission reassignment (display only - no automatic reassignment)
   useEffect(() => {
-    let hasTriggeredCheck = false // Track if we've already triggered the check for this cycle
-    
     const updateCountdown = async () => {
       try {
         const lastAssigned = await neonApi.getLastAssignmentTimestamp()
@@ -793,43 +771,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
         const remainingMinutes = Math.max(0, reassignmentIntervalMinutes - elapsedMinutes)
         
         if (remainingMinutes <= 0) {
-          setNextReassignmentCountdown('Any moment...')
-          
-          // Trigger reassignment check after half a second if we haven't already
-          if (!hasTriggeredCheck) {
-            hasTriggeredCheck = true
-            setTimeout(async () => {
-                  try {
-                    const shouldReassign = await neonApi.shouldReassignMissions()
-                    if (shouldReassign) {
-                      await neonApi.resetAndAssignAllMissions()
-                      // Fetch updated missions for this agent (always update, even if empty)
-                      const newMissions = await neonApi.getAllMissionsForAgent(agentId)
-                      setMissions(newMissions || [])
-                      missionIdsRef.current = new Set((newMissions || []).map(m => m.id))
-                      const completedMap = new Map()
-                      (newMissions || []).forEach(m => {
-                        completedMap.set(m.id, m.completed || false)
-                      })
-                      completedStatusRef.current = completedMap
-                      // Update completed missions state based on new mission data
-                      const completedSet = new Set((newMissions || []).filter(m => m.completed).map(m => m.id))
-                      setCompletedMissions(completedSet)
-                      setSuccessKeys({})
-                    }
-                  } catch (error) {
-                    // Silently fail
-                  }
-              // Reset the flag after a delay to allow for next cycle
-              setTimeout(() => {
-                hasTriggeredCheck = false
-              }, 2000)
-            }, 500) // Half a second delay
-          }
+          setNextReassignmentCountdown('Admin can reassign')
         } else {
-          // Reset the trigger flag when countdown is not at zero
-          hasTriggeredCheck = false
-          
           const totalSeconds = Math.floor(remainingMinutes * 60)
           const minutes = Math.floor(totalSeconds / 60)
           const seconds = totalSeconds % 60
@@ -855,7 +798,6 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
     
     return () => {
       clearInterval(interval)
-      hasTriggeredCheck = false
     }
   }, [missions, agentId]) // Reset countdown when missions change (reassignment happened)
 
@@ -1243,43 +1185,39 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
   const fetchRandomMissions = async (doReset = false) => {
     try {
       setLoading(true)
-      // Optionally reset and reassign before fetching
-      if (doReset) {
-        await neonApi.resetAndAssignAllMissions()
-        // Clear all intel for this agent
-        await neonApi.clearAgentIntel(agentId)
-        // Reset intel tab state if users are loaded
-        if (users.length > 0) {
-          setUserAliases({})
-          setLockedAliases({})
-          setAliasTeams({})
-          setUsedAliases(new Set())
-        }
-      }
-      // Fetch all missions (both book and passphrase) assigned to this agent
+      setError(null) // Clear any previous errors
+      // NOTE: doReset parameter is ignored - only admin panel can reassign missions
+      // Just fetch missions - don't attempt reassignment
       let assignedMissions = await neonApi.getAllMissionsForAgent(agentId)
-      // If none assigned yet, attempt assignment then fetch again
-      if (!assignedMissions || assignedMissions.length === 0) {
-        await neonApi.resetAndAssignAllMissions()
-        assignedMissions = await neonApi.getAllMissionsForAgent(agentId)
-      }
-      setMissions(assignedMissions)
+      
+      // getAllMissionsForAgent always returns an array (never throws)
+      // Empty array is valid - means no missions assigned yet
+      setMissions(assignedMissions || [])
       // Update refs with mission IDs and completion status
-      missionIdsRef.current = new Set(assignedMissions.map(m => m.id))
+      missionIdsRef.current = new Set((assignedMissions || []).map(m => m.id))
       const completedMap = new Map()
-      assignedMissions.forEach(m => {
+      (assignedMissions || []).forEach(m => {
         completedMap.set(m.id, m.completed || false)
       })
       completedStatusRef.current = completedMap
       // Set completed missions state based on mission data
-      const completedSet = new Set(assignedMissions.filter(m => m.completed).map(m => m.id))
+      const completedSet = new Set((assignedMissions || []).filter(m => m.completed).map(m => m.id))
       setCompletedMissions(completedSet)
       setSuccessKeys({})
       // Clear any existing errors when refreshing
       setMissionErrors({})
     } catch (error) {
+      // This should rarely be hit now since getAllMissionsForAgent doesn't throw
+      // But if it does, log it with details
       console.error('Error fetching missions:', error)
-      setError('Failed to fetch missions')
+      console.error('Error details:', error.message, error.stack)
+      // Only set error if it's a real error (not just empty missions)
+      if (error && error.message) {
+        setError('Failed to fetch missions: ' + error.message)
+      } else {
+        // Unknown error - but don't show error if missions fetch succeeded
+        setError(null)
+      }
     } finally {
       setLoading(false)
     }
