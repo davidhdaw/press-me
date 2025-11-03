@@ -2705,7 +2705,7 @@ export const neonApi = {
         return null
       }
 
-      // Assign book missions (one red, one blue per mission)
+      // Load all available missions
       const bookMissions = await sql`
         SELECT id, previous_reds, previous_blues FROM book_missions 
         WHERE (assigned_red IS NULL OR assigned_red = ANY(${userIdsArray}::integer[]))
@@ -2713,53 +2713,107 @@ export const neonApi = {
         ORDER BY id
       `
       
-      for (const m of bookMissions) {
-        if (redUsers.length === 0 || blueUsers.length === 0) break
-        
-        const prevReds = Array.isArray(m.previous_reds) ? m.previous_reds : []
-        const prevBlues = Array.isArray(m.previous_blues) ? m.previous_blues : []
-        
-        const eligibleReds = redUsers.filter(id => 
-          !prevReds.includes(id) && (missionCounts.get(id) || 0) < 3
-        )
-        const eligibleBlues = blueUsers.filter(id => 
-          !prevBlues.includes(id) && (missionCounts.get(id) || 0) < 3
-        )
-        
-        if (eligibleReds.length > 0 && eligibleBlues.length > 0) {
-          const redId = pick(eligibleReds)
-          const blueId = pick(eligibleBlues)
-          
-          await sql`
-            UPDATE book_missions
-            SET assigned_red = ${redId},
-                assigned_blue = ${blueId},
-                previous_reds = array_append(COALESCE(previous_reds, ARRAY[]::integer[]), ${redId}),
-                previous_blues = array_append(COALESCE(previous_blues, ARRAY[]::integer[]), ${blueId})
-            WHERE id = ${m.id}
-          `
-          
-          missionCounts.set(redId, (missionCounts.get(redId) || 0) + 1)
-          missionCounts.set(blueId, (missionCounts.get(blueId) || 0) + 1)
-          missionTypesByUser.set(redId, [...(missionTypesByUser.get(redId) || []), 'book'])
-          missionTypesByUser.set(blueId, [...(missionTypesByUser.get(blueId) || []), 'book'])
-        }
-      }
-
-      // Assign passphrase and object missions to reach 3 missions per user
-      // First passphrase missions - include previous arrays to check if user has had this mission before
       const passphraseMissions = await sql`
         SELECT id, previous_receivers, previous_senders FROM passphrase_missions
         WHERE assigned_receiver IS NULL
         ORDER BY id
       `
       
+      const objectMissions = await sql`
+        SELECT id, past_assigned_agents FROM object_missions
+        WHERE assigned_agent IS NULL
+        ORDER BY id
+      `
+
+      // Assign missions to each user one at a time, ensuring mix of types
       for (const userId of allSelectedUsers) {
+        const userTeam = users.find(u => u.id === userId)?.team
+        if (!userTeam) continue
+        
         while ((missionCounts.get(userId) || 0) < 3) {
           const neededType = getNeededMissionType(userId)
           if (!neededType) break
           
-          if (neededType === 'passphrase') {
+          if (neededType === 'book') {
+            // Find an available book mission for this user's team
+            const eligibleBookMissions = bookMissions.filter(m => {
+              const prevReds = Array.isArray(m.previous_reds) ? m.previous_reds : []
+              const prevBlues = Array.isArray(m.previous_blues) ? m.previous_blues : []
+              
+              // Check if user can be assigned to this mission
+              if (userTeam === 'red') {
+                return !prevReds.includes(userId) && !m.assigned_red
+              } else {
+                return !prevBlues.includes(userId) && !m.assigned_blue
+              }
+            })
+            
+            if (eligibleBookMissions.length > 0) {
+              const mission = pick(eligibleBookMissions)
+              
+              // For book missions, we need both a red and blue user
+              // If this user's team slot is available, find the opposite team user
+              if (userTeam === 'red' && !mission.assigned_red) {
+                // Need a blue user
+                const availableBlue = blueUsers.find(id => 
+                  !mission.previous_blues?.includes(id) && 
+                  (missionCounts.get(id) || 0) < 3 &&
+                  !mission.assigned_blue
+                )
+                
+                if (availableBlue) {
+                  await sql`
+                    UPDATE book_missions
+                    SET assigned_red = ${userId},
+                        assigned_blue = ${availableBlue},
+                        previous_reds = array_append(COALESCE(previous_reds, ARRAY[]::integer[]), ${userId}),
+                        previous_blues = array_append(COALESCE(previous_blues, ARRAY[]::integer[]), ${availableBlue})
+                    WHERE id = ${mission.id}
+                  `
+                  missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
+                  missionCounts.set(availableBlue, (missionCounts.get(availableBlue) || 0) + 1)
+                  missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'book'])
+                  missionTypesByUser.set(availableBlue, [...(missionTypesByUser.get(availableBlue) || []), 'book'])
+                  // Mark mission as assigned in our local array
+                  mission.assigned_red = userId
+                  mission.assigned_blue = availableBlue
+                } else {
+                  break // No available blue user
+                }
+              } else if (userTeam === 'blue' && !mission.assigned_blue) {
+                // Need a red user
+                const availableRed = redUsers.find(id => 
+                  !mission.previous_reds?.includes(id) && 
+                  (missionCounts.get(id) || 0) < 3 &&
+                  !mission.assigned_red
+                )
+                
+                if (availableRed) {
+                  await sql`
+                    UPDATE book_missions
+                    SET assigned_red = ${availableRed},
+                        assigned_blue = ${userId},
+                        previous_reds = array_append(COALESCE(previous_reds, ARRAY[]::integer[]), ${availableRed}),
+                        previous_blues = array_append(COALESCE(previous_blues, ARRAY[]::integer[]), ${userId})
+                    WHERE id = ${mission.id}
+                  `
+                  missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
+                  missionCounts.set(availableRed, (missionCounts.get(availableRed) || 0) + 1)
+                  missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'book'])
+                  missionTypesByUser.set(availableRed, [...(missionTypesByUser.get(availableRed) || []), 'book'])
+                  // Mark mission as assigned in our local array
+                  mission.assigned_red = availableRed
+                  mission.assigned_blue = userId
+                } else {
+                  break // No available red user
+                }
+              } else {
+                break // Mission already has this team assigned
+              }
+            } else {
+              break // No available book missions
+            }
+          } else if (neededType === 'passphrase') {
             // Check both previous_receivers and previous_senders to ensure user hasn't had this mission
             const eligibleMissions = passphraseMissions.filter(m => {
               const prevReceivers = Array.isArray(m.previous_receivers) ? m.previous_receivers : []
@@ -2778,17 +2832,12 @@ export const neonApi = {
               `
               missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
               missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'passphrase'])
+              // Mark mission as assigned in our local array
+              mission.assigned_receiver = userId
             } else {
               break
             }
           } else if (neededType === 'object') {
-            // Get only unassigned missions - previous assignments are checked via past_assigned_agents
-            const objectMissions = await sql`
-              SELECT id, past_assigned_agents FROM object_missions
-              WHERE assigned_agent IS NULL
-              ORDER BY id
-            `
-            
             const eligible = objectMissions.filter(m => {
               const prev = Array.isArray(m.past_assigned_agents) ? m.past_assigned_agents : []
               return !prev.includes(userId) && !m.assigned_agent
@@ -2805,6 +2854,8 @@ export const neonApi = {
               `
               missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
               missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'object'])
+              // Mark mission as assigned in our local array
+              mission.assigned_agent = userId
             } else {
               break
             }
@@ -2814,23 +2865,22 @@ export const neonApi = {
         }
       }
 
-      // If users still need missions, assign any available type
+      // If users still need missions (couldn't get preferred type), fill with any available type
       for (const userId of allSelectedUsers) {
+        const userTeam = users.find(u => u.id === userId)?.team
+        if (!userTeam) continue
+        
         while ((missionCounts.get(userId) || 0) < 3) {
-          // Try object missions first (simpler)
-          const objectMissions = await sql`
-            SELECT id, past_assigned_agents FROM object_missions
-            WHERE assigned_agent IS NULL
-            ORDER BY id
-          `
+          let assigned = false
           
-          const eligible = objectMissions.filter(m => {
+          // Try object missions
+          const availableObjectMissions = objectMissions.filter(m => {
             const prev = Array.isArray(m.past_assigned_agents) ? m.past_assigned_agents : []
-            return !prev.includes(userId)
+            return !prev.includes(userId) && !m.assigned_agent
           })
           
-          if (eligible.length > 0) {
-            const mission = pick(eligible)
+          if (availableObjectMissions.length > 0) {
+            const mission = pick(availableObjectMissions)
             await sql`
               UPDATE object_missions
               SET assigned_agent = ${userId},
@@ -2840,8 +2890,99 @@ export const neonApi = {
             `
             missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
             missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'object'])
+            mission.assigned_agent = userId
+            assigned = true
           } else {
-            break
+            // Try passphrase missions
+            const availablePassphraseMissions = passphraseMissions.filter(m => {
+              const prevReceivers = Array.isArray(m.previous_receivers) ? m.previous_receivers : []
+              const prevSenders = Array.isArray(m.previous_senders) ? m.previous_senders : []
+              return !prevReceivers.includes(userId) && !prevSenders.includes(userId) && !m.assigned_receiver
+            })
+            
+            if (availablePassphraseMissions.length > 0) {
+              const mission = pick(availablePassphraseMissions)
+              await sql`
+                UPDATE passphrase_missions
+                SET assigned_receiver = ${userId},
+                    previous_receivers = array_append(COALESCE(previous_receivers, ARRAY[]::integer[]), ${userId})
+                WHERE id = ${mission.id}
+              `
+              missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
+              missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'passphrase'])
+              mission.assigned_receiver = userId
+              assigned = true
+            } else {
+              // Try book missions
+              const availableBookMissions = bookMissions.filter(m => {
+                const prevReds = Array.isArray(m.previous_reds) ? m.previous_reds : []
+                const prevBlues = Array.isArray(m.previous_blues) ? m.previous_blues : []
+                
+                if (userTeam === 'red') {
+                  return !prevReds.includes(userId) && !m.assigned_red
+                } else {
+                  return !prevBlues.includes(userId) && !m.assigned_blue
+                }
+              })
+              
+              if (availableBookMissions.length > 0) {
+                const mission = pick(availableBookMissions)
+                
+                if (userTeam === 'red' && !mission.assigned_red) {
+                  const availableBlue = blueUsers.find(id => 
+                    !mission.previous_blues?.includes(id) && 
+                    (missionCounts.get(id) || 0) < 3 &&
+                    !mission.assigned_blue
+                  )
+                  
+                  if (availableBlue) {
+                    await sql`
+                      UPDATE book_missions
+                      SET assigned_red = ${userId},
+                          assigned_blue = ${availableBlue},
+                          previous_reds = array_append(COALESCE(previous_reds, ARRAY[]::integer[]), ${userId}),
+                          previous_blues = array_append(COALESCE(previous_blues, ARRAY[]::integer[]), ${availableBlue})
+                      WHERE id = ${mission.id}
+                    `
+                    missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
+                    missionCounts.set(availableBlue, (missionCounts.get(availableBlue) || 0) + 1)
+                    missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'book'])
+                    missionTypesByUser.set(availableBlue, [...(missionTypesByUser.get(availableBlue) || []), 'book'])
+                    mission.assigned_red = userId
+                    mission.assigned_blue = availableBlue
+                    assigned = true
+                  }
+                } else if (userTeam === 'blue' && !mission.assigned_blue) {
+                  const availableRed = redUsers.find(id => 
+                    !mission.previous_reds?.includes(id) && 
+                    (missionCounts.get(id) || 0) < 3 &&
+                    !mission.assigned_red
+                  )
+                  
+                  if (availableRed) {
+                    await sql`
+                      UPDATE book_missions
+                      SET assigned_red = ${availableRed},
+                          assigned_blue = ${userId},
+                          previous_reds = array_append(COALESCE(previous_reds, ARRAY[]::integer[]), ${availableRed}),
+                          previous_blues = array_append(COALESCE(previous_blues, ARRAY[]::integer[]), ${userId})
+                      WHERE id = ${mission.id}
+                    `
+                    missionCounts.set(userId, (missionCounts.get(userId) || 0) + 1)
+                    missionCounts.set(availableRed, (missionCounts.get(availableRed) || 0) + 1)
+                    missionTypesByUser.set(userId, [...(missionTypesByUser.get(userId) || []), 'book'])
+                    missionTypesByUser.set(availableRed, [...(missionTypesByUser.get(availableRed) || []), 'book'])
+                    mission.assigned_red = availableRed
+                    mission.assigned_blue = userId
+                    assigned = true
+                  }
+                }
+              }
+            }
+          }
+          
+          if (!assigned) {
+            break // No more missions available
           }
         }
       }
