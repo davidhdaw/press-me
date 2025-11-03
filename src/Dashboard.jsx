@@ -1289,20 +1289,8 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
     onLogout()
   }
 
-  const handleRevealRed = () => {
-    // Reveal both names when either bar is clicked
-    if (!redRevealed || !blueRevealed) {
-      setRedRevealed(true)
-      setBlueRevealed(true)
-      // Start countdown if it hasn't started yet
-      if (countdown === null) {
-        setCountdown(5)
-      }
-    }
-  }
-
-  const handleRevealBlue = () => {
-    // Reveal both names when either bar is clicked
+  const handleRevealAll = () => {
+    // Reveal both names when reveal button is clicked
     if (!redRevealed || !blueRevealed) {
       setRedRevealed(true)
       setBlueRevealed(true)
@@ -2312,59 +2300,55 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
           <div className="initial-intel-modal-overlay">
             <div className="initial-intel-modal">
               <div className="initial-intel-modal-header">
-                <h2>🔒 CLASSIFIED INTEL 🔒</h2>
+                <h2>For your eyes only</h2>
               </div>
               <div className="initial-intel-modal-content">
-                <div style={{ marginBottom: '20px', padding: 'var(--unit-sm)', backgroundColor: '#fff3cd', border: '2px dashed var(--black)', borderRadius: '4px' }}>
-                  <p style={{ fontWeight: 'bold', marginBottom: '8px', color: '#d32f2f' }}>
-                    ⚠️ WARNING
+                  <p>
+                    Reveal your starting intel away from prying eyes. This message will self-destruct in 5 seconds once revealed.
                   </p>
-                  <p style={{ margin: 0, fontSize: '0.9em' }}>
-                    Clicking a black bar will reveal both names. You will only have <strong>5 seconds</strong> to view them before this message self-destructs.
-                  </p>
-                </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '20px' }}>
                   <div>
-                    <p style={{ marginBottom: '8px', fontSize: '0.9em', color: '#666' }}>Red Team Member:</p>
+                    <h4>Red Team Agent:</h4>
                     {redRevealed ? (
                       <div className="initial-intel-revealed red-team">
                         {initialIntelRed}
                       </div>
                     ) : (
-                      <div 
-                        className="initial-intel-censor-bar"
-                        onClick={handleRevealRed}
-                        style={{ cursor: 'pointer' }}
-                      >
+                      <div className="initial-intel-censor-bar">
                         ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
                       </div>
                     )}
                   </div>
                   
                   <div>
-                    <p style={{ marginBottom: '8px', fontSize: '0.9em', color: '#666' }}>Blue Team Member:</p>
+                    <h4>Blue Team Agent:</h4>
                     {blueRevealed ? (
                       <div className="initial-intel-revealed blue-team">
                         {initialIntelBlue}
                       </div>
                     ) : (
-                      <div 
-                        className="initial-intel-censor-bar"
-                        onClick={handleRevealBlue}
-                        style={{ cursor: 'pointer' }}
-                      >
+                      <div className="initial-intel-censor-bar">
                         ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
                       </div>
                     )}
                   </div>
                 </div>
                 
+                {!redRevealed && !blueRevealed && (
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <button 
+                      onClick={handleRevealAll}
+                      className="initial-intel-reveal-button"
+                    >
+                      Reveal Intel
+                    </button>
+                  </div>
+                )}
+                
                 {(redRevealed || blueRevealed) && countdown !== null && (
                   <div className="initial-intel-countdown">
-                    <p style={{ fontWeight: 'bold', color: '#d32f2f', marginBottom: '8px' }}>
-                      ⚠️ This message will self-destruct in {countdown} seconds...
-                    </p>
+                      This message will self-destruct in {countdown} seconds...
                   </div>
                 )}
               </div>
