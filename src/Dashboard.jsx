@@ -1862,11 +1862,6 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                         .map((user) => (
                         <tr key={`${user.id}-name`} data-user-id={user.id}>
                           <td 
-                            className={`${
-                              userSelections[user.id] === 'red' ? 'team-red' : 
-                              userSelections[user.id] === 'blue' ? 'team-blue' : 
-                              ''
-                            }`}
                             data-user-id={user.id}
                           >
                             {user.firstname} {user.lastname}
@@ -1950,7 +1945,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                                     />
                                   )}
                                 </div>
-                                <span className="team-label">Red</span>
+                                <span className={`team-label ${userSelections[user.id] === 'red' ? 'team-red' : ''}`}>Red</span>
                               </label>
                               <label 
                                 className={`radio-label ${incorrectTeams[user.id] && userSelections[user.id] === 'blue' ? 'incorrect-guess' : ''}`}
@@ -1977,7 +1972,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                                     />
                                   )}
                                 </div>
-                                <span className="team-label">Blue</span>
+                                <span className={`team-label ${userSelections[user.id] === 'blue' ? 'team-blue' : ''}`}>Blue</span>
                               </label>
                               <label className="radio-label">
                                 <input
@@ -2001,7 +1996,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                                     />
                                   )}
                                 </div>
-                                <span className="team-label">Unknown</span>
+                                <span className={`team-label ${userSelections[user.id] === 'unknown' ? 'team-unknown' : ''}`}>Unknown</span>
                               </label>
                             </div>
                           </td>
