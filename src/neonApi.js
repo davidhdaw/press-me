@@ -3160,8 +3160,8 @@ export const neonApi = {
               totalScoreChange += 1
               scoreDetails.push({ userId, type: 'alias', position: 0, correct: true, points: 1 })
             } else {
-              totalScoreChange -= 1
-              scoreDetails.push({ userId, type: 'alias', position: 0, correct: false, points: -1 })
+              // No penalty for incorrect alias guesses - just track for UI feedback
+              scoreDetails.push({ userId, type: 'alias', position: 0, correct: false, points: 0 })
             }
           }
 
@@ -3173,8 +3173,8 @@ export const neonApi = {
               totalScoreChange += 1
               scoreDetails.push({ userId, type: 'alias', position: 1, correct: true, points: 1 })
             } else {
-              totalScoreChange -= 1
-              scoreDetails.push({ userId, type: 'alias', position: 1, correct: false, points: -1 })
+              // No penalty for incorrect alias guesses - just track for UI feedback
+              scoreDetails.push({ userId, type: 'alias', position: 1, correct: false, points: 0 })
             }
           }
         }
