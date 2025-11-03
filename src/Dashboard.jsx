@@ -360,6 +360,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
               console.log('[INTEL-SUBMIT] Session changed or reset, clearing submission localStorage')
               localStorage.removeItem(intelSessionKey)
               localStorage.removeItem(intelTimestampKey)
+              // Clear intel assignments localStorage
+              localStorage.removeItem(`intel_aliases_${currentSessionId}_${agentId}`)
+              localStorage.removeItem(`intel_selections_${currentSessionId}_${agentId}`)
               setHasSubmittedIntel(false)
               setIntelScore(null)
             }
@@ -596,6 +599,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
               localStorage.removeItem(sessionStatusKey)
               localStorage.removeItem(intelSessionKey)
               localStorage.removeItem(intelTimestampKey)
+              // Clear intel assignments localStorage
+              localStorage.removeItem(`intel_aliases_${activeSession.id}_${agentId}`)
+              localStorage.removeItem(`intel_selections_${activeSession.id}_${agentId}`)
               setHasSeenInitialIntel(false)
               setHasSubmittedIntel(false)
               setIntelScore(null)
@@ -604,6 +610,9 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
               console.log('[SESSION-CHECK] Detected session reset via intel timestamp, clearing intel submission localStorage')
               localStorage.removeItem(intelSessionKey)
               localStorage.removeItem(intelTimestampKey)
+              // Clear intel assignments localStorage
+              localStorage.removeItem(`intel_aliases_${activeSession.id}_${agentId}`)
+              localStorage.removeItem(`intel_selections_${activeSession.id}_${agentId}`)
               setHasSubmittedIntel(false)
               setIntelScore(null)
             }
@@ -854,6 +863,46 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
         }
       })
       
+      // Load saved assignments from localStorage
+      const aliasesStorageKey = `intel_aliases_${activeSession.id}_${agentId}`
+      const selectionsStorageKey = `intel_selections_${activeSession.id}_${agentId}`
+      
+      try {
+        const savedAliases = localStorage.getItem(aliasesStorageKey)
+        const savedSelections = localStorage.getItem(selectionsStorageKey)
+        
+        if (savedAliases) {
+          const parsedAliases = JSON.parse(savedAliases)
+          // Merge saved aliases with known aliases (known aliases take precedence for locked positions)
+          Object.keys(parsedAliases).forEach(userId => {
+            const userIdNum = Number(userId)
+            if (sessionUserIds.has(userIdNum)) {
+              const savedAliasPair = parsedAliases[userId] || [null, null]
+              const isLocked = lockedPositions[userIdNum] || [false, false]
+              
+              // Merge: use known alias if locked, otherwise use saved
+              knownAliases[userIdNum] = [
+                isLocked[0] ? knownAliases[userIdNum][0] : (savedAliasPair[0] || null),
+                isLocked[1] ? knownAliases[userIdNum][1] : (savedAliasPair[1] || null)
+              ]
+            }
+          })
+        }
+        
+        if (savedSelections) {
+          const parsedSelections = JSON.parse(savedSelections)
+          // Merge saved selections
+          Object.keys(parsedSelections).forEach(userId => {
+            const userIdNum = Number(userId)
+            if (sessionUserIds.has(userIdNum)) {
+              selections[userIdNum] = parsedSelections[userId] || 'unknown'
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Error loading saved intel assignments from localStorage:', error)
+      }
+      
       setUserSelections(selections)
       setUserAliases(knownAliases)
       setLockedAliases(lockedPositions)
@@ -861,7 +910,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
       
       // Randomize aliases, excluding known ones (only from session users)
       const allAliases = sessionUsers.flatMap(user => [user.alias_1, user.alias_2])
-      const knownAliasSet = new Set(Object.values(knownAliases).flat().filter(a => a !== null))
+      const knownAliasSet = new Set(Object.values(knownAliases).flat().filter(a => a !== null && a !== undefined))
       const unknownAliases = allAliases.filter(alias => !knownAliasSet.has(alias))
       const shuffled = [...unknownAliases].sort(() => Math.random() - 0.5)
       setRandomizedAliases(shuffled)
@@ -876,10 +925,32 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
   }
 
   const handleTeamSelection = (userId, team) => {
-    setUserSelections(prev => ({
-      ...prev,
-      [userId]: team
-    }))
+    setUserSelections(prev => {
+      const updated = {
+        ...prev,
+        [userId]: team
+      }
+      
+      return updated
+    })
+    
+    // Save to localStorage async
+    const saveToStorage = async () => {
+      try {
+        const activeSession = await neonApi.getActiveSession()
+        if (activeSession) {
+          const storageKey = `intel_selections_${activeSession.id}_${agentId}`
+          setUserSelections(prev => {
+            localStorage.setItem(storageKey, JSON.stringify(prev))
+            return prev
+          })
+        }
+      } catch (error) {
+        console.error('Error saving team selection to localStorage:', error)
+      }
+    }
+    saveToStorage()
+    
     // Clear incorrect status for this user's team when they change their guess
     setIncorrectTeams(prev => {
       const updated = { ...prev }
@@ -942,10 +1013,26 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
       const current = prev[userId] || []
       const updated = [...current]
       updated[targetIndex] = alias
-      return {
+      const result = {
         ...prev,
         [userId]: updated
       }
+      
+      // Save to localStorage
+      const saveToStorage = async () => {
+        try {
+          const activeSession = await neonApi.getActiveSession()
+          if (activeSession) {
+            const storageKey = `intel_aliases_${activeSession.id}_${agentId}`
+            localStorage.setItem(storageKey, JSON.stringify(result))
+          }
+        } catch (error) {
+          console.error('Error saving alias assignment to localStorage:', error)
+        }
+      }
+      saveToStorage()
+      
+      return result
     })
     
     // Mark the new alias as used
@@ -979,10 +1066,26 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
         const current = prev[userId] || []
         const updated = [...current]
         updated[targetIndex] = undefined
-        return {
+        const result = {
           ...prev,
           [userId]: updated
         }
+        
+        // Save to localStorage
+        const saveToStorage = async () => {
+          try {
+            const activeSession = await neonApi.getActiveSession()
+            if (activeSession) {
+              const storageKey = `intel_aliases_${activeSession.id}_${agentId}`
+              localStorage.setItem(storageKey, JSON.stringify(result))
+            }
+          } catch (error) {
+            console.error('Error saving alias removal to localStorage:', error)
+          }
+        }
+        saveToStorage()
+        
+        return result
       })
       
       // Return to alias-section by removing from usedAliases
