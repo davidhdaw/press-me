@@ -1661,7 +1661,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
               <p>You are {firstName} {lastName}, <span className="relationship">{relationship}</span>. You are here tonight because <span className="alibi">{alibi}</span>.</p>
               <div className="backstory-buttons">
                 <button onClick={getRandomBackstory} className="reroll-button">
-                  Reroll
+                  Shuffle
                 </button>
                 <button onClick={openModal} className="write-your-own-button">
                   Write your own
@@ -1697,10 +1697,7 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
               </div>
             ) : (
               <>
-                <div className="reassignment-countdown-header">
-                  <span className="countdown-label">NEW MISSIONS IN:</span>
-                  <span className="countdown-time">{nextReassignmentCountdown}</span>
-                </div>
+
                 <div className="missions-grid">
               {missions
                 .filter(mission => !completedMissions.has(mission.id))
@@ -1727,24 +1724,14 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
                         const displayLines = lines.slice(0, 3)
                         return (
                           <div>
-                            <p style={{ whiteSpace: 'pre-line', marginBottom: '0.5rem' }}>{displayLines[0] || ''}</p>
+                            <p className="mission-body-line">{displayLines[0] || ''}</p>
                             {displayLines[1] && (
-                              <p 
-                                style={{ 
-                                  border: '2px solid var(--black)', 
-                                  borderRadius: '8px',
-                                  padding: '0.25rem', 
-                                  display: 'inline-block',
-                                  transform: 'rotate(0.5deg)',
-                                  margin: '0.5rem 0',
-                                  fontStyle: 'italic'
-                                }}
-                              >
+                              <p className="mission-body-outline">
                                 {displayLines[1]}
                               </p>
                             )}
                             {displayLines[2] && (
-                              <p style={{ whiteSpace: 'pre-line', marginTop: '0.5rem' }}>{displayLines[2]}</p>
+                              <p className="mission-body-line">{displayLines[2]}</p>
                             )}
                           </div>
                         )
@@ -1781,7 +1768,11 @@ function Dashboard({ agentName, agentId, firstName, lastName, alias1, alias2, te
             )}
               </>
             )}
-          </div>
+                <div className="reassignment-countdown-header">
+                  <span className="countdown-label">NEW MISSIONS IN:</span>
+                  <span className="countdown-time">{nextReassignmentCountdown}</span>
+                </div>
+              </div>
         )}
 
         {activeTab === 'intel' && (
