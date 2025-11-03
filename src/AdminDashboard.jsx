@@ -679,7 +679,7 @@ function AdminDashboard({ currentUser, onLogout }) {
                                       
                                       return (
                                         <div 
-                                          key={mission.id || idx} 
+                                          key={`${user.id}-${mission.id}-${idx}-book`} 
                                           style={{ 
                                             fontSize: '0.9em',
                                             padding: '8px',
@@ -753,7 +753,7 @@ function AdminDashboard({ currentUser, onLogout }) {
                                       
                                       return (
                                         <div 
-                                          key={mission.id || idx} 
+                                          key={`${user.id}-${mission.id}-${idx}-passphrase`} 
                                           style={{ 
                                             fontSize: '0.9em',
                                             padding: '8px',
@@ -812,7 +812,7 @@ function AdminDashboard({ currentUser, onLogout }) {
                                     
                                     return (
                                       <div 
-                                        key={mission.id || idx} 
+                                        key={`${user.id}-${mission.id}-${idx}-${missionType}`} 
                                         style={{ 
                                           fontSize: '0.9em',
                                           padding: '6px',
