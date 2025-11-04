@@ -104,20 +104,10 @@ function Login({ onLogin }) {
       <div>
         <div>
           <h1>
-            SECURITY LOCKOUT
+            Intrduder detected!
           </h1>
           <div>
-            MULTIPLE UNAUTHORIZED ACCESS ATTEMPTS DETECTED<br />
-            <br />
-            SECURITY PROTOCOLS ACTIVATED<br />
-            <br />
-            <span>
-              FIND HANDLER "DAVID DAW" BEFORE CLEANUP SQUAD ARRIVES
-            </span>
-          </div>
-          <div>
-            ALL FURTHER ATTEMPTS WILL BE LOGGED AND TRACED<br />
-            SYSTEM ACCESS TEMPORARILY SUSPENDED
+              Maybe you've been in deep cover too long. Maybe you're an imposter. Either way, find a host to get the situation sorted.
           </div>
         </div>
       </div>
@@ -133,7 +123,6 @@ function Login({ onLogin }) {
           <p>A Daw Industries game product</p>
         </div>
         <form onSubmit={handlePassphraseSubmit} className="login-form">
-          <h2 className="welcome-agent">WELCOME AGENT</h2>
           <div className="form-group">
             <label htmlFor="password">Prove it's really you.</label>
             <input

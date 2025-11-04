@@ -16,6 +16,8 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
+  justify-content: space-between;
+  align-items: center;
 }
 
 /* LOGIN */
@@ -27,6 +29,8 @@
   background-color: var(--red);
   padding: var(--unit-base);
   box-sizing: border-box;
+  width: 100%;
+  height: inherit;
 }
 
 .login-container .logo h1{
@@ -40,16 +44,6 @@
   text-align: left;
   position: relative;
   padding: var(--unit-base);
-}
-
-.login-container .welcome-agent {
-  font-size: 2.5rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: var(--white);
-  margin-bottom: var(--unit-base);
-  text-align: center;
 }
 
 .login-container .form-group label {
@@ -83,10 +77,6 @@
 
 /* MISSION */
 
-.mission-container{
-  justify-content: flex-start;
-}
-
 .mission-container .team-red{
   color: var(--red);
 }
@@ -106,6 +96,7 @@
 .mission-container .agent-header{
   padding: var(--unit-base);
   height: 35vh;
+  width: 100%;
 }
 
 .mission-container.bg-red .agent-header{
@@ -142,7 +133,7 @@
   text-align: center;
   display: inline-block;
   position: absolute;
-  top: 50%;
+  top: calc(35vh + 90px);
   left: 50%;
   transform: translate(-50%, -120%) skewY(-10deg);
 }
@@ -156,6 +147,13 @@
 
 .mission-container .agent-intro *{
   margin:0;
+}
+
+.mission-content{
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  bottom: var(--unit-base);
 }
 
 .mission-objectives{
@@ -181,23 +179,32 @@
 }
 
 .mission-objectives ul :last-child {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .mission-objectives ul li {
   line-height: 1.25;
 }
 
-.mission-container .mission-button{
-  position: fixed;
-  bottom: 0;
-  background-color: var(--yellow);
+.mission-content .mission-button{
+  background-image: url('/svgs/Button-yellow.svg');
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  border: none;
   color: var(--black);
-  transform: rotate(-5deg);
   font-weight: 700;
   text-transform: uppercase;
   font-size: 1.3em;
   line-height: 1.1;
+  padding: 15px 40px;
+  cursor: pointer;
+  min-width: 300px;
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* LOADING */
@@ -235,6 +242,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  width: 100%;
 }
 
 .mission-footer {
@@ -244,11 +252,7 @@
   flex-wrap: wrap;
   gap: 1rem;
 }
-    
-  .missions-grid {
-    grid-template-columns: 1fr;
-  }
-  
+      
   .mission-footer {
     flex-direction: column;
     align-items: stretch;
@@ -383,23 +387,22 @@
 }
 
 .reassignment-countdown-header {
-  padding: var(--unit-base);
-  text-align: center;
-  background-color: var(--black);
+  background-color: var(--red);
   color: var(--yellow);
+  padding: var(--unit-sm);
+  text-align: center;
   font-weight: 700;
-  font-size: 1.2rem;
-  border-bottom: 2px solid var(--yellow);
+  font-size: 1rem;
+  bottom:0;
+  position: fixed;
+  width: calc(100% - 8px);
+  box-sizing: border-box;
 }
 
 .reassignment-countdown-header .countdown-label {
-  margin-right: 0.5rem;
+  margin-right: var(--unit-sm);
 }
 
-.reassignment-countdown-header .countdown-time {
-  font-weight: 900;
-  letter-spacing: 1px;
-}
 
 .no-session-message {
   text-align: center;
@@ -412,11 +415,9 @@
 }
 
 .no-session-message h2 {
-  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
   font-size: 2rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 3px;
   color: var(--black);
   margin: 0 0 var(--unit-base) 0;
 }
@@ -434,7 +435,7 @@
   flex-direction: column;
   gap: 1.5rem;
   padding: var(--unit-base);
-  margin-bottom: var(--unit-base);
+  margin-bottom: var(--unit-lg);
 }
 
 .mission-card {
@@ -512,6 +513,24 @@
   text-transform: uppercase;
   font-weight: 500;
   flex: 1;
+}
+
+.mission-card p.mission-body-line{
+  font-family: 'Jost', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  text-transform: none;
+  font-size: 1em;
+  line-height: 1.2;
+  margin: 0 0 var(--unit-sm) 0;
+}
+
+.mission-body-outline{
+  border: 2px solid var(--black);
+  border-radius: 8px;
+  padding: 0.25rem;
+  display: inline-block;
+  transform: rotate(0.5deg);
+  margin: 0.5rem 0;
+  font-style: italic;
 }
 
 .mission-card p{
@@ -1208,6 +1227,18 @@
   word-wrap: break-word;
 }
 
+.team-label.team-red {
+  color: var(--red);
+}
+
+.team-label.team-blue {
+  color: var(--blue);
+}
+
+.team-label.team-unknown {
+  color: var(--brown);
+}
+
 .alias-section{
   position: fixed;
   bottom: 0;
@@ -1218,7 +1249,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--unit-xs);
-  justify-content: space-between;
   height: 20vh;
   overflow-y: auto;
 }
@@ -1237,6 +1267,8 @@
   touch-action: none;
   transform: rotate(var(--rotation, 0deg));
   transition: transform 0.2s ease;
+  height: 28px;
+
 }
 
 .alias-section div:active{
@@ -1658,19 +1690,11 @@ body:has(.admin-dashboard) {
 }
 
 .admin-button {
-  background-color: var(--black);
-  color: var(--yellow);
-  border: 2px solid var(--yellow);
-  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  font-weight: 600;
+  color: var(--black);
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 1px;
   transition: all 0.2s ease;
-}
-
-.admin-button:hover {
-  background-color: var(--yellow);
-  color: var(--black);
 }
 
 /* Admin Modal Styles */
@@ -1907,7 +1931,7 @@ body:has(.admin-dashboard) {
 
 .initial-intel-modal {
   background-color: var(--white);
-  border: 6px solid var(--black);
+  border: 4px solid var(--black);
   box-shadow: 12px 12px 0px 0 var(--black);
   max-width: 500px;
   width: 90%;
@@ -1918,7 +1942,6 @@ body:has(.admin-dashboard) {
 .initial-intel-modal-header {
   background-color: var(--yellow);
   padding: var(--unit-base);
-  border-bottom: 4px solid var(--black);
   text-align: center;
 }
 
@@ -1936,39 +1959,56 @@ body:has(.admin-dashboard) {
   text-align: center;
 }
 
+.initial-intel-modal-content h4 {
+  font-size: 1.1em;
+  font-weight: 500;
+  text-transform: uppercase;
+  margin: 0 0 var(--unit-sm) 0;
+}
+
 .initial-intel-censor-bar {
   background-color: var(--black);
   color: var(--black);
-  padding: var(--unit-base);
+  padding: var(--unit-sm);
   border-radius: 4px;
   font-family: monospace;
   font-size: 1.2em;
   letter-spacing: 2px;
   user-select: none;
-  transition: background-color 0.2s;
   text-align: center;
   border: 2px solid var(--black);
-  min-height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.initial-intel-censor-bar:hover {
-  background-color: #333;
+.initial-intel-reveal-button {
+  background-color: var(--yellow);
+  color: var(--black);
+  padding: var(--unit-sm) var(--unit-base);
+  font-size: 1.2em;
+  font-weight: 500;
+  text-transform: uppercase;
   cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 4px;
+}
+
+.initial-intel-reveal-button:hover {
+  background-color: var(--red);
+  color: var(--white);
+  transform: scale(1.05);
 }
 
 .initial-intel-revealed {
   background-color: var(--white);
-  padding: var(--unit-base);
+  padding: var(--unit-sm);
   border-radius: 4px;
   font-weight: bold;
   font-size: 1.2em;
   border: 3px solid var(--black);
   text-align: center;
   animation: reveal 0.3s ease-in;
-  min-height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1998,9 +2038,9 @@ body:has(.admin-dashboard) {
 .initial-intel-countdown {
   margin-top: var(--unit-base);
   padding: var(--unit-sm);
-  background-color: #fff3cd;
-  border: 2px dashed var(--black);
-  border-radius: 4px;
+  background-color: var(--black);
+  color: var(--yellow);
+  text-transform: uppercase;
 }
 
 .initial-intel-countdown p {
