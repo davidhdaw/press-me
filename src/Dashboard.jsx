@@ -117,7 +117,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   const [isInActiveSession, setIsInActiveSession] = useState(false)
   const [sessionCheckLoading, setSessionCheckLoading] = useState(true)
 
-  const [showBriefingModal, setShowBriefingModal] = useState(true)
+  const [showBriefingModal, setShowBriefingModal] = useState(() => !localStorage.getItem('briefingSeen'))
   const [isBriefingClosing, setIsBriefingClosing] = useState(false)
 
   const [pushMissions, setPushMissions] = useState([])
@@ -125,6 +125,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   const [showPushMissionModal, setShowPushMissionModal] = useState(false)
   const [isPushMissionClosing, setIsPushMissionClosing] = useState(false)
   const [pushMissionType, setPushMissionType] = useState('new')
+  const [showPushBountyPaidStamp, setShowPushBountyPaidStamp] = useState(false)
 
   // ── Session & mission data fetching ────────────────────────────────────────
 
@@ -305,9 +306,26 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
         setShowPushMissionModal(false)
         setIsPushMissionClosing(false)
         setPendingPushMission(null)
+        setShowPushBountyPaidStamp(false)
       }, 300)
     } catch (error) {
       console.error('Error acknowledging push mission:', error)
+    }
+  }
+
+  const handleMarkPushBountyPaid = async () => {
+    if (!pendingPushMission) return
+    try {
+      await neonApi.markPushBountyPaid(pendingPushMission.id)
+      setPushMissions(prev => prev.map(m =>
+        m.id === pendingPushMission.id ? { ...m, bounty_paid: true } : m
+      ))
+      setShowPushBountyPaidStamp(true)
+      setTimeout(() => {
+        handleAcknowledgePushMission()
+      }, 1100)
+    } catch (error) {
+      console.error('Error marking push bounty paid:', error)
     }
   }
 
@@ -340,6 +358,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
 
   const closeBriefingModal = () => {
     setIsBriefingClosing(true)
+    localStorage.setItem('briefingSeen', '1')
     setTimeout(() => {
       setShowBriefingModal(false)
       setIsBriefingClosing(false)
@@ -825,21 +844,52 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
           <div className="modal-content">
             <h2>{pendingPushMission.title}</h2>
             <p style={{ whiteSpace: 'pre-line' }}>{pendingPushMission.mission_body}</p>
-            {pendingPushMission.bounty > 0 && (
-              <div className="push-mission-bounty">
-                {pushMissionType === 'completed' ? `Bonus awarded: $${pendingPushMission.bounty}!` : `Bounty: $${pendingPushMission.bounty}`}
+            {pushMissionType === 'new' && pendingPushMission.bounty > 0 && (
+              <div className="push-mission-bounty">Bounty: ${pendingPushMission.bounty}</div>
+            )}
+            {pushMissionType === 'completed' && pendingPushMission.bounty > 0 && (
+              <div className="mission-phrase-payout-shell mission-payout-stamp-host" style={{ marginTop: 'var(--unit-base)' }}>
+                {showPushBountyPaidStamp && (
+                  <div className="bounty-paid-stamp-overlay" aria-hidden="true">
+                    <span className="bounty-paid-stamp-mark">PAID</span>
+                  </div>
+                )}
+                <div className="bounty-award">
+                  <p className="bounty-award-amount">Bonus awarded: ${pendingPushMission.bounty}!</p>
+                  <button
+                    type="button"
+                    className="bounty-paid-button"
+                    disabled={showPushBountyPaidStamp}
+                    onClick={handleMarkPushBountyPaid}
+                  >
+                    Mark as paid
+                  </button>
+                </div>
               </div>
             )}
           </div>
-          <div className="push-mission-footer">
-            <button
-              type="button"
-              onClick={handleAcknowledgePushMission}
-              className="push-mission-ack-button"
-            >
-              ACKNOWLEDGED
-            </button>
-          </div>
+          {pushMissionType === 'new' && (
+            <div className="push-mission-footer">
+              <button
+                type="button"
+                onClick={handleAcknowledgePushMission}
+                className="push-mission-ack-button"
+              >
+                ACKNOWLEDGED
+              </button>
+            </div>
+          )}
+          {pushMissionType === 'completed' && pendingPushMission.bounty === 0 && (
+            <div className="push-mission-footer">
+              <button
+                type="button"
+                onClick={handleAcknowledgePushMission}
+                className="push-mission-ack-button"
+              >
+                ACKNOWLEDGED
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

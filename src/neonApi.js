@@ -62,5 +62,6 @@ export const neonApi = {
   acknowledgePushMission: pushMissions.acknowledgePushMission,
   completePushMission: pushMissions.completePushMission,
   markCompletionSeen: pushMissions.markCompletionSeen,
+  markPushBountyPaid: pushMissions.markPushBountyPaid,
   getAllPushMissionsForSession: pushMissions.getAllPushMissionsForSession,
 };

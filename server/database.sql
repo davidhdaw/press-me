@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS push_missions (
     completed_at TIMESTAMP,
     completion_seen BOOLEAN DEFAULT false,
     completion_seen_at TIMESTAMP,
+    bounty_paid BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT NOW()
 );
 

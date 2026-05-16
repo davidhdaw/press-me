@@ -108,6 +108,22 @@ export async function markCompletionSeen(pushMissionId, userId) {
   }
 }
 
+export async function markPushBountyPaid(pushMissionId) {
+  try {
+    const result = await sql`
+      UPDATE push_missions
+      SET bounty_paid = true
+      WHERE id = ${pushMissionId} AND completed = true
+      RETURNING *
+    `;
+    if (result.length === 0) throw new Error('Push mission not found or not completed');
+    return { success: true };
+  } catch (error) {
+    console.error('Error marking push bounty paid:', error);
+    throw error;
+  }
+}
+
 export async function getAllPushMissionsForSession(sessionId) {
   try {
     return await sql`

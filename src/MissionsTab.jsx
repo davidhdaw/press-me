@@ -60,7 +60,15 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
                   <div className="mission-card-completed-row">
                     <h3>{pm.title}</h3>
                     {pm.bounty > 0 && (
-                      <span className="mission-bounty-badge mission-bounty-badge--paid">PAID</span>
+                      <span
+                        className={
+                          pm.bounty_paid
+                            ? 'mission-bounty-badge mission-bounty-badge--paid'
+                            : 'mission-bounty-badge mission-bounty-badge--unpaid'
+                        }
+                      >
+                        {pm.bounty_paid ? 'PAID' : 'UNPAID'}
+                      </span>
                     )}
                   </div>
                 </div>
