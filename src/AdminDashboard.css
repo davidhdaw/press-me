@@ -995,3 +995,67 @@ body:has(.admin-dashboard) {
   background-color: var(--brown);
   color: var(--black);
 }
+
+/* ── Push Mission History ─────────────────────────────────────── */
+
+.push-mission-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--unit-sm);
+}
+
+.push-mission-history-item {
+  background: var(--white);
+  border: 1px solid var(--brown);
+  border-radius: 4px;
+  padding: var(--unit-sm) var(--unit-base);
+}
+
+.push-mission-history-header {
+  display: flex;
+  align-items: center;
+  gap: var(--unit-sm);
+  flex-wrap: wrap;
+}
+
+.push-mission-history-target {
+  font-size: 0.85rem;
+  color: var(--brown);
+}
+
+.push-mission-history-bounty {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.push-mission-history-status {
+  margin-top: var(--unit-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--unit-sm);
+}
+
+.push-status-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.push-status-badge--pending {
+  background-color: var(--yellow);
+  color: var(--black);
+}
+
+.push-status-badge--acknowledged {
+  background-color: var(--blue);
+  color: var(--white);
+}
+
+.push-status-badge--completed {
+  background-color: var(--green);
+  color: var(--black);
+}

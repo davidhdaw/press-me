@@ -120,6 +120,12 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   const [showBriefingModal, setShowBriefingModal] = useState(true)
   const [isBriefingClosing, setIsBriefingClosing] = useState(false)
 
+  const [pushMissions, setPushMissions] = useState([])
+  const [pendingPushMission, setPendingPushMission] = useState(null)
+  const [showPushMissionModal, setShowPushMissionModal] = useState(false)
+  const [isPushMissionClosing, setIsPushMissionClosing] = useState(false)
+  const [pushMissionType, setPushMissionType] = useState('new')
+
   // ── Session & mission data fetching ────────────────────────────────────────
 
   useEffect(() => {
@@ -226,6 +232,40 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
     return () => clearInterval(interval)
   }, [agentId, isInActiveSession, activeSessionId])
 
+  useEffect(() => {
+    if (!isInActiveSession || !activeSessionId) return
+
+    const checkPushMissions = async () => {
+      try {
+        const acknowledged = await neonApi.getAcknowledgedPushMissions(activeSessionId, agentId)
+        setPushMissions(acknowledged || [])
+
+        if (showPushMissionModal) return
+
+        const pending = await neonApi.getPendingPushMissions(activeSessionId, agentId)
+        if (pending && pending.length > 0) {
+          setPendingPushMission(pending[0])
+          setPushMissionType('new')
+          setShowPushMissionModal(true)
+          return
+        }
+
+        const completedUnseen = await neonApi.getCompletedUnseenPushMissions(activeSessionId, agentId)
+        if (completedUnseen && completedUnseen.length > 0) {
+          setPendingPushMission(completedUnseen[0])
+          setPushMissionType('completed')
+          setShowPushMissionModal(true)
+        }
+      } catch (error) {
+        console.error('[PUSH-MISSIONS] Error checking push missions:', error)
+      }
+    }
+
+    checkPushMissions()
+    const interval = setInterval(checkPushMissions, 5000)
+    return () => clearInterval(interval)
+  }, [agentId, isInActiveSession, activeSessionId, showPushMissionModal])
+
   const fetchMissions = async () => {
     try {
       setLoading(true)
@@ -247,6 +287,27 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
       if (error && error.message) setError('Failed to fetch missions: ' + error.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // ── Push mission modal ─────────────────────────────────────────────────────
+
+  const handleAcknowledgePushMission = async () => {
+    if (!pendingPushMission) return
+    try {
+      if (pushMissionType === 'new') {
+        await neonApi.acknowledgePushMission(pendingPushMission.id, agentId)
+      } else {
+        await neonApi.markCompletionSeen(pendingPushMission.id, agentId)
+      }
+      setIsPushMissionClosing(true)
+      setTimeout(() => {
+        setShowPushMissionModal(false)
+        setIsPushMissionClosing(false)
+        setPendingPushMission(null)
+      }, 300)
+    } catch (error) {
+      console.error('Error acknowledging push mission:', error)
     }
   }
 
@@ -498,6 +559,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               completedMissions={completedMissions}
               onMissionClick={openMissionModal}
               onOpenBriefing={openBriefingModal}
+              pushMissions={pushMissions}
             />
           </div>
         </div>
@@ -750,6 +812,34 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {showPushMissionModal && pendingPushMission && (
+        <div className={`modal push-mission-modal ${isPushMissionClosing ? 'closing' : ''}`}>
+          <div className="modal-header">
+            <span className={`push-mission-badge ${pushMissionType === 'completed' ? 'push-mission-badge--complete' : ''}`}>
+              {pushMissionType === 'new' ? 'INCOMING TRANSMISSION' : 'MISSION COMPLETE'}
+            </span>
+          </div>
+          <div className="modal-content">
+            <h2>{pendingPushMission.title}</h2>
+            <p style={{ whiteSpace: 'pre-line' }}>{pendingPushMission.mission_body}</p>
+            {pendingPushMission.bounty > 0 && (
+              <div className="push-mission-bounty">
+                {pushMissionType === 'completed' ? `Bonus awarded: $${pendingPushMission.bounty}!` : `Bounty: $${pendingPushMission.bounty}`}
+              </div>
+            )}
+          </div>
+          <div className="push-mission-footer">
+            <button
+              type="button"
+              onClick={handleAcknowledgePushMission}
+              className="push-mission-ack-button"
+            >
+              ACKNOWLEDGED
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -148,6 +148,12 @@ function AdminDashboard({ currentUser, onLogout }) {
   const [showPassphrases, setShowPassphrases] = useState(false)
   const [expandedSessions, setExpandedSessions] = useState(new Set())
 
+  // Push missions state
+  const [pushMissionForm, setPushMissionForm] = useState({ targetUserId: '', title: '', missionBody: '', bounty: '' })
+  const [sendingPushMission, setSendingPushMission] = useState(false)
+  const [pushMissionHistory, setPushMissionHistory] = useState([])
+  const [loadingPushHistory, setLoadingPushHistory] = useState(false)
+
   // Tab state
   const [activeTab, setActiveTab] = useState('sessions')
 
@@ -169,6 +175,12 @@ function AdminDashboard({ currentUser, onLogout }) {
     }
     if (activeTab === 'users' && usersTabList.length === 0) {
       loadUsersTab()
+    }
+    if (activeTab === 'push') {
+      loadPushMissionHistory()
+      if (activeSession && sessionUsers.length === 0) {
+        loadActiveSessionData(activeSession)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
@@ -221,6 +233,48 @@ function AdminDashboard({ currentUser, onLogout }) {
       setPlayerMissions([])
     } finally {
       setLoadingSessionData(false)
+    }
+  }
+
+  const loadPushMissionHistory = async () => {
+    if (!activeSession) return
+    try {
+      setLoadingPushHistory(true)
+      const history = await neonApi.getAllPushMissionsForSession(activeSession.id)
+      setPushMissionHistory(history || [])
+    } catch (error) {
+      console.error('Error loading push mission history:', error)
+    } finally {
+      setLoadingPushHistory(false)
+    }
+  }
+
+  const handleSendPushMission = async () => {
+    setSendingPushMission(true)
+    try {
+      await neonApi.createPushMission({
+        sessionId: activeSession.id,
+        targetUserId: parseInt(pushMissionForm.targetUserId),
+        sentByUserId: currentUser.id,
+        title: pushMissionForm.title.trim(),
+        missionBody: pushMissionForm.missionBody.trim(),
+        bounty: parseInt(pushMissionForm.bounty) || 0
+      })
+      setPushMissionForm({ targetUserId: '', title: '', missionBody: '', bounty: '' })
+      await loadPushMissionHistory()
+    } catch (error) {
+      alert(`Error sending push mission: ${error.message}`)
+    } finally {
+      setSendingPushMission(false)
+    }
+  }
+
+  const handleCompletePushMission = async (pushMissionId) => {
+    try {
+      await neonApi.completePushMission(pushMissionId)
+      await loadPushMissionHistory()
+    } catch (error) {
+      alert(`Error completing push mission: ${error.message}`)
     }
   }
 
@@ -624,6 +678,12 @@ function AdminDashboard({ currentUser, onLogout }) {
         >
           Users
         </button>
+        <button
+          className={`admin-tab${activeTab === 'push' ? ' active' : ''}`}
+          onClick={() => setActiveTab('push')}
+        >
+          Push
+        </button>
       </div>
 
       <div className="admin-content">
@@ -911,6 +971,104 @@ function AdminDashboard({ currentUser, onLogout }) {
             {!activeSession && (
               <div className="admin-section">
                 <p className="admin-empty-message">No active session. Start a session from the Sessions tab to see participants here.</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ===== PUSH TAB ===== */}
+        {activeTab === 'push' && (
+          <>
+            {!activeSession ? (
+              <div className="admin-section">
+                <p className="admin-empty-message">No active session. Start a session first to send push missions.</p>
+              </div>
+            ) : (
+              <div className="admin-section">
+                <h2>Send Push Mission</h2>
+                <div className="admin-form-group">
+                  <label>Target Player</label>
+                  <select
+                    value={pushMissionForm.targetUserId}
+                    onChange={(e) => setPushMissionForm(f => ({ ...f, targetUserId: e.target.value }))}
+                  >
+                    <option value="">-- Select player --</option>
+                    {sessionUsers.map(user => (
+                      <option key={user.id} value={user.id}>{user.firstname} {user.lastname}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="admin-form-group">
+                  <label>Title</label>
+                  <input
+                    type="text"
+                    value={pushMissionForm.title}
+                    onChange={(e) => setPushMissionForm(f => ({ ...f, title: e.target.value }))}
+                    placeholder="Mission title"
+                  />
+                </div>
+                <div className="admin-form-group">
+                  <label>Mission Body</label>
+                  <textarea
+                    value={pushMissionForm.missionBody}
+                    onChange={(e) => setPushMissionForm(f => ({ ...f, missionBody: e.target.value }))}
+                    rows={4}
+                    placeholder="Write the mission details..."
+                  />
+                </div>
+                <div className="admin-form-group">
+                  <label>Bounty ($)</label>
+                  <input
+                    type="number"
+                    value={pushMissionForm.bounty}
+                    onChange={(e) => setPushMissionForm(f => ({ ...f, bounty: e.target.value }))}
+                    placeholder="0"
+                    min="0"
+                  />
+                </div>
+                <button
+                  onClick={handleSendPushMission}
+                  disabled={sendingPushMission || !pushMissionForm.targetUserId || !pushMissionForm.title.trim()}
+                  className="button-primary"
+                >
+                  {sendingPushMission ? 'Sending...' : 'Send Push Mission'}
+                </button>
+
+                <h2 style={{ marginTop: '2rem' }}>Sent Push Missions</h2>
+                {loadingPushHistory ? (
+                  <p>Loading...</p>
+                ) : pushMissionHistory.length === 0 ? (
+                  <p className="admin-empty-message">No push missions sent yet.</p>
+                ) : (
+                  <div className="push-mission-history">
+                    {pushMissionHistory.map(pm => (
+                      <div key={pm.id} className="push-mission-history-item">
+                        <div className="push-mission-history-header">
+                          <strong>{pm.title}</strong>
+                          <span className="push-mission-history-target">→ {pm.target_firstname} {pm.target_lastname}</span>
+                          {pm.bounty > 0 && <span className="push-mission-history-bounty">${pm.bounty}</span>}
+                        </div>
+                        <div className="push-mission-history-status">
+                          {pm.completed ? (
+                            <span className="push-status-badge push-status-badge--completed">Completed</span>
+                          ) : pm.acknowledged ? (
+                            <>
+                              <span className="push-status-badge push-status-badge--acknowledged">Acknowledged</span>
+                              <button
+                                onClick={() => handleCompletePushMission(pm.id)}
+                                className="button-complete"
+                              >
+                                Mark Complete
+                              </button>
+                            </>
+                          ) : (
+                            <span className="push-status-badge push-status-badge--pending">Pending</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </>
