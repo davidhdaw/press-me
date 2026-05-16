@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { neonApi } from './neonApi'
 import { isAdmin } from './utils/admin.js'
+import './AdminDashboard.css'
+
+const PRODUCTION_URL = 'https://press-me-iota.vercel.app'
+
+function getPlayerLoginUrl(user) {
+  const alias = `${user.alias_1} ${user.alias_2}`
+  const base64Alias = btoa(unescape(encodeURIComponent(alias)))
+  return `${PRODUCTION_URL}/login/${encodeURIComponent(base64Alias)}`
+}
 
 // Helper function to format timestamp with proper timezone handling
 function formatTimestamp(timestamp) {
@@ -106,8 +115,7 @@ function AdminDashboard({ currentUser, onLogout }) {
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
   const [advancingPhase, setAdvancingPhase] = useState(false)
 
-  // Global mission manager state
-  const [showMissionManager, setShowMissionManager] = useState(false)
+  // Mission manager state
   const [showMissionModal, setShowMissionModal] = useState(false)
   const [editingMission, setEditingMission] = useState(null)
   const [missionForm, setMissionForm] = useState({
@@ -127,6 +135,22 @@ function AdminDashboard({ currentUser, onLogout }) {
   const [phaseMissions, setPhaseMissions] = useState([])
   const [loadingPhaseMissions, setLoadingPhaseMissions] = useState(false)
 
+  // Add user state
+  const [showAddUserModal, setShowAddUserModal] = useState(false)
+  const [addingUser, setAddingUser] = useState(false)
+  const [newUserForm, setNewUserForm] = useState({
+    firstname: '', lastname: '', alias_1: '', alias_2: '', passphrase: '', is_admin: false
+  })
+
+  // Users tab state
+  const [usersTabList, setUsersTabList] = useState([])
+  const [loadingUsersTab, setLoadingUsersTab] = useState(false)
+  const [showPassphrases, setShowPassphrases] = useState(false)
+  const [expandedSessions, setExpandedSessions] = useState(new Set())
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState('sessions')
+
   // Check if user is admin
   const userIsAdmin = isAdmin(currentUser)
 
@@ -135,10 +159,19 @@ function AdminDashboard({ currentUser, onLogout }) {
       navigate('/admin/login')
       return
     }
-    // Load sessions data
     loadSessions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userIsAdmin, navigate])
+
+  useEffect(() => {
+    if (activeTab === 'missions' && phaseMissions.length === 0) {
+      loadPhaseMissions()
+    }
+    if (activeTab === 'users' && usersTabList.length === 0) {
+      loadUsersTab()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
 
   const loadSessions = async () => {
     try {
@@ -254,25 +287,6 @@ function AdminDashboard({ currentUser, onLogout }) {
     }
   }
 
-  const handleOpenVoting = async (sessionId) => {
-    try {
-      await neonApi.openVoting(sessionId)
-      await loadSessions()
-      alert('Voting opened! Users can now submit intel.')
-    } catch (error) {
-      alert(`Error opening voting: ${error.message || 'Please try again.'}`)
-    }
-  }
-
-  const handleCloseVoting = async (sessionId) => {
-    try {
-      await neonApi.closeVoting(sessionId)
-      await loadSessions()
-      alert('Voting closed.')
-    } catch (error) {
-      alert(`Error closing voting: ${error.message || 'Please try again.'}`)
-    }
-  }
 
   const handleOpenCreateModal = async () => {
     try {
@@ -456,11 +470,6 @@ function AdminDashboard({ currentUser, onLogout }) {
     }
   }
 
-  const handleOpenMissionManager = () => {
-    setShowMissionManager(true)
-    loadPhaseMissions()
-  }
-
   const handleOpenMissionModal = (mission = null) => {
     setEditingMission(mission)
     if (mission) {
@@ -545,6 +554,39 @@ function AdminDashboard({ currentUser, onLogout }) {
     }
   }
 
+  const loadUsersTab = async () => {
+    try {
+      setLoadingUsersTab(true)
+      const users = await neonApi.getUsers()
+      setUsersTabList(users || [])
+    } catch (error) {
+      console.error('Error loading users:', error)
+      setUsersTabList([])
+    } finally {
+      setLoadingUsersTab(false)
+    }
+  }
+
+  const handleAddUser = async () => {
+    const { firstname, lastname, alias_1, alias_2, passphrase } = newUserForm
+    if (!firstname || !lastname || !alias_1 || !alias_2 || !passphrase) {
+      alert('All fields are required.')
+      return
+    }
+    try {
+      setAddingUser(true)
+      await neonApi.createUser(newUserForm)
+      setShowAddUserModal(false)
+      setNewUserForm({ firstname: '', lastname: '', alias_1: '', alias_2: '', passphrase: '', is_admin: false })
+      await loadUsersTab()
+      alert(`User ${firstname} ${lastname} created!`)
+    } catch (error) {
+      alert(`Error creating user: ${error.message || 'Please try again.'}`)
+    } finally {
+      setAddingUser(false)
+    }
+  }
+
   if (!userIsAdmin) {
     return null
   }
@@ -563,231 +605,315 @@ function AdminDashboard({ currentUser, onLogout }) {
         </div>
       </div>
 
+      <div className="admin-tabs">
+        <button
+          className={`admin-tab${activeTab === 'sessions' ? ' active' : ''}`}
+          onClick={() => setActiveTab('sessions')}
+        >
+          Sessions
+        </button>
+        <button
+          className={`admin-tab${activeTab === 'missions' ? ' active' : ''}`}
+          onClick={() => setActiveTab('missions')}
+        >
+          Missions
+        </button>
+        <button
+          className={`admin-tab${activeTab === 'users' ? ' active' : ''}`}
+          onClick={() => setActiveTab('users')}
+        >
+          Users
+        </button>
+      </div>
+
       <div className="admin-content">
-        <div className="admin-section">
-          <h2>Session Management</h2>
-          <div className="session-controls">
-            <button onClick={handleOpenCreateModal} className="button-primary">
-              Create New Session
-            </button>
-            <button onClick={handleOpenMissionManager} className="button-secondary">
-              Manage Missions
-            </button>
-          </div>
 
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: 'var(--unit-base)' }}>
-              <p>Loading sessions...</p>
-            </div>
-          ) : (
-            <div className="sessions-list">
-              {!sessions || sessions.length === 0 ? (
-                <p style={{ textAlign: 'center', padding: 'var(--unit-base)', fontStyle: 'italic' }}>
-                  No sessions found. Create a new session to get started.
-                </p>
+        {/* ===== SESSIONS TAB ===== */}
+        {activeTab === 'sessions' && (
+          <>
+            <div className="admin-section">
+              <h2>Session Management</h2>
+              <div className="session-controls">
+                <button onClick={handleOpenCreateModal} className="button-primary">
+                  Create New Session
+                </button>
+              </div>
+
+              {loading ? (
+                <div className="admin-placeholder">
+                  <p>Loading sessions...</p>
+                </div>
               ) : (
-                <ul>
-                  {Array.isArray(sessions) && sessions.map(session => (
-                    <li key={session.id}>
-                      <div className="session-item">
-                        <h3>{session.name}</h3>
-                        <div className="session-info">
-                          <p className={`session-status status-${session.status}`}>Status: {session.status}</p>
-                          <p>Players: {session.participant_user_ids?.length || 0}</p>
-                          {session.created_at && (
-                            <p>Created: {formatTimestamp(session.created_at)}</p>
-                          )}
-                          {session.started_at && (
-                            <p>Started: {formatTimestamp(session.started_at)}</p>
-                          )}
-                          {session.paused_at && (
-                            <p>Paused: {formatTimestamp(session.paused_at)}</p>
-                          )}
-                          {session.ended_at && (
-                            <p>Ended: {formatTimestamp(session.ended_at)}</p>
-                          )}
-                        </div>
-                        <div className="session-actions">
-                          {session.status === 'draft' && (
-                            <>
-                              <button onClick={() => handleOpenEditModal(session)} className="button-secondary">
-                                Edit
-                              </button>
-                              <button onClick={() => handleStartSession(session.id)} className="button-primary">
-                                Start Session
-                              </button>
-                            </>
-                          )}
-                          {session.status === 'active' && (
-                            <>
-                              {(session.current_phase || 0) < 3 && (
-                                <button
-                                  onClick={() => handleAdvancePhase()}
-                                  className="button-primary"
-                                  disabled={advancingPhase}
-                                >
-                                  {advancingPhase ? 'Advancing...' : `Advance to Phase ${(session.current_phase || 0) + 1}`}
-                                </button>
-                              )}
-                              <button onClick={() => session.voting_open ? handleCloseVoting(session.id) : handleOpenVoting(session.id)} className="button-secondary">
-                                {session.voting_open ? 'Close Voting' : 'Open Voting'}
-                              </button>
-                              <button onClick={() => handlePauseSession(session.id)} className="button-secondary">
-                                Pause
-                              </button>
-                              <button onClick={() => handleEndSession(session.id)} className="logout-button">
-                                End Session
-                              </button>
-                            </>
-                          )}
-                          {session.status === 'paused' && (
-                            <>
-                              <button onClick={() => handleOpenEditModal(session)} className="button-secondary">
-                                Edit
-                              </button>
-                              <button onClick={() => handleResumeSession(session.id)} className="button-primary">
-                                Resume
-                              </button>
-                              <button onClick={() => handleEndSession(session.id)} className="logout-button">
-                                End Session
-                              </button>
-                              <button onClick={() => handleResetSession(session.id)} className="logout-button" style={{ backgroundColor: '#d32f2f' }}>
-                                Reset Session
-                              </button>
-                            </>
-                          )}
-                          {session.status === 'ended' && (
-                            <>
-                              <button onClick={() => handleOpenEditModal(session)} className="button-secondary">
-                                Edit
-                              </button>
-                              <button onClick={() => handleResetSession(session.id)} className="logout-button" style={{ backgroundColor: '#d32f2f' }}>
-                                Reset Session
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </div>
+                <div className="sessions-list">
+                  {!sessions || sessions.length === 0 ? (
+                    <p className="admin-empty-message">
+                      No sessions found. Create a new session to get started.
+                    </p>
+                  ) : (
+                    <ul>
+                      {Array.isArray(sessions) && sessions.map(session => {
+                        const isActive = session.status === 'active'
+                        const isExpanded = isActive || expandedSessions.has(session.id)
+                        const toggleExpand = () => {
+                          if (isActive) return
+                          const next = new Set(expandedSessions)
+                          if (next.has(session.id)) next.delete(session.id)
+                          else next.add(session.id)
+                          setExpandedSessions(next)
+                        }
 
-        {activeSession && (
-          <div className="admin-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--unit-base)' }}>
-              <h2>Active Session: {activeSession.name} — Phase {activeSession.current_phase || 0} of 3</h2>
-              <button
-                onClick={() => loadActiveSessionData(activeSession)}
-                className="button-secondary"
-                disabled={loadingSessionData}
-                style={{ marginLeft: 'auto' }}
-              >
-                {loadingSessionData ? 'Refreshing...' : 'Refresh Data'}
-              </button>
-            </div>
-            {loadingSessionData ? (
-              <div style={{ textAlign: 'center', padding: 'var(--unit-base)' }}>
-                <p>Loading session data...</p>
-              </div>
-            ) : sessionUsers.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 'var(--unit-base)', fontStyle: 'italic' }}>
-                <p>No users in this session.</p>
-              </div>
-            ) : (
-              <div className="session-users-view">
-                <h3>Session Participants and Missions</h3>
-                {sessionUsers.map(user => {
-                  const missions = playerMissions.filter(m => m.userId === user.id)
-                  const phases = [0, 1, 2, 3].filter(p => missions.some(m => m.phase === p))
-                  const currentPhase = activeSession.current_phase || 0
-
-                  return (
-                    <div key={user.id} style={{ marginBottom: '16px', padding: '12px', border: '1px solid #ddd', borderRadius: '6px' }}>
-                      <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-                        {user.firstname} {user.lastname}
-                        <span style={{ fontWeight: 'normal', color: '#888', marginLeft: '8px' }}>
-                          {user.alias_1} {user.alias_2}
-                        </span>
-                        <span style={{ marginLeft: '8px', fontSize: '0.85em', color: '#666' }}>
-                          {missions.filter(m => m.completed).length}/{missions.length} completed
-                        </span>
-                      </div>
-                      {phases.length === 0 ? (
-                        <span style={{ fontStyle: 'italic', color: '#888' }}>No missions assigned</span>
-                      ) : (
-                        phases.map(phase => {
-                          const phaseMissions = missions.filter(m => m.phase === phase)
-                          const isLocked = phase < currentPhase
-                          return (
-                            <div key={phase} style={{ marginBottom: '8px' }}>
-                              <div style={{ fontSize: '0.85em', fontWeight: 'bold', color: isLocked ? '#999' : '#333', marginBottom: '4px' }}>
-                                Phase {phase} {isLocked ? '(Locked)' : phase === currentPhase ? '(Current)' : ''}
+                        return (
+                          <li key={session.id}>
+                            <div className={`session-item${isActive ? ' active' : ' collapsed'}`}>
+                              <div className="session-item-header" onClick={!isActive ? toggleExpand : undefined}>
+                                <h3>{session.name}</h3>
+                                <span className={`session-status status-${session.status}`}>{session.status}</span>
+                                {!isActive && (
+                                  <span className="session-expand-icon">{isExpanded ? '▾' : '▸'}</span>
+                                )}
                               </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '12px' }}>
-                                {phaseMissions.map(m => (
-                                  <div
-                                    key={m.playerMissionId}
-                                    style={{
-                                      fontSize: '0.9em',
-                                      padding: '6px 8px',
-                                      backgroundColor: m.completed ? '#f0f8f0' : isLocked ? '#f5f5f5' : '#f9f9f9',
-                                      borderRadius: '4px',
-                                      border: m.completed ? '1px solid #90ee90' : '1px solid #ddd',
-                                      opacity: isLocked && !m.completed ? 0.6 : 1,
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'center'
-                                    }}
-                                  >
-                                    <div>
-                                      <strong>{m.title}</strong>
-                                      {m.variableValue && (
-                                        <span style={{ color: '#666', marginLeft: '6px', fontSize: '0.85em' }}>
-                                          [{m.variableValue}]
-                                        </span>
-                                      )}
-                                      <span style={{ color: '#999', marginLeft: '6px', fontSize: '0.8em' }}>
-                                        ({m.completionType})
-                                      </span>
-                                      {m.completed && (
-                                        <span style={{ color: 'green', marginLeft: '8px', fontSize: '0.85em' }}>
-                                          Done{m.signerName ? ` (signed by ${m.signerName})` : ''}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {!m.completed && !isLocked && (
-                                      <button
-                                        onClick={() => handleRequestCompleteMission(m.playerMissionId, m.userId)}
-                                        style={{
-                                          padding: '3px 8px',
-                                          fontSize: '0.8em',
-                                          cursor: 'pointer',
-                                          backgroundColor: '#4CAF50',
-                                          color: 'white',
-                                          border: 'none',
-                                          borderRadius: '4px'
-                                        }}
-                                      >
-                                        Complete
-                                      </button>
+                              {isExpanded && (
+                                <>
+                                  <div className="session-info">
+                                    <p>Players: {session.participant_user_ids?.length || 0}</p>
+                                    {session.created_at && <p>Created: {formatTimestamp(session.created_at)}</p>}
+                                    {session.started_at && <p>Started: {formatTimestamp(session.started_at)}</p>}
+                                    {session.paused_at && <p>Paused: {formatTimestamp(session.paused_at)}</p>}
+                                    {session.ended_at && <p>Ended: {formatTimestamp(session.ended_at)}</p>}
+                                  </div>
+                                  <div className="session-actions">
+                                    {session.status === 'draft' && (
+                                      <>
+                                        <button onClick={() => handleOpenEditModal(session)} className="button-secondary">Edit</button>
+                                        <button onClick={() => handleStartSession(session.id)} className="button-primary">Start Session</button>
+                                      </>
+                                    )}
+                                    {session.status === 'active' && (
+                                      <>
+                                        {(session.current_phase || 0) < 3 && (
+                                          <button onClick={() => handleAdvancePhase()} className="button-primary" disabled={advancingPhase}>
+                                            {advancingPhase ? 'Advancing...' : `Advance to Phase ${(session.current_phase || 0) + 1}`}
+                                          </button>
+                                        )}
+                                        <button onClick={() => handlePauseSession(session.id)} className="button-secondary">Pause</button>
+                                        <button onClick={() => handleEndSession(session.id)} className="logout-button">End Session</button>
+                                      </>
+                                    )}
+                                    {session.status === 'paused' && (
+                                      <>
+                                        <button onClick={() => handleOpenEditModal(session)} className="button-secondary">Edit</button>
+                                        <button onClick={() => handleResumeSession(session.id)} className="button-primary">Resume</button>
+                                        <button onClick={() => handleEndSession(session.id)} className="logout-button">End Session</button>
+                                        <button onClick={() => handleResetSession(session.id)} className="logout-button" style={{ backgroundColor: '#d32f2f' }}>Reset</button>
+                                      </>
+                                    )}
+                                    {session.status === 'ended' && (
+                                      <>
+                                        <button onClick={() => handleOpenEditModal(session)} className="button-secondary">Edit</button>
+                                        <button onClick={() => handleResetSession(session.id)} className="logout-button" style={{ backgroundColor: '#d32f2f' }}>Reset</button>
+                                      </>
                                     )}
                                   </div>
-                                ))}
-                              </div>
+                                </>
+                              )}
                             </div>
-                          )
-                        })
-                      )}
-                    </div>
-                  )
-                })}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ===== MISSIONS TAB ===== */}
+        {activeTab === 'missions' && (
+          <div className="admin-section">
+            <div className="admin-section-header-row">
+              <h2>Phase Missions</h2>
+              <div className="session-controls">
+                <button onClick={() => handleOpenMissionModal()} className="button-primary">
+                  Add Mission
+                </button>
+                <button onClick={loadPhaseMissions} className="button-secondary" disabled={loadingPhaseMissions}>
+                  {loadingPhaseMissions ? 'Refreshing...' : 'Refresh'}
+                </button>
               </div>
+            </div>
+            {loadingPhaseMissions ? (
+              <div className="admin-placeholder"><p>Loading missions...</p></div>
+            ) : phaseMissions.length === 0 ? (
+              <p className="admin-empty-message">No missions defined yet.</p>
+            ) : (
+              [0, 1, 2, 3].map(phase => {
+                const missions = phaseMissions.filter(m => m.phase === phase)
+                if (missions.length === 0) return null
+                return (
+                  <div key={phase} className="mission-phase-group">
+                    <h3>Phase {phase} ({missions.length} missions)</h3>
+                    {missions.map(m => (
+                      <div key={m.id} className="mission-list-item">
+                        <div className="mission-list-item-header">
+                          <strong>{m.title}</strong>
+                          <div className="mission-list-item-actions">
+                            <button onClick={() => handleOpenMissionModal(m)} className="mission-icon-btn" title="Edit">
+                              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" />
+                              </svg>
+                            </button>
+                            <button onClick={() => handleDeleteMission(m.id)} className="mission-icon-btn mission-icon-btn-danger" title="Delete">
+                              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <span className="mission-meta">
+                          <span className="mission-tag tag-completion">{m.completion_type}</span>
+                          {m.bounty ? <span className="mission-tag tag-bounty">{`$${m.bounty}`}</span> : null}
+                          {m.signer_constraint && m.signer_constraint !== 'any' ? <span className="mission-tag tag-constraint">{m.signer_constraint.replace(/_/g, ' ')}</span> : null}
+                          {m.variable_pool ? <span className="mission-tag tag-variable">variables</span> : null}
+                          {m.variable_source === 'participants' ? <span className="mission-tag tag-variable">player var</span> : null}
+                        </span>
+                        <div className="mission-body-preview">
+                          {m.mission_body.length > 100 ? m.mission_body.substring(0, 100) + '...' : m.mission_body}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })
             )}
           </div>
+        )}
+
+        {/* ===== USERS TAB ===== */}
+        {activeTab === 'users' && (
+          <>
+            {activeSession && (
+              <div className="admin-section">
+                <div className="admin-section-header-row">
+                  <h2>Active: {activeSession.name} — Phase {activeSession.current_phase || 0}/3</h2>
+                  <div className="session-controls">
+                    <button
+                      onClick={() => setShowPassphrases(p => !p)}
+                      className={`button-secondary${showPassphrases ? ' active' : ''}`}
+                    >
+                      {showPassphrases ? 'Hide PW' : 'Show PW'}
+                    </button>
+                    <button
+                      onClick={() => loadActiveSessionData(activeSession)}
+                      className="button-secondary"
+                      disabled={loadingSessionData}
+                    >
+                      {loadingSessionData ? '...' : 'Refresh'}
+                    </button>
+                    <button
+                      className="button-icon"
+                      title="Download Player URLs as CSV"
+                      onClick={() => {
+                        const rows = [['Name', 'URL']]
+                        sessionUsers.forEach(user => {
+                          const name = `${user.firstname} ${user.lastname}`
+                          const url = getPlayerLoginUrl(user)
+                          rows.push([name, url])
+                        })
+                        const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+                        const blob = new Blob([csv], { type: 'text/csv' })
+                        const a = document.createElement('a')
+                        a.href = URL.createObjectURL(blob)
+                        a.download = `${activeSession.name}-player-urls.csv`
+                        a.click()
+                        URL.revokeObjectURL(a.href)
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M8 2v8M4 7l4 4 4-4M2 14h12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                {loadingSessionData ? (
+                  <div className="admin-placeholder">
+                    <p>Loading session data...</p>
+                  </div>
+                ) : sessionUsers.length === 0 ? (
+                  <p className="admin-empty-message">No users in this session.</p>
+                ) : (
+                  <div className="session-users-view">
+                    {sessionUsers.map(user => {
+                      const missions = playerMissions.filter(m => m.userId === user.id)
+                      const phases = [0, 1, 2, 3].filter(p => missions.some(m => m.phase === p))
+                      const currentPhase = activeSession.current_phase || 0
+
+                      return (
+                        <div key={user.id} className="participant-card">
+                          <div className="participant-header">
+                            {user.firstname} {user.lastname}
+                          </div>
+                          {showPassphrases && user.passphrase && (
+                            <div className="participant-passphrase">{user.passphrase}</div>
+                          )}
+                          {phases.length === 0 ? (
+                            <span className="admin-empty-message">No missions assigned</span>
+                          ) : (
+                            phases.map(phase => {
+                              const phaseMissions = missions.filter(m => m.phase === phase)
+                              const isLocked = phase < currentPhase
+                              return (
+                                <div key={phase} className="participant-phase">
+                                  <div className={`phase-label${isLocked ? ' locked' : ''}`}>
+                                    Phase {phase} {isLocked ? '(Locked)' : phase === currentPhase ? '(Current)' : ''}
+                                  </div>
+                                  <div className="phase-missions">
+                                    {phaseMissions.map(m => (
+                                      <div
+                                        key={m.playerMissionId}
+                                        className={`phase-mission-row${m.completed ? ' completed' : ''}${isLocked && !m.completed ? ' locked' : ''}`}
+                                      >
+                                        <div>
+                                          <strong>{m.title}</strong>
+                                          {m.variableValue && (
+                                            <span className="mission-variable"> [{m.variableValue}]</span>
+                                          )}
+                                          <span className="mission-type"> ({m.completionType})</span>
+                                          {m.completed && (
+                                            <span className="mission-done">
+                                              Done{m.signerName ? ` (signed by ${m.signerName})` : ''}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {!m.completed && !isLocked && (
+                                          <button
+                                            onClick={() => handleRequestCompleteMission(m.playerMissionId, m.userId)}
+                                            className="button-complete"
+                                          >
+                                            Complete
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            })
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!activeSession && (
+              <div className="admin-section">
+                <p className="admin-empty-message">No active session. Start a session from the Sessions tab to see participants here.</p>
+              </div>
+            )}
+          </>
         )}
 
       </div>
@@ -798,15 +924,14 @@ function AdminDashboard({ currentUser, onLogout }) {
           <div className="admin-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
               <h2>Create New Session</h2>
-              <button 
-                className="admin-modal-close" 
+              <button
+                className="admin-modal-close"
                 onClick={() => setShowCreateModal(false)}
                 disabled={creatingSession}
               >
                 ×
               </button>
             </div>
-            
             <div className="admin-modal-body">
               <div className="admin-form-group">
                 <label htmlFor="session-name">Session Name</label>
@@ -819,12 +944,11 @@ function AdminDashboard({ currentUser, onLogout }) {
                   disabled={creatingSession}
                 />
               </div>
-
               <div className="admin-form-group">
                 <div className="admin-form-header">
                   <label>Select Players ({selectedUsers.size} selected)</label>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={handleSelectAll}
                     className="select-all-button"
                     disabled={creatingSession}
@@ -843,28 +967,18 @@ function AdminDashboard({ currentUser, onLogout }) {
                       />
                       <span className="user-info">
                         <strong>{user.firstname} {user.lastname}</strong>
-                        <span className="user-codename">{user.alias_1} {user.alias_2}</span>
-                        <span className={`user-team team-${user.team}`}>{user.team}</span>
+                        {user.passphrase && <span className="user-codename">{user.passphrase}</span>}
                       </span>
                     </label>
                   ))}
                 </div>
               </div>
             </div>
-
             <div className="admin-modal-footer">
-              <button 
-                onClick={() => setShowCreateModal(false)}
-                className="button-secondary"
-                disabled={creatingSession}
-              >
+              <button onClick={() => setShowCreateModal(false)} className="button-secondary" disabled={creatingSession}>
                 Cancel
               </button>
-              <button 
-                onClick={handleCreateSession}
-                className="button-primary"
-                disabled={creatingSession || !sessionName.trim() || selectedUsers.size === 0}
-              >
+              <button onClick={handleCreateSession} className="button-primary" disabled={creatingSession || !sessionName.trim() || selectedUsers.size === 0}>
                 {creatingSession ? 'Creating...' : 'Create Session'}
               </button>
             </div>
@@ -878,15 +992,14 @@ function AdminDashboard({ currentUser, onLogout }) {
           <div className="admin-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
               <h2>Edit Session</h2>
-              <button 
-                className="admin-modal-close" 
+              <button
+                className="admin-modal-close"
                 onClick={() => setShowEditModal(false)}
                 disabled={editingSession}
               >
                 ×
               </button>
             </div>
-            
             <div className="admin-modal-body">
               <div className="admin-form-group">
                 <label htmlFor="edit-session-name">Session Name</label>
@@ -899,12 +1012,11 @@ function AdminDashboard({ currentUser, onLogout }) {
                   disabled={editingSession}
                 />
               </div>
-
               <div className="admin-form-group">
                 <div className="admin-form-header">
                   <label>Select Players ({selectedUsers.size} selected)</label>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={handleSelectAll}
                     className="select-all-button"
                     disabled={editingSession}
@@ -923,81 +1035,20 @@ function AdminDashboard({ currentUser, onLogout }) {
                       />
                       <span className="user-info">
                         <strong>{user.firstname} {user.lastname}</strong>
-                        <span className="user-codename">{user.alias_1} {user.alias_2}</span>
-                        <span className={`user-team team-${user.team}`}>{user.team}</span>
+                        {user.passphrase && <span className="user-codename">{user.passphrase}</span>}
                       </span>
                     </label>
                   ))}
                 </div>
               </div>
             </div>
-
             <div className="admin-modal-footer">
-              <button 
-                onClick={() => setShowEditModal(false)}
-                className="button-secondary"
-                disabled={editingSession}
-              >
+              <button onClick={() => setShowEditModal(false)} className="button-secondary" disabled={editingSession}>
                 Cancel
               </button>
-              <button 
-                onClick={handleUpdateSession}
-                className="button-primary"
-                disabled={editingSession || !sessionName.trim() || selectedUsers.size === 0}
-              >
+              <button onClick={handleUpdateSession} className="button-primary" disabled={editingSession || !sessionName.trim() || selectedUsers.size === 0}>
                 {editingSession ? 'Updating...' : 'Update Session'}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Global Mission Manager */}
-      {showMissionManager && (
-        <div className="admin-modal-overlay" onClick={() => setShowMissionManager(false)}>
-          <div className="admin-modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', maxHeight: '80vh', overflow: 'auto' }}>
-            <div className="admin-modal-header">
-              <h2>Phase Missions</h2>
-              <button className="admin-modal-close" onClick={() => setShowMissionManager(false)}>x</button>
-            </div>
-            <div className="admin-modal-body">
-              <div style={{ marginBottom: '12px' }}>
-                <button onClick={() => handleOpenMissionModal()} className="button-primary">
-                  Add Mission
-                </button>
-              </div>
-              {loadingPhaseMissions ? (
-                <p>Loading missions...</p>
-              ) : phaseMissions.length === 0 ? (
-                <p style={{ fontStyle: 'italic', color: '#888' }}>No missions defined yet.</p>
-              ) : (
-                [0, 1, 2, 3].map(phase => {
-                  const missions = phaseMissions.filter(m => m.phase === phase)
-                  if (missions.length === 0) return null
-                  return (
-                    <div key={phase} style={{ marginBottom: '16px' }}>
-                      <h3 style={{ marginBottom: '8px' }}>Phase {phase} ({missions.length} missions)</h3>
-                      {missions.map(m => (
-                        <div key={m.id} style={{ padding: '8px', marginBottom: '4px', backgroundColor: '#f9f9f9', borderRadius: '4px', border: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ flex: 1 }}>
-                            <strong>{m.title}</strong>
-                            <span style={{ color: '#999', marginLeft: '8px', fontSize: '0.85em' }}>
-                              {m.completion_type}{m.bounty ? ` | ${m.bounty}pts` : ''}{m.variable_pool ? ' | has variables' : ''}{m.variable_source === 'participants' ? ' | player var' : ''}{m.signer_constraint && m.signer_constraint !== 'any' ? ` | ${m.signer_constraint}` : ''}
-                            </span>
-                            <div style={{ fontSize: '0.85em', color: '#666', marginTop: '2px' }}>
-                              {m.mission_body.length > 100 ? m.mission_body.substring(0, 100) + '...' : m.mission_body}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
-                            <button onClick={() => handleOpenMissionModal(m)} className="button-secondary" style={{ padding: '3px 8px', fontSize: '0.8em' }}>Edit</button>
-                            <button onClick={() => handleDeleteMission(m.id)} className="logout-button" style={{ padding: '3px 8px', fontSize: '0.8em' }}>Delete</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                })
-              )}
             </div>
           </div>
         </div>
@@ -1132,7 +1183,7 @@ function AdminDashboard({ currentUser, onLogout }) {
                 </div>
               )}
               <div className="admin-form-group">
-                <label>Bounty (points awarded on completion)</label>
+                <label>Bounty (dollars awarded on completion)</label>
                 <input
                   type="number"
                   min="0"
@@ -1167,12 +1218,7 @@ function AdminDashboard({ currentUser, onLogout }) {
           <div className="admin-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
               <h2>Complete Mission</h2>
-              <button
-                className="admin-modal-close"
-                onClick={handleCancelCompleteMission}
-              >
-                x
-              </button>
+              <button className="admin-modal-close" onClick={handleCancelCompleteMission}>x</button>
             </div>
             <div className="admin-modal-body">
               <p>Are you sure you want to manually complete this mission?</p>
@@ -1180,19 +1226,56 @@ function AdminDashboard({ currentUser, onLogout }) {
                 This will mark the mission as completed and award intel to the user (if applicable).
               </p>
             </div>
-            <div className="admin-modal-actions">
-              <button
-                onClick={handleCancelCompleteMission}
-                className="button-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmCompleteMission}
-                className="button-primary"
-                style={{ backgroundColor: '#4CAF50' }}
-              >
+            <div className="admin-modal-footer">
+              <button onClick={handleCancelCompleteMission} className="button-secondary">Cancel</button>
+              <button onClick={handleConfirmCompleteMission} className="button-primary" style={{ backgroundColor: '#4CAF50' }}>
                 Complete Mission
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add User Modal */}
+      {showAddUserModal && (
+        <div className="admin-modal-overlay" onClick={() => setShowAddUserModal(false)}>
+          <div className="admin-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h2>Add User</h2>
+              <button className="admin-modal-close" onClick={() => setShowAddUserModal(false)}>x</button>
+            </div>
+            <div className="admin-modal-body">
+              <div className="admin-form-group">
+                <label>First Name</label>
+                <input type="text" value={newUserForm.firstname} onChange={(e) => setNewUserForm({ ...newUserForm, firstname: e.target.value })} placeholder="First name" disabled={addingUser} />
+              </div>
+              <div className="admin-form-group">
+                <label>Last Name</label>
+                <input type="text" value={newUserForm.lastname} onChange={(e) => setNewUserForm({ ...newUserForm, lastname: e.target.value })} placeholder="Last name" disabled={addingUser} />
+              </div>
+              <div className="admin-form-group">
+                <label>Alias 1</label>
+                <input type="text" value={newUserForm.alias_1} onChange={(e) => setNewUserForm({ ...newUserForm, alias_1: e.target.value })} placeholder="First alias word" disabled={addingUser} />
+              </div>
+              <div className="admin-form-group">
+                <label>Alias 2</label>
+                <input type="text" value={newUserForm.alias_2} onChange={(e) => setNewUserForm({ ...newUserForm, alias_2: e.target.value })} placeholder="Second alias word" disabled={addingUser} />
+              </div>
+              <div className="admin-form-group">
+                <label>Passphrase</label>
+                <input type="text" value={newUserForm.passphrase} onChange={(e) => setNewUserForm({ ...newUserForm, passphrase: e.target.value })} placeholder="Login passphrase" disabled={addingUser} />
+              </div>
+              <div className="admin-form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input type="checkbox" checked={newUserForm.is_admin} onChange={(e) => setNewUserForm({ ...newUserForm, is_admin: e.target.checked })} disabled={addingUser} />
+                  Admin
+                </label>
+              </div>
+            </div>
+            <div className="admin-modal-footer">
+              <button className="button-secondary" onClick={() => setShowAddUserModal(false)} disabled={addingUser}>Cancel</button>
+              <button className="button-primary" onClick={handleAddUser} disabled={addingUser}>
+                {addingUser ? 'Creating...' : 'Create User'}
               </button>
             </div>
           </div>

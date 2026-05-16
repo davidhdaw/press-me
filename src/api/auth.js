@@ -14,15 +14,61 @@ export async function logLogin(agentName, success, ipAddress, userAgent) {
   }
 }
 
-// Validate alias (check if it exists without requiring passphrase)
-// ONLY accepts: "alias_1 alias_2" (with space, underscore, or concatenated) in that order
-// Case-insensitive comparison
-// Returns passphrase hint (all words except last word)
-export async function validateAlias(alias) {
+// Sign in by real name (no passphrase required).
+// Accepts: "firstname lastname" — last name may be multiple words (case-insensitive).
+export async function signInByName(name, userAgent) {
   try {
-    // Check for alias_1 followed by alias_2 with space, underscore, or no separator (case-insensitive)
+    const nameParts = name.trim().split(/\s+/);
+    if (nameParts.length < 2) {
+      return { success: false, message: 'Please enter your full name (first and last)' };
+    }
+
+    const firstname = nameParts[0];
+    const lastname = nameParts.slice(1).join(' ');
+
     const userResult = await sql`
-      SELECT id, firstname, lastname, team, alias_1, alias_2, passphrase, is_admin
+      SELECT id, firstname, lastname, alias_1, alias_2, passphrase, is_admin
+      FROM users 
+      WHERE LOWER(firstname) = LOWER(${firstname})
+        AND LOWER(lastname) = LOWER(${lastname})
+        AND ishere = true
+      LIMIT 1
+    `;
+
+    if (userResult.length === 0) {
+      return { success: false, message: 'Name not found' };
+    }
+
+    const user = userResult[0];
+    const displayLogin = `${user.firstname} ${user.lastname}`;
+    await logLogin(displayLogin, true, null, userAgent);
+
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        alias_1: user.alias_1,
+        alias_2: user.alias_2,
+        codename: `${user.alias_1} ${user.alias_2}`,
+        passphrase: user.passphrase,
+        is_admin: user.is_admin || false
+      }
+    };
+  } catch (error) {
+    console.error('Error signing in by name:', error);
+    throw error;
+  }
+}
+
+// Sign in by alias (no passphrase required).
+// ONLY accepts: "alias_1 alias_2" (with space, underscore, or concatenated) in that order.
+// Case-insensitive comparison.
+export async function signInByAlias(alias, userAgent) {
+  try {
+    const userResult = await sql`
+      SELECT id, firstname, lastname, alias_1, alias_2, passphrase, is_admin
       FROM users 
       WHERE (
         LOWER(alias_1 || ' ' || alias_2) = LOWER(${alias})
@@ -32,27 +78,27 @@ export async function validateAlias(alias) {
     `;
     
     if (userResult.length === 0) {
-      return { valid: false, message: 'Alias not found' };
+      return { success: false, message: 'Alias not found' };
     }
-    
-    // Get passphrase hint (all words except last word)
-    const passphrase = userResult[0].passphrase || '';
-    const passphraseWords = passphrase.trim().split(/\s+/);
-    const passphraseHint = passphraseWords.length > 1 
-      ? passphraseWords.slice(0, -1).join(' ')
-      : '';
-    
+
+    const user = userResult[0];
+    await logLogin(alias, true, null, userAgent);
+
     return {
-      valid: true,
+      success: true,
       user: {
-        alias_1: userResult[0].alias_1,
-        alias_2: userResult[0].alias_2,
-        codename: `${userResult[0].alias_1} ${userResult[0].alias_2}`
-      },
-      passphraseHint
+        id: user.id,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        alias_1: user.alias_1,
+        alias_2: user.alias_2,
+        codename: `${user.alias_1} ${user.alias_2}`,
+        passphrase: user.passphrase,
+        is_admin: user.is_admin || false
+      }
     };
   } catch (error) {
-    console.error('Error validating alias:', error);
+    console.error('Error signing in by alias:', error);
     throw error;
   }
 }
@@ -64,7 +110,7 @@ export async function authenticate(alias, passphrase, ipAddress, userAgent) {
   try {
     // Check for alias_1 followed by alias_2 with space, underscore, or no separator (case-insensitive)
     const userResult = await sql`
-      SELECT id, firstname, lastname, team, alias_1, alias_2, passphrase, is_admin
+      SELECT id, firstname, lastname, alias_1, alias_2, passphrase, is_admin
       FROM users 
       WHERE (
         LOWER(alias_1 || ' ' || alias_2) = LOWER(${alias})
@@ -104,10 +150,10 @@ export async function authenticate(alias, passphrase, ipAddress, userAgent) {
           id: user.id,
           firstname: user.firstname,
           lastname: user.lastname,
-          team: user.team,
           alias_1: user.alias_1,
           alias_2: user.alias_2,
           codename: `${user.alias_1} ${user.alias_2}`,
+          passphrase: user.passphrase,
           is_admin: user.is_admin || false
         }
       };
@@ -139,7 +185,7 @@ export async function validateAdminName(name) {
     
     // Check for firstname and lastname (case-insensitive) and ensure user is admin
     const userResult = await sql`
-      SELECT id, firstname, lastname, team, alias_1, alias_2, passphrase, is_admin
+      SELECT id, firstname, lastname, alias_1, alias_2, passphrase, is_admin
       FROM users 
       WHERE LOWER(firstname) = LOWER(${firstname})
         AND LOWER(lastname) = LOWER(${lastname})
@@ -192,7 +238,7 @@ export async function authenticateAdmin(name, passphrase, ipAddress, userAgent) 
     
     // Check for firstname and lastname (case-insensitive) and ensure user is admin
     const userResult = await sql`
-      SELECT id, firstname, lastname, team, alias_1, alias_2, passphrase, is_admin
+      SELECT id, firstname, lastname, alias_1, alias_2, passphrase, is_admin
       FROM users 
       WHERE LOWER(firstname) = LOWER(${firstname})
         AND LOWER(lastname) = LOWER(${lastname})
@@ -231,10 +277,10 @@ export async function authenticateAdmin(name, passphrase, ipAddress, userAgent) 
           id: user.id,
           firstname: user.firstname,
           lastname: user.lastname,
-          team: user.team,
           alias_1: user.alias_1,
           alias_2: user.alias_2,
           codename: `${user.alias_1} ${user.alias_2}`,
+          passphrase: user.passphrase,
           is_admin: user.is_admin || false
         }
       };
