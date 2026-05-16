@@ -12,7 +12,7 @@ export function BriefingMissionRow({ onOpenBriefing }) {
   )
 }
 
-function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions }) {
+function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions, onPushMissionClick }) {
   if (!isInActiveSession) {
     return (
       <div className="tab-content">
@@ -56,7 +56,11 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
           {completedPush.length > 0 && (
             <div className="missions-grid missions-grid--compact">
               {completedPush.map(pm => (
-                <div key={`push-${pm.id}`} className="mission-card mission-card--completed mission-card--push">
+                <div
+                  key={`push-${pm.id}`}
+                  className="mission-card mission-card--completed mission-card--push clickable"
+                  onClick={() => onPushMissionClick && onPushMissionClick(pm)}
+                >
                   <div className="mission-card-completed-row">
                     <h3>{pm.title}</h3>
                     {pm.bounty > 0 && (

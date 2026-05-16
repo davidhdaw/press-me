@@ -126,6 +126,10 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   const [isPushMissionClosing, setIsPushMissionClosing] = useState(false)
   const [pushMissionType, setPushMissionType] = useState('new')
   const [showPushBountyPaidStamp, setShowPushBountyPaidStamp] = useState(false)
+  const [payoutPushMission, setPayoutPushMission] = useState(null)
+  const [showPayoutPushModal, setShowPayoutPushModal] = useState(false)
+  const [isPayoutPushClosing, setIsPayoutPushClosing] = useState(false)
+  const [showPayoutPushStamp, setShowPayoutPushStamp] = useState(false)
 
   // ── Session & mission data fetching ────────────────────────────────────────
 
@@ -323,6 +327,39 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
       setShowPushBountyPaidStamp(true)
       setTimeout(() => {
         handleAcknowledgePushMission()
+      }, 1100)
+    } catch (error) {
+      console.error('Error marking push bounty paid:', error)
+    }
+  }
+
+  const openPushMissionPayout = (pm) => {
+    setPayoutPushMission(pm)
+    setShowPayoutPushModal(true)
+    setIsPayoutPushClosing(false)
+    setShowPayoutPushStamp(false)
+  }
+
+  const closePayoutPushModal = () => {
+    setIsPayoutPushClosing(true)
+    setTimeout(() => {
+      setShowPayoutPushModal(false)
+      setIsPayoutPushClosing(false)
+      setPayoutPushMission(null)
+      setShowPayoutPushStamp(false)
+    }, 300)
+  }
+
+  const handlePayoutPushBountyPaid = async () => {
+    if (!payoutPushMission) return
+    try {
+      await neonApi.markPushBountyPaid(payoutPushMission.id)
+      setPushMissions(prev => prev.map(m =>
+        m.id === payoutPushMission.id ? { ...m, bounty_paid: true } : m
+      ))
+      setShowPayoutPushStamp(true)
+      setTimeout(() => {
+        closePayoutPushModal()
       }, 1100)
     } catch (error) {
       console.error('Error marking push bounty paid:', error)
@@ -557,13 +594,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   // ── Normal render ──────────────────────────────────────────────────────────
 
   const selectedMission = missions.find(m => m.playerMissionId === selectedMissionId)
-  const bountySignerDisplayName = signoffSuccessSignerName || selectedMission?.signerName
-  const bountyPlayerFirst = firstName || 'You'
-  const bountySignerFirst = firstNameFromFullName(bountySignerDisplayName)
-  const bountyCollectCashLine =
-    selectedMission?.completionType === 'signoff' && bountySignerFirst
-      ? `See ${bountyPlayerFirst} or ${bountySignerFirst} to collect your cash.`
-      : `See ${bountyPlayerFirst} to collect your cash.`
+  const bountyCollectCashLine = 'See David or Nikki to receive your cash.'
 
   return (
     <div className="dashboard-container">
@@ -579,6 +610,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               onMissionClick={openMissionModal}
               onOpenBriefing={openBriefingModal}
               pushMissions={pushMissions}
+              onPushMissionClick={openPushMissionPayout}
             />
           </div>
         </div>
@@ -856,6 +888,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
                 )}
                 <div className="bounty-award">
                   <p className="bounty-award-amount">Bonus awarded: ${pendingPushMission.bounty}!</p>
+                  <p className="bounty-award-lede">{bountyCollectCashLine}</p>
                   <button
                     type="button"
                     className="bounty-paid-button"
@@ -890,6 +923,44 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {showPayoutPushModal && payoutPushMission && (
+        <div className={`modal push-mission-modal ${isPayoutPushClosing ? 'closing' : ''}`}>
+          <div className="modal-header">
+            <button type="button" onClick={closePayoutPushModal} className="close-button">Close</button>
+          </div>
+          <div className="modal-content">
+            <h2>{payoutPushMission.title}</h2>
+            <p style={{ whiteSpace: 'pre-line' }}>{payoutPushMission.mission_body}</p>
+            {payoutPushMission.bounty > 0 && !payoutPushMission.bounty_paid && (
+              <div className="mission-phrase-payout-shell mission-payout-stamp-host" style={{ marginTop: 'var(--unit-base)' }}>
+                {showPayoutPushStamp && (
+                  <div className="bounty-paid-stamp-overlay" aria-hidden="true">
+                    <span className="bounty-paid-stamp-mark">PAID</span>
+                  </div>
+                )}
+                <div className="bounty-award">
+                  <p className="bounty-award-amount">Bonus awarded: ${payoutPushMission.bounty}!</p>
+                  <p className="bounty-award-lede">{bountyCollectCashLine}</p>
+                  <button
+                    type="button"
+                    className="bounty-paid-button"
+                    disabled={showPayoutPushStamp}
+                    onClick={handlePayoutPushBountyPaid}
+                  >
+                    Mark as paid
+                  </button>
+                </div>
+              </div>
+            )}
+            {payoutPushMission.bounty > 0 && payoutPushMission.bounty_paid && (
+              <div className="push-mission-bounty" style={{ marginTop: 'var(--unit-base)' }}>
+                Bonus: ${payoutPushMission.bounty} — PAID
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
