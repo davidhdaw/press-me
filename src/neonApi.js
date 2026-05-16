@@ -6,6 +6,7 @@ import * as users from './api/users.js';
 import * as auth from './api/auth.js';
 import * as sessions from './api/sessions.js';
 import * as phaseMissions from './api/phaseMissions.js';
+import * as pushMissions from './api/pushMissions.js';
 
 // Assemble the neonApi object with all functions
 export const neonApi = {
@@ -52,4 +53,15 @@ export const neonApi = {
 
   // Sessions (new)
   advancePhase: sessions.advancePhase,
+
+  // Push Missions
+  createPushMission: pushMissions.createPushMission,
+  getPendingPushMissions: pushMissions.getPendingPushMissions,
+  getCompletedUnseenPushMissions: pushMissions.getCompletedUnseenPushMissions,
+  getAcknowledgedPushMissions: pushMissions.getAcknowledgedPushMissions,
+  acknowledgePushMission: pushMissions.acknowledgePushMission,
+  completePushMission: pushMissions.completePushMission,
+  markCompletionSeen: pushMissions.markCompletionSeen,
+  markPushBountyPaid: pushMissions.markPushBountyPaid,
+  getAllPushMissionsForSession: pushMissions.getAllPushMissionsForSession,
 };

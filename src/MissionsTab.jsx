@@ -12,7 +12,7 @@ export function BriefingMissionRow({ onOpenBriefing }) {
   )
 }
 
-function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing }) {
+function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions, onPushMissionClick }) {
   if (!isInActiveSession) {
     return (
       <div className="tab-content">
@@ -25,13 +25,66 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
     )
   }
 
+  const activePush = (pushMissions || []).filter(m => !m.completed)
+  const completedPush = (pushMissions || []).filter(m => m.completed)
+
+  const cp = Number(currentPhase)
+  const phaseOrder = [cp, ...([0, 1, 2, 3].filter(p => p !== cp))]
+
   return (
     <div className="tab-content">
       <BriefingMissionRow onOpenBriefing={onOpenBriefing} />
-      {[0, 1, 2, 3].map(phase => {
+
+      {(activePush.length > 0 || completedPush.length > 0) && (
+        <div className="missions-phase missions-phase--push">
+          {activePush.length > 0 && (
+            <div className="missions-grid">
+              {activePush.map(pm => (
+                <div key={`push-${pm.id}`} className="mission-card mission-card--push">
+                  <div className="push-mission-card-label">SPECIAL OPS</div>
+                  <div className="mission-header">
+                    <h3>{pm.title}</h3>
+                    {pm.bounty > 0 && (
+                      <span style={{ fontSize: '0.75em', color: 'var(--green)', fontWeight: 'bold' }}>{`$${pm.bounty}`}</span>
+                    )}
+                  </div>
+                  <p style={{ whiteSpace: 'pre-line' }}>{pm.mission_body}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {completedPush.length > 0 && (
+            <div className="missions-grid missions-grid--compact">
+              {completedPush.map(pm => (
+                <div
+                  key={`push-${pm.id}`}
+                  className="mission-card mission-card--completed mission-card--push clickable"
+                  onClick={() => onPushMissionClick && onPushMissionClick(pm)}
+                >
+                  <div className="mission-card-completed-row">
+                    <h3>{pm.title}</h3>
+                    {pm.bounty > 0 && (
+                      <span
+                        className={
+                          pm.bounty_paid
+                            ? 'mission-bounty-badge mission-bounty-badge--paid'
+                            : 'mission-bounty-badge mission-bounty-badge--unpaid'
+                        }
+                      >
+                        {pm.bounty_paid ? 'PAID' : 'UNPAID'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {phaseOrder.map(phase => {
         const phaseMissions = missions.filter(m => Number(m.phase) === phase)
         if (phaseMissions.length === 0) return null
-        const cp = Number(currentPhase)
         const isLocked = phase < cp
 
         const incomplete = m => !completedMissions.has(m.playerMissionId)

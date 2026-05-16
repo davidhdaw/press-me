@@ -1453,3 +1453,132 @@
   letter-spacing: 1px;
   transition: all 0.2s ease;
 }
+
+/* ── Push Mission Modal ─────────────────────────────────────────────────── */
+
+.modal.push-mission-modal {
+  z-index: 2200;
+  background-color: var(--black);
+  color: var(--white);
+  justify-content: center;
+  align-items: center;
+  padding: var(--unit-lg);
+}
+
+.modal.push-mission-modal .modal-header {
+  position: absolute;
+  top: var(--unit-lg);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.push-mission-badge {
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--red);
+  animation: pushBadgePulse 1.5s ease-in-out 3;
+}
+
+.push-mission-badge--complete {
+  color: var(--green);
+}
+
+@keyframes pushBadgePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.modal.push-mission-modal .modal-content {
+  text-align: center;
+  max-width: 400px;
+  margin-top: 60px;
+}
+
+.modal.push-mission-modal .modal-content h2 {
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  color: var(--yellow);
+  font-size: 1.6rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: var(--unit-sm);
+}
+
+.modal.push-mission-modal .modal-content > p {
+  color: var(--white);
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+.push-mission-bounty {
+  margin-top: var(--unit-base);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.push-mission-footer {
+  position: absolute;
+  bottom: var(--unit-lg);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.push-mission-ack-button {
+  background-color: var(--red);
+  color: var(--white);
+  border: none;
+  padding: var(--unit-sm) var(--unit-lg);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  cursor: pointer;
+}
+
+.push-mission-badge--complete + .push-mission-footer .push-mission-ack-button,
+.modal.push-mission-modal:has(.push-mission-badge--complete) .push-mission-ack-button {
+  background-color: var(--green);
+}
+
+/* Push mission cards in mission list */
+.mission-card--push {
+  background-color: var(--black);
+  color: var(--white);
+  border-left: 3px solid var(--red);
+}
+
+.mission-card--push h3 {
+  color: var(--yellow);
+}
+
+.mission-card--push p {
+  color: var(--white);
+}
+
+.push-mission-card-label {
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: var(--unit-xs);
+}
+
+.mission-card--completed.mission-card--push {
+  background-color: var(--black);
+  border-left: 3px solid var(--green);
+}
+
+.mission-card--completed.mission-card--push h3 {
+  color: var(--white);
+}

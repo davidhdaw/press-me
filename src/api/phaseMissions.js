@@ -138,12 +138,19 @@ export async function assignPhaseToPlayers(sessionId, phase) {
       let variables;
 
       if (mission.variable_source === 'participants') {
-        // Assign each player a random OTHER participant's name
-        variables = shuffledPlayerIds.map(playerId => {
-          const others = playerIds.filter(id => id !== playerId);
-          const picked = others[Math.floor(Math.random() * others.length)];
-          return nameMap[picked] || String(picked);
-        });
+        // Pair players mutually (if A gets B, B gets A)
+        const pairOrder = shuffleArray([...playerIds]);
+        const partnerMap = {};
+        for (let i = 0; i + 1 < pairOrder.length; i += 2) {
+          partnerMap[pairOrder[i]] = pairOrder[i + 1];
+          partnerMap[pairOrder[i + 1]] = pairOrder[i];
+        }
+        if (pairOrder.length % 2 === 1) {
+          const lastPlayer = pairOrder[pairOrder.length - 1];
+          const lastPaired = pairOrder[pairOrder.length - 2];
+          partnerMap[lastPlayer] = lastPaired;
+        }
+        variables = shuffledPlayerIds.map(playerId => nameMap[partnerMap[playerId]] || String(partnerMap[playerId]));
       } else {
         variables = assignVariables(mission.variable_pool, shuffledPlayerIds.length);
       }

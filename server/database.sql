@@ -70,6 +70,24 @@ CREATE TABLE IF NOT EXISTS player_missions (
     UNIQUE(session_id, user_id, mission_id)
 );
 
+CREATE TABLE IF NOT EXISTS push_missions (
+    id SERIAL PRIMARY KEY,
+    session_id INTEGER NOT NULL REFERENCES sessions(id),
+    target_user_id INTEGER NOT NULL REFERENCES users(id),
+    sent_by_user_id INTEGER NOT NULL REFERENCES users(id),
+    title TEXT NOT NULL,
+    mission_body TEXT NOT NULL,
+    bounty INTEGER DEFAULT 0,
+    acknowledged BOOLEAN DEFAULT false,
+    acknowledged_at TIMESTAMP,
+    completed BOOLEAN DEFAULT false,
+    completed_at TIMESTAMP,
+    completion_seen BOOLEAN DEFAULT false,
+    completion_seen_at TIMESTAMP,
+    bounty_paid BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_users_alias_1 ON users(alias_1);
 CREATE INDEX IF NOT EXISTS idx_users_alias_2 ON users(alias_2);
@@ -86,3 +104,5 @@ CREATE INDEX IF NOT EXISTS idx_player_missions_user ON player_missions(user_id);
 CREATE INDEX IF NOT EXISTS idx_player_missions_mission ON player_missions(mission_id);
 CREATE INDEX IF NOT EXISTS idx_player_missions_signoff ON player_missions(signed_off_by);
 CREATE INDEX IF NOT EXISTS idx_player_missions_lookup ON player_missions(session_id, user_id, completed);
+CREATE INDEX IF NOT EXISTS idx_push_missions_target ON push_missions(target_user_id, acknowledged);
+CREATE INDEX IF NOT EXISTS idx_push_missions_session ON push_missions(session_id);
