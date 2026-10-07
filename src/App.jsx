@@ -4,8 +4,9 @@ import './App.css'
 import Login from './Login'
 import Dashboard from './Dashboard'
 import AdminDashboard from './AdminDashboard'
-import AdminLogin from './AdminLogin'
-import { isAdmin } from './utils/admin.js'
+import BankPage from './BankPage'
+import StaffLogin from './StaffLogin'
+import StaffGate from './StaffGate'
 
 function App() {
   const savedUser = localStorage.getItem('spyUser')
@@ -73,42 +74,24 @@ function App() {
             )
           } 
         />
-        <Route 
-          path="/admin/login" 
+        {/* Staff pages: separate sign-in (name + staff PIN), never via player login */}
+        <Route path="/staff" element={<StaffLogin />} />
+        <Route path="/admin/login/*" element={<Navigate to="/staff" replace />} />
+        <Route
+          path="/admin"
           element={
-            isLoggedIn && isAdmin(currentUser) ? (
-              <Navigate to="/admin" replace />
-            ) : (
-              <AdminLogin onLogin={handleLogin} />
-            )
-          } 
+            <StaffGate role="host">
+              {(staff, logout) => <AdminDashboard staff={staff} onLogout={logout} />}
+            </StaffGate>
+          }
         />
-        <Route 
-          path="/admin/login/:name" 
+        <Route
+          path="/bank"
           element={
-            isLoggedIn && isAdmin(currentUser) ? (
-              <Navigate to="/admin" replace />
-            ) : (
-              <AdminLogin onLogin={handleLogin} />
-            )
-          } 
-        />
-        <Route 
-          path="/admin" 
-          element={
-            isLoggedIn ? (
-              isAdmin(currentUser) ? (
-                <AdminDashboard 
-                  currentUser={currentUser}
-                  onLogout={handleLogout}
-                />
-              ) : (
-                <Navigate to="/admin/login" replace />
-              )
-            ) : (
-              <Navigate to="/admin/login" replace />
-            )
-          } 
+            <StaffGate role="banker">
+              {(staff, logout) => <BankPage staff={staff} onLogout={logout} />}
+            </StaffGate>
+          }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

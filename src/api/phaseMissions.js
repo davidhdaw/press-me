@@ -251,7 +251,7 @@ export async function getPlayerMissions(sessionId, userId) {
         pm.signed_off_by,
         pm.signed_off_at,
         pm.phrase_answer,
-        pm.bounty_paid,
+        pm.bounty_awarded,
         ph.id as mission_id,
         ph.phase,
         ph.title,
@@ -305,7 +305,7 @@ export async function getPlayerMissions(sessionId, userId) {
         signedOffBy: r.signed_off_by,
         signedOffAt: r.signed_off_at,
         bounty: r.bounty || 0,
-        bountyPaid: r.bounty_paid || false,
+        bountyAwarded: r.bounty_awarded || 0,
         signerName: r.signer_firstname ? `${r.signer_firstname} ${r.signer_lastname}` : null,
         phaseLocked: r.phase < currentPhase,
         isCulminating: r.is_culminating,
@@ -354,7 +354,8 @@ export async function completePhaseMission(playerMissionId, answer, userId) {
 
     await sql`
       UPDATE player_missions
-      SET completed = true, completed_at = NOW(), phrase_answer = ${answer}
+      SET completed = true, completed_at = NOW(), phrase_answer = ${answer},
+          bounty_awarded = ${mission.bounty || 0}
       WHERE id = ${playerMissionId}
     `;
 
@@ -460,7 +461,8 @@ export async function signOffMission(playerMissionId, signerPassphrase) {
     const updated = await sql`
       UPDATE player_missions
       SET completed = true, completed_at = NOW(),
-          signed_off_by = ${signerUserId}, signed_off_at = NOW()
+          signed_off_by = ${signerUserId}, signed_off_at = NOW(),
+          bounty_awarded = ${mission.bounty || 0}
       WHERE id = ${playerMissionId} AND completed = false
       RETURNING signed_off_at
     `;
@@ -484,7 +486,7 @@ export async function signOffMission(playerMissionId, signerPassphrase) {
 export async function adminCompletePhaseMission(playerMissionId) {
   try {
     const rows = await sql`
-      SELECT pm.*, ph.title FROM player_missions pm
+      SELECT pm.*, ph.title, ph.bounty FROM player_missions pm
       JOIN phase_missions ph ON pm.mission_id = ph.id
       WHERE pm.id = ${playerMissionId}
     `;
@@ -496,13 +498,14 @@ export async function adminCompletePhaseMission(playerMissionId) {
 
     await sql`
       UPDATE player_missions
-      SET completed = true, completed_at = NOW()
+      SET completed = true, completed_at = NOW(), bounty_awarded = ${mission.bounty || 0}
       WHERE id = ${playerMissionId}
     `;
 
     return {
       success: true,
-      message: 'Mission completed successfully'
+      message: 'Mission completed successfully',
+      bounty: mission.bounty || 0
     };
   } catch (error) {
     console.error('Error admin completing phase mission:', error);
@@ -523,7 +526,6 @@ export async function getAllPlayerMissionsForSession(sessionId) {
         pm.completed_at,
         pm.signed_off_by,
         pm.signed_off_at,
-        pm.bounty_paid,
         ph.id as mission_id,
         ph.phase,
         ph.title,
@@ -572,29 +574,12 @@ export async function getAllPlayerMissionsForSession(sessionId) {
         completed: r.completed,
         completedAt: r.completed_at,
         bounty: r.bounty || 0,
-        bountyPaid: r.bounty_paid || false,
         signedOffBy: r.signed_off_by,
         signerName: r.signer_firstname ? `${r.signer_firstname} ${r.signer_lastname}` : null
       };
     });
   } catch (error) {
     console.error('Error fetching all player missions for session:', error);
-    throw error;
-  }
-}
-
-export async function markBountyPaid(playerMissionId) {
-  try {
-    const result = await sql`
-      UPDATE player_missions
-      SET bounty_paid = true
-      WHERE id = ${playerMissionId} AND completed = true
-      RETURNING *
-    `;
-    if (result.length === 0) throw new Error('Mission not found or not completed');
-    return { success: true };
-  } catch (error) {
-    console.error('Error marking bounty paid:', error);
     throw error;
   }
 }

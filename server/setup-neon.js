@@ -92,6 +92,34 @@ async function setupNeonDatabase() {
       )
     `;
 
+    // Signed-in staff (hosts and bankers). The token lives in the staff
+    // member's browser; roles are always re-read from users, never trusted
+    // from the browser.
+    await sql`
+      CREATE TABLE IF NOT EXISTS staff_sessions (
+        token TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        expires_at TIMESTAMP NOT NULL
+      )
+    `;
+
+    // Banker withdrawals (spending at the toy table) and corrections. Mission
+    // deposits aren't stored here: they're player_missions.bounty_awarded and
+    // completed push_missions.bounty. Balance = deposits + SUM(amount).
+    await sql`
+      CREATE TABLE IF NOT EXISTS bank_transactions (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER NOT NULL REFERENCES sessions(id),
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        amount INTEGER NOT NULL CHECK (amount != 0),
+        kind VARCHAR(20) NOT NULL CHECK (kind IN ('withdrawal', 'adjustment')),
+        note TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `;
+
     // Ad-hoc missions a host sends to one player mid-game.
     await sql`
       CREATE TABLE IF NOT EXISTS push_missions (
@@ -118,8 +146,39 @@ async function setupNeonDatabase() {
     // Columns added after the first release. ADD COLUMN IF NOT EXISTS is a no-op
     // on databases that already have them.
     await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS is_culminating BOOLEAN NOT NULL DEFAULT false`;
+    // Bounty deposited when the mission was completed (snapshot, so editing a
+    // mission's bounty later doesn't rewrite anyone's bank history)
+    await sql`ALTER TABLE player_missions ADD COLUMN IF NOT EXISTS bounty_awarded INTEGER`;
+    // Staff roles and login. is_admin = host. Staff PINs are separate from
+    // passphrases, which players see during sign-offs.
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banker BOOLEAN NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS staff_pin_hash TEXT`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS staff_pin_salt TEXT`;
 
     console.log('✓ Columns verified');
+
+    // Every money movement for a player in a session, newest data always live.
+    // Balance = SUM(amount); the app's statement and overdraft check read this.
+    await sql`
+      CREATE OR REPLACE VIEW bank_ledger AS
+        SELECT 'mission'::text AS kind, pm.id AS ref_id, pm.session_id, pm.user_id,
+               pm.bounty_awarded AS amount, ph.title AS note, NULL::integer AS created_by,
+               pm.completed_at AS created_at
+        FROM player_missions pm
+        JOIN phase_missions ph ON ph.id = pm.mission_id
+        WHERE pm.completed AND pm.bounty_awarded > 0
+      UNION ALL
+        SELECT 'push'::text, id, session_id, target_user_id,
+               bounty, title, sent_by_user_id, completed_at
+        FROM push_missions
+        WHERE completed AND bounty > 0
+      UNION ALL
+        SELECT kind::text, id, session_id, user_id,
+               amount, note, created_by, created_at
+        FROM bank_transactions
+    `;
+
+    console.log('✓ Views verified');
 
     // Databases created by older versions of the game have a NOT NULL users.team
     // column that the app no longer writes; relax it so new users can be added.
@@ -155,6 +214,8 @@ async function setupNeonDatabase() {
     await sql`CREATE INDEX IF NOT EXISTS idx_player_missions_lookup ON player_missions(session_id, user_id, completed)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_push_missions_target ON push_missions(target_user_id, acknowledged)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_push_missions_session ON push_missions(session_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_staff_sessions_user ON staff_sessions(user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_bank_transactions_account ON bank_transactions(session_id, user_id)`;
 
     console.log('✓ Indexes verified');
     console.log('\n✓ Database setup completed successfully!');

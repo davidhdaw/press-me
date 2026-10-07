@@ -1,6 +1,6 @@
 # Press Me
 
-A phone-based companion app for a live, in-person spy party game. Guests sign in on their phones and receive missions in acts ("phases"), carry them out in the room, and prove completion by getting another guest to sign off with their secret passphrase. Hosts run the night from an admin dashboard: starting the session, advancing phases, sending ad-hoc missions, and paying out bounties.
+A phone-based companion app for a live, in-person spy party game. Guests sign in on their phones and receive missions in acts ("phases"), carry them out in the room, and prove completion by getting another guest to sign off with their secret passphrase. Mission bounties are deposited into each player's bank account, which they spend on small prizes at a staffed bank. Hosts run the night from an admin dashboard: starting the session, advancing phases, and sending ad-hoc missions.
 
 ## Architecture
 
@@ -8,22 +8,27 @@ A phone-based companion app for a live, in-person spy party game. Guests sign in
 - **Database:** Neon (serverless Postgres).
 - **No backend.** The browser talks to Neon directly through `@neondatabase/serverless`; all game logic lives in `src/api/`. The `server/` folder only holds Node scripts you run by hand to set up and maintain the database.
 
-> **Security model:** the database connection string is compiled into the browser bundle, passphrases are stored in plain text, and admin checks happen client-side. The app is hosted on Vercel only so guests don't need to join local wi-fi; they reach it through per-player QR/NFC login links, groups are small, and there's little to gain from attacking it, so this is an accepted trade-off. Revisit it if the game ever handles anything sensitive.
+> **Security model:** the database connection string is compiled into the browser bundle, passphrases are stored in plain text, and role checks happen client-side. Staff pages do require a separate sign-in (name + hashed staff PIN, a server-side session token, roles re-read from the database), which keeps guests from walking or tinkering their way in. It won't stop someone who extracts the connection string from the bundle. The app is hosted on Vercel only so guests don't need to join local wi-fi; they reach it through per-player QR/NFC login links, groups are small, and there's little to gain from attacking it, so this is an accepted trade-off. Revisit it if the game ever handles anything sensitive.
 
 ```
 press-me/
 ├── src/
 │   ├── App.jsx              # Routes; keeps the signed-in user in localStorage ('spyUser')
 │   ├── Login.jsx            # Player sign-in (name or alias)
-│   ├── Dashboard.jsx        # Player view: missions, sign-offs, push missions, bounty payout
+│   ├── Dashboard.jsx        # Player view: missions, sign-offs, push missions
+│   ├── BankStrip.jsx        # Player's balance in the footer + statement
 │   ├── MissionsTab.jsx      # Mission list grouped by phase
 │   ├── AgentTab.jsx         # Reveal-on-tap passphrase
-│   ├── AdminLogin.jsx       # Host sign-in (name + passphrase)
+│   ├── StaffLogin.jsx       # Staff sign-in at /staff (name + staff PIN)
+│   ├── StaffGate.jsx        # Guards /admin and /bank by role, checked against the DB
 │   ├── AdminDashboard.jsx   # Host view: Sessions / Missions / Users / Push tabs
+│   ├── BankPage.jsx         # Banker view at /bank: balances, withdrawals, corrections
 │   ├── neonApi.js           # Single `neonApi` object the components call
 │   └── api/
 │       ├── db.js            # Neon connection (browser)
-│       ├── auth.js          # Player and admin sign-in, login logging
+│       ├── auth.js          # Player sign-in, login logging
+│       ├── staff.js         # Staff sign-in, sessions, PINs (pin.js: hashing)
+│       ├── bank.js          # Statements, balances, withdrawals
 │       ├── users.js
 │       ├── sessions.js      # Session lifecycle and phase advancement
 │       ├── phaseMissions.js # Mission catalogue, assignment, completion, sign-off rules
@@ -33,7 +38,8 @@ press-me/
 │   ├── setup-neon.js        # Creates all tables — schema source of truth
 │   ├── setup-phase-missions.js  # Seeds the mission catalogue (destructive)
 │   ├── generate-login-urls.js   # Per-player one-tap login URLs for QR/NFC
-│   └── update-passphrases.js    # Reassigns single-word passphrases
+│   ├── update-passphrases.js    # Reassigns single-word passphrases
+│   └── set-staff-pin.js     # Gives someone a staff PIN (and role)
 ├── arduino/                 # Experimental button-logger sketch (not wired into the app)
 ├── mission_ideas.md         # Design notes for the current mission set
 └── public/                  # Favicon and briefing seal image
@@ -75,12 +81,19 @@ npm run seed-missions -- --yes
 
 ### Create the first host
 
-A fresh database has no users, and new users are added from the admin dashboard's **Users** tab, so insert the first host by hand (Neon SQL editor or `psql`):
+A fresh database has no users, and new users are added from the admin dashboard's **Users** tab, so insert the first host by hand (Neon SQL editor or `psql`), then give them a staff PIN:
 
 ```sql
 INSERT INTO users (id, firstname, lastname, alias_1, alias_2, passphrase, is_admin)
 VALUES (1, 'Jane', 'Host', 'Silent', 'Owl', 'raven', true);
 ```
+
+```bash
+cd server
+npm run set-staff-pin -- "Jane Host" 482913 --host
+```
+
+After that, hosts give other staff roles and PINs from **Users → Edit**. The same script works for anyone (`--host` and/or `--banker`).
 
 ### Run it
 
@@ -98,9 +111,21 @@ npm run lint
 
 - **Players** go to `/` and enter their real name (`First Last`) or their two-word alias (`Swift Spider`, `swift_spider`, or `SwiftSpider`). No passphrase is needed to sign in. Only users with `ishere = true` can sign in.
 - **One-tap login:** `/login/<base64 of name or alias>` signs a player straight in, which is handy on a QR code or NFC tag. `cd server && npm run login-urls` prints one for every player.
-- **Hosts** go to `/admin/login`, enter their name, see their passphrase with the last word hidden, and type the last word (or the whole phrase). Requires `is_admin = true`.
+- **Staff** (hosts and bankers) go to `/staff` and sign in with their name and **staff PIN**. Hosts land on `/admin`, bankers on `/bank`. A player sign-in never grants staff access, even for a host's own account.
 
-Sign-ins are recorded in `login_logs`. The signed-in user is cached in `localStorage`, so a refresh keeps them signed in.
+Sign-ins are recorded in `login_logs`. The signed-in player is cached in `localStorage`, so a refresh keeps them signed in.
+
+### Staff roles and access
+
+| Role | Flag | Can use |
+| --- | --- | --- |
+| Host | `users.is_admin` | `/admin` (everything) and `/bank` |
+| Banker | `users.is_banker` | `/bank` only |
+
+- **Staff PINs** are 4–8 digits and separate from passphrases, which players see whenever a host signs off a mission. They're stored hashed (PBKDF2), so **Show PW** can't reveal them. Set them in **Users → Edit** or with `npm run set-staff-pin`.
+- Signing in creates a row in `staff_sessions` (valid 24 hours). The browser keeps only the token. `/admin` and `/bank` look up the person's current roles through it on load and every minute, so removing a role takes effect on screens that are already open. Logging out deletes the token.
+- Five wrong PINs for a name within 15 minutes locks that name out for 15 minutes.
+- Old `/admin/login` links redirect to `/staff`.
 
 ### Passphrases and sign-offs
 
@@ -136,7 +161,7 @@ Mission options (editable in the **Missions** tab):
   - `participants`: another player's name, paired so A↔B are assigned to each other. Used by False Fracas.
 - **Sign-off prompt:** the sentence the witness sees before signing, for example "`{player_name}` served me food…".
 - **Culminating:** hidden until the player finishes the rest of the phase. See below.
-- **Bounty:** play-money reward. After completion the player's phone shows the bounty, and a host taps **Mark as paid** once they've handed it over.
+- **Bounty:** dollars deposited into the player's bank account the moment the mission is completed. See Banking below.
 
 ### Culminating missions
 
@@ -150,7 +175,22 @@ A mission marked **Culminating** (a checkbox in the Missions tab) is a phase's f
 
 ### Push missions
 
-From the **Push** tab a host can send a one-off mission (title, body, bounty) to a single player during an active session. It pops up on the player's phone to acknowledge. When the host marks it complete, the player sees the completion and the bounty is paid out the same way.
+From the **Push** tab a host can send a one-off mission (title, body, bounty) to a single player during an active session. It pops up on the player's phone to acknowledge. When the host marks it complete, the player sees the completion and the bounty is deposited into their bank account.
+
+### Banking
+
+Each player has a bank account per session (everyone starts at $0 each event), in dollars.
+
+- **Deposits are automatic.** Completing a mission deposits its bounty, whether by sign-off, answer, or a host's **Complete** button. So does a completed push mission. The amount is recorded at completion (`player_missions.bounty_awarded`), so editing a mission's bounty later doesn't change anyone's history.
+- **Players** see their balance in a **BANK** strip at the bottom of their phone. Tapping it opens their statement. The mission success screen says "$400 deposited!".
+- **Bankers** use `/bank` (hosts reach it from the admin header):
+  1. Search for the player by name or alias.
+  2. Enter the amount and what it's for (e.g. "rubber duck"), then **Withdraw**.
+  3. **Correct a mistake** adds or removes money with a required reason.
+  - A balance can never go below zero; the check happens in the same database statement as the withdrawal.
+  - Every transaction records which banker made it, and shows in both the banker's and the player's history.
+  - The bank works while the session is active or paused.
+- Balances come from the `bank_ledger` view: mission deposits + push-mission deposits + `bank_transactions`, which holds banker withdrawals and corrections.
 
 ### Running a session (hosts)
 
@@ -169,7 +209,7 @@ The **Users** tab lists every user, with an **Edit** button on each player and o
 
 - **Add Player** creates a new user or picks an existing one (a returning guest). If a session is active, it also adds them to it and assigns the **current phase's** missions straight away. Earlier phases are locked, so they're skipped, and later phases include them automatically when you advance. Missions that pair players ("start a fight with `{variable}`") pair late joiners with each other first; otherwise with a random existing player.
 - After saving, the modal shows the player's login link, ready to copy onto a QR code or NFC tag.
-- **Edit** changes name, aliases, passphrase, checked-in status, or host status. It's safe mid-game: missions reference players by id. Changing an alias changes the player's login link. A changed passphrase appears on the player's phone the next time they open or reveal it.
+- **Edit** changes name, aliases, passphrase, checked-in status, staff roles (host/banker) and staff PIN. It's safe mid-game: missions reference players by id. Changing an alias changes the player's login link. A changed passphrase appears on the player's phone the next time they open or reveal it.
 - Names, aliases and passphrases (by last word) must be unique, because they're what sign-in and sign-off match on. Duplicates are rejected.
 - Adding participants to a **paused** session via **Edit** also assigns them the current phase's missions.
 
@@ -179,14 +219,17 @@ Tables used by the app (defined in `server/setup-neon.js`):
 
 | Table | Purpose |
 | --- | --- |
-| `users` | Guests and hosts: name, two-word alias, passphrase, `ishere`, `is_admin` |
+| `users` | Guests and staff: name, two-word alias, passphrase, `ishere`, `is_admin` (host), `is_banker`, hashed staff PIN |
 | `login_logs` | Sign-in attempts |
 | `sessions` | Game nights: status, participants, `current_phase` |
 | `phase_missions` | Mission catalogue |
-| `player_missions` | Per-session, per-player mission state: completion, signer, bounty paid |
-| `push_missions` | Host-sent ad-hoc missions and their acknowledge/complete/seen/paid state |
+| `player_missions` | Per-session, per-player mission state: completion, signer, `bounty_awarded` |
+| `push_missions` | Host-sent ad-hoc missions and their acknowledge/complete/seen state |
+| `staff_sessions` | Signed-in staff tokens (24-hour expiry) |
+| `bank_transactions` | Banker withdrawals and corrections |
+| `bank_ledger` (view) | Every money movement per player per session; balance = `SUM(amount)` |
 
-The live database also contains tables left over from earlier versions of the game (`book_missions`, `agent_intel`, `teams`, `missions_legacy`, `button_events`, and others), plus unused `users.team`, `users.score`, and `sessions.voting_open` columns. Nothing reads them.
+The live database also contains tables left over from earlier versions of the game (`book_missions`, `agent_intel`, `teams`, `missions_legacy`, `button_events`, and others), plus unused `users.team`, `users.score`, `sessions.voting_open`, and `bounty_paid` columns (from the old cash payout). Nothing reads them.
 
 ## Troubleshooting
 

@@ -8,7 +8,8 @@
     "setup-db": "node setup-neon.js",
     "seed-missions": "node setup-phase-missions.js",
     "login-urls": "node generate-login-urls.js",
-    "reassign-passphrases": "node update-passphrases.js"
+    "reassign-passphrases": "node update-passphrases.js",
+    "set-staff-pin": "node set-staff-pin.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

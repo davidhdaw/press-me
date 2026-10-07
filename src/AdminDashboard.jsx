@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { neonApi } from './neonApi'
-import { isAdmin } from './utils/admin.js'
+import { isValidPin } from './api/pin.js'
 import './AdminDashboard.css'
 
 const PRODUCTION_URL = 'https://press-me-iota.vercel.app'
@@ -13,7 +13,8 @@ function getPlayerLoginUrl(user) {
 }
 
 const EMPTY_PLAYER_FORM = {
-  firstname: '', lastname: '', alias_1: '', alias_2: '', passphrase: '', is_admin: false, ishere: true
+  firstname: '', lastname: '', alias_1: '', alias_2: '', passphrase: '',
+  is_admin: false, is_banker: false, ishere: true, staffPin: ''
 }
 
 // Helper function to format timestamp with proper timezone handling
@@ -99,7 +100,8 @@ function formatTimestamp(timestamp) {
   }
 }
 
-function AdminDashboard({ currentUser, onLogout }) {
+// Only rendered for a verified host (see StaffGate)
+function AdminDashboard({ staff, onLogout }) {
   const navigate = useNavigate()
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -163,17 +165,10 @@ function AdminDashboard({ currentUser, onLogout }) {
   // Tab state
   const [activeTab, setActiveTab] = useState('sessions')
 
-  // Check if user is admin
-  const userIsAdmin = isAdmin(currentUser)
-
   useEffect(() => {
-    if (!userIsAdmin) {
-      navigate('/admin/login')
-      return
-    }
     loadSessions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userIsAdmin, navigate])
+  }, [])
 
   useEffect(() => {
     if (activeTab === 'missions' && phaseMissions.length === 0) {
@@ -261,7 +256,7 @@ function AdminDashboard({ currentUser, onLogout }) {
       await neonApi.createPushMission({
         sessionId: activeSession.id,
         targetUserId: parseInt(pushMissionForm.targetUserId),
-        sentByUserId: currentUser.id,
+        sentByUserId: staff.id,
         title: pushMissionForm.title.trim(),
         missionBody: pushMissionForm.missionBody.trim(),
         bounty: parseInt(pushMissionForm.bounty) || 0
@@ -395,7 +390,7 @@ function AdminDashboard({ currentUser, onLogout }) {
       await neonApi.createSession({
         name: sessionName.trim(),
         userIds: Array.from(selectedUsers),
-        createdBy: currentUser?.id
+        createdBy: staff.id
       })
 
       setShowCreateModal(false)
@@ -645,7 +640,9 @@ function AdminDashboard({ currentUser, onLogout }) {
       alias_2: user.alias_2 || '',
       passphrase: user.passphrase || '',
       is_admin: !!user.is_admin,
-      ishere: user.ishere !== false
+      is_banker: !!user.is_banker,
+      ishere: user.ishere !== false,
+      staffPin: ''
     })
     setPlayerResult(null)
     setPlayerModal({ mode: 'edit', user })
@@ -658,12 +655,17 @@ function AdminDashboard({ currentUser, onLogout }) {
   }
 
   const handleSavePlayer = async () => {
+    const { staffPin, ...userFields } = playerForm
+    if (staffPin && !isValidPin(staffPin)) {
+      alert('Staff PIN must be 4 to 8 digits')
+      return
+    }
     setSavingPlayer(true)
     try {
       let user
       let message
       if (playerModal.mode === 'edit') {
-        user = await neonApi.updateUser(playerModal.user.id, playerForm)
+        user = await neonApi.updateUser(playerModal.user.id, userFields)
         const aliasChanged = user.alias_1 !== playerModal.user.alias_1 || user.alias_2 !== playerModal.user.alias_2
         message = aliasChanged
           ? 'Saved. Their alias changed, so their login link has changed too — give them the new one below.'
@@ -674,7 +676,7 @@ function AdminDashboard({ currentUser, onLogout }) {
           user = usersTabList.find(u => u.id === Number(existingUserId))
           if (!user.ishere) user = await neonApi.updateUser(user.id, { ishere: true })
         } else {
-          user = await neonApi.createUser(playerForm)
+          user = await neonApi.createUser(userFields)
         }
         message = `${user.firstname} ${user.lastname} is ready.`
         if (activeSession && addToSession) {
@@ -685,6 +687,10 @@ function AdminDashboard({ currentUser, onLogout }) {
             message = `${user.firstname} ${user.lastname} was saved but NOT added to ${activeSession.name}: ${error.message} Retry with Add Player → Existing player.`
           }
         }
+      }
+      if (staffPin && (user.is_admin || user.is_banker)) {
+        await neonApi.setStaffPin(user.id, staffPin)
+        message += ' Staff PIN set.'
       }
       setPlayerResult({ user, message })
       await loadUsersTab()
@@ -706,17 +712,14 @@ function AdminDashboard({ currentUser, onLogout }) {
     }
   }
 
-  if (!userIsAdmin) {
-    return null
-  }
-
   return (
     <div className="admin-dashboard">
       <div className="admin-header">
         <h1>Admin Dashboard</h1>
         <div className="admin-actions">
-          <button onClick={() => navigate('/dashboard')} className="back-button">
-            Back to Dashboard
+          <span className="staff-signed-in">{staff.firstname} {staff.lastname}</span>
+          <button onClick={() => navigate('/bank')} className="back-button">
+            Bank
           </button>
           <button onClick={onLogout} className="logout-button">
             Logout
@@ -1087,6 +1090,8 @@ function AdminDashboard({ currentUser, onLogout }) {
                       <span className="user-row-meta">
                         {user.alias_1} {user.alias_2}
                         {user.is_admin && ' · host'}
+                        {user.is_banker && ' · banker'}
+                        {(user.is_admin || user.is_banker) && !user.has_staff_pin && ' (no staff PIN)'}
                         {!user.ishere && ' · not checked in'}
                       </span>
                     </div>
@@ -1623,9 +1628,31 @@ function AdminDashboard({ currentUser, onLogout }) {
                       <div className="admin-form-group">
                         <label className="admin-checkbox-label">
                           <input type="checkbox" checked={playerForm.is_admin} onChange={(e) => setPlayerForm({ ...playerForm, is_admin: e.target.checked })} disabled={savingPlayer} />
-                          Host (admin)
+                          Host (full admin dashboard)
+                        </label>
+                        <label className="admin-checkbox-label">
+                          <input type="checkbox" checked={playerForm.is_banker} onChange={(e) => setPlayerForm({ ...playerForm, is_banker: e.target.checked })} disabled={savingPlayer} />
+                          Banker (bank screen only)
                         </label>
                       </div>
+                      {(playerForm.is_admin || playerForm.is_banker) && (
+                        <div className="admin-form-group">
+                          <label>Staff PIN</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={playerForm.staffPin}
+                            onChange={(e) => setPlayerForm({ ...playerForm, staffPin: e.target.value.replace(/\D/g, '') })}
+                            placeholder={playerModal.mode === 'edit' && playerModal.user.has_staff_pin ? 'Leave blank to keep current PIN' : '4–8 digits'}
+                            disabled={savingPlayer}
+                          />
+                          <p className="admin-form-hint">
+                            {playerModal.mode === 'edit' && playerModal.user.has_staff_pin
+                              ? 'They sign in at /staff with their name and this PIN.'
+                              : "No PIN yet: they can't sign in at /staff until you set one."}
+                          </p>
+                        </div>
+                      )}
                     </>
                   )}
 

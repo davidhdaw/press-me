@@ -1186,3 +1186,124 @@ body:has(.admin-dashboard) {
   margin: var(--unit-xs) 0 0;
   padding-left: var(--unit-base);
 }
+
+/* Staff */
+.staff-signed-in {
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  align-self: center;
+}
+
+/* Bank page */
+.bank-search {
+  border: 2px solid var(--black);
+  margin-bottom: var(--unit-sm);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1.1rem;
+}
+
+.bank-accounts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bank-account-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--unit-sm);
+  padding: var(--unit-sm) var(--unit-xs);
+  background: none;
+  border: none;
+  border-bottom: 1px solid #ddd;
+  cursor: pointer;
+  text-align: left;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.1rem;
+  color: var(--black);
+}
+
+.bank-account-row:hover {
+  background-color: rgba(238, 205, 69, 0.3);
+}
+
+.bank-account-balance {
+  font-weight: 700;
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.bank-balance-card {
+  text-align: center;
+  padding: var(--unit-base) 0 var(--unit-sm);
+}
+
+.bank-balance-card h2 {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.bank-balance {
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.bank-form {
+  border: 2px solid var(--black);
+  border-radius: 4px;
+  padding: var(--unit-sm);
+  margin: var(--unit-sm) 0;
+}
+
+.bank-form h3 {
+  margin-top: 0;
+}
+
+.bank-form input[type="text"],
+.bank-form select {
+  border: 2px solid var(--black);
+}
+
+.bank-form .button-primary {
+  width: 100%;
+}
+
+.bank-correction-row {
+  display: flex;
+  gap: var(--unit-sm);
+}
+
+.bank-correction-row select {
+  width: auto;
+  padding: var(--unit-sm);
+  border-radius: 4px;
+  background: var(--white);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.1rem;
+}
+
+.bank-correction-toggle {
+  margin-bottom: var(--unit-base);
+}
+
+.bank-feedback {
+  background-color: var(--green);
+  border: 2px solid var(--black);
+  border-radius: 4px;
+  padding: var(--unit-sm);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-weight: 600;
+}
+
+.bank-feedback--error {
+  background-color: var(--red);
+  color: var(--white);
+}

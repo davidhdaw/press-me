@@ -7,6 +7,8 @@ import * as auth from './api/auth.js';
 import * as sessions from './api/sessions.js';
 import * as phaseMissions from './api/phaseMissions.js';
 import * as pushMissions from './api/pushMissions.js';
+import * as staff from './api/staff.js';
+import * as bank from './api/bank.js';
 
 // Assemble the neonApi object with all functions
 export const neonApi = {
@@ -19,8 +21,17 @@ export const neonApi = {
   // Auth
   signInByName: auth.signInByName,
   signInByAlias: auth.signInByAlias,
-  validateAdminName: auth.validateAdminName,
-  authenticateAdmin: auth.authenticateAdmin,
+
+  // Staff (hosts and bankers)
+  staffLogin: staff.staffLogin,
+  getStaffSession: staff.getStaffSession,
+  staffLogout: staff.staffLogout,
+  setStaffPin: staff.setStaffPin,
+
+  // Bank
+  getStatement: bank.getStatement,
+  getBalances: bank.getBalances,
+  recordTransaction: bank.recordTransaction,
   
   // Sessions
   getAllSessions: sessions.getAllSessions,
@@ -44,7 +55,6 @@ export const neonApi = {
   signOffMission: phaseMissions.signOffMission,
   adminCompletePhaseMission: phaseMissions.adminCompletePhaseMission,
   getAllPlayerMissionsForSession: phaseMissions.getAllPlayerMissionsForSession,
-  markBountyPaid: phaseMissions.markBountyPaid,
 
   // Sessions (new)
   advancePhase: sessions.advancePhase,
@@ -57,6 +67,5 @@ export const neonApi = {
   acknowledgePushMission: pushMissions.acknowledgePushMission,
   completePushMission: pushMissions.completePushMission,
   markCompletionSeen: pushMissions.markCompletionSeen,
-  markPushBountyPaid: pushMissions.markPushBountyPaid,
   getAllPushMissionsForSession: pushMissions.getAllPushMissionsForSession,
 };

@@ -12,7 +12,7 @@ export function BriefingMissionRow({ onOpenBriefing }) {
   )
 }
 
-function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions, onPushMissionClick }) {
+function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions }) {
   if (!isInActiveSession) {
     return (
       <div className="tab-content">
@@ -58,21 +58,12 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
               {completedPush.map(pm => (
                 <div
                   key={`push-${pm.id}`}
-                  className="mission-card mission-card--completed mission-card--push clickable"
-                  onClick={() => onPushMissionClick && onPushMissionClick(pm)}
+                  className="mission-card mission-card--completed mission-card--push"
                 >
                   <div className="mission-card-completed-row">
                     <h3>{pm.title}</h3>
                     {pm.bounty > 0 && (
-                      <span
-                        className={
-                          pm.bounty_paid
-                            ? 'mission-bounty-badge mission-bounty-badge--paid'
-                            : 'mission-bounty-badge mission-bounty-badge--unpaid'
-                        }
-                      >
-                        {pm.bounty_paid ? 'PAID' : 'UNPAID'}
-                      </span>
+                      <span className="mission-bounty-badge mission-bounty-badge--paid">+${pm.bounty}</span>
                     )}
                   </div>
                 </div>
@@ -132,16 +123,8 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
                   >
                     <div className="mission-card-completed-row">
                       <h3>{mission.title}</h3>
-                      {mission.bounty > 0 && (
-                        <span
-                          className={
-                            mission.bountyPaid
-                              ? 'mission-bounty-badge mission-bounty-badge--paid'
-                              : 'mission-bounty-badge mission-bounty-badge--unpaid'
-                          }
-                        >
-                          {mission.bountyPaid ? 'PAID' : 'UNPAID'}
-                        </span>
+                      {mission.bountyAwarded > 0 && (
+                        <span className="mission-bounty-badge mission-bounty-badge--paid">+${mission.bountyAwarded}</span>
                       )}
                     </div>
                   </div>
