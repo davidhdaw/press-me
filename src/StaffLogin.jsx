@@ -8,7 +8,7 @@ import './AdminDashboard.css'
 // here from, if their role allows it, otherwise their home page. (Never send
 // them back to a page they can't open, or the gate would bounce them here.)
 function destinationFor(staff, next) {
-  const allowed = next === '/admin' ? staff.is_admin : next === '/bank' ? staff.is_banker : false
+  const allowed = (next === '/admin' || next === '/awards') ? staff.is_admin : next === '/bank' ? staff.is_banker : false
   if (allowed) return next
   return staff.is_admin ? '/admin' : '/bank'
 }

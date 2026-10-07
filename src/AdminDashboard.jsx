@@ -17,87 +17,20 @@ const EMPTY_PLAYER_FORM = {
   is_admin: false, is_banker: false, ishere: true, staffPin: ''
 }
 
-// Helper function to format timestamp with proper timezone handling
+// Timestamps arrive as Dates already in the right instant (see api/timestamps.js)
 function formatTimestamp(timestamp) {
   if (!timestamp) return ''
-  
-  try {
-    let date
-    
-    if (typeof timestamp === 'string') {
-      const trimmed = timestamp.trim()
-      if (!trimmed) return ''
-      
-      // Check if it explicitly has timezone info (Z or +/-HH:MM)
-      const hasExplicitTimezone = trimmed.endsWith('Z') || 
-                                  /[+-]\d{2}:?\d{2}$/.test(trimmed)
-      
-      if (hasExplicitTimezone) {
-        // Has explicit timezone info, parse as-is
-        date = new Date(trimmed)
-      } else {
-        // No timezone info - PostgreSQL TIMESTAMP without timezone stores in UTC
-        // Parse the components and create a UTC date explicitly
-        // Handle formats like: "2024-01-15 14:30:00" or "2024-01-15T14:30:00" or "2024-01-15T14:30:00.123456"
-        let normalized = trimmed
-        
-        // Replace space with T
-        normalized = normalized.replace(' ', 'T')
-        
-        // Remove microseconds/milliseconds if present (keep only seconds)
-        if (normalized.includes('.')) {
-          const parts = normalized.split('.')
-          normalized = parts[0] + (parts[1] ? '.' + parts[1].substring(0, 3) : '')
-        }
-        
-        // Ensure we have a proper ISO format
-        // Parse YYYY-MM-DDTHH:mm:ss or YYYY-MM-DDTHH:mm:ss.SSS
-        const isoPattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?$/
-        const match = normalized.match(isoPattern)
-        
-        if (match) {
-          // Create date using UTC methods to ensure it's treated as UTC
-          const year = parseInt(match[1], 10)
-          const month = parseInt(match[2], 10) - 1 // months are 0-indexed
-          const day = parseInt(match[3], 10)
-          const hour = parseInt(match[4], 10)
-          const minute = parseInt(match[5], 10)
-          const second = parseInt(match[6], 10)
-          
-          date = new Date(Date.UTC(year, month, day, hour, minute, second))
-        } else {
-          // Fallback: add Z to mark as UTC
-          date = new Date(normalized + 'Z')
-        }
-      }
-    } else {
-      // Already a Date object or number
-      date = timestamp instanceof Date ? timestamp : new Date(timestamp)
-    }
-    
-    // Validate the date
-    if (isNaN(date.getTime())) {
-      console.warn('Invalid timestamp:', timestamp)
-      return String(timestamp) // Return the original as string if invalid
-    }
-    
-    // Subtract 8 hours (PST is UTC-8) from UTC timestamp before displaying
-    const pstDate = new Date(date.getTime() - (8 * 60 * 60 * 1000))
-    
-    // Format the PST date
-    return pstDate.toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZoneName: 'short'
-    })
-  } catch (error) {
-    console.error('Error formatting timestamp:', timestamp, error)
-    return String(timestamp) // Return the original as string on error
-  }
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return String(timestamp)
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short'
+  })
 }
 
 // Only rendered for a verified host (see StaffGate)
@@ -720,6 +653,9 @@ function AdminDashboard({ staff, onLogout }) {
           <span className="staff-signed-in">{staff.firstname} {staff.lastname}</span>
           <button onClick={() => navigate('/bank')} className="back-button">
             Bank
+          </button>
+          <button onClick={() => navigate('/awards')} className="back-button">
+            Awards
           </button>
           <button onClick={onLogout} className="logout-button">
             Logout

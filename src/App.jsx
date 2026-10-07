@@ -5,6 +5,7 @@ import Login from './Login'
 import Dashboard from './Dashboard'
 import AdminDashboard from './AdminDashboard'
 import BankPage from './BankPage'
+import AwardsPage from './AwardsPage'
 import StaffLogin from './StaffLogin'
 import StaffGate from './StaffGate'
 
@@ -90,6 +91,14 @@ function App() {
           element={
             <StaffGate role="banker">
               {(staff, logout) => <BankPage staff={staff} onLogout={logout} />}
+            </StaffGate>
+          }
+        />
+        <Route
+          path="/awards"
+          element={
+            <StaffGate role="host">
+              {() => <AwardsPage />}
             </StaffGate>
           }
         />

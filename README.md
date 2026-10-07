@@ -23,12 +23,15 @@ press-me/
 │   ├── StaffGate.jsx        # Guards /admin and /bank by role, checked against the DB
 │   ├── AdminDashboard.jsx   # Host view: Sessions / Missions / Users / Push tabs
 │   ├── BankPage.jsx         # Banker view at /bank: balances, withdrawals, corrections
+│   ├── AwardsPage.jsx       # Host presenter screen at /awards for the end-of-game ceremony
 │   ├── neonApi.js           # Single `neonApi` object the components call
 │   └── api/
 │       ├── db.js            # Neon connection (browser)
 │       ├── auth.js          # Player sign-in, login logging
 │       ├── staff.js         # Staff sign-in, sessions, PINs (pin.js: hashing)
 │       ├── bank.js          # Statements, balances, withdrawals
+│       ├── awards.js        # Ceremony awards: rankings and winner selection
+│       ├── timestamps.js    # Reads DB timestamps as UTC (see Troubleshooting)
 │       ├── users.js
 │       ├── sessions.js      # Session lifecycle and phase advancement
 │       ├── phaseMissions.js # Mission catalogue, assignment, completion, sign-off rules
@@ -119,7 +122,7 @@ Sign-ins are recorded in `login_logs`. The signed-in player is cached in `localS
 
 | Role | Flag | Can use |
 | --- | --- | --- |
-| Host | `users.is_admin` | `/admin` (everything) and `/bank` |
+| Host | `users.is_admin` | `/admin` (everything), `/bank` and `/awards` |
 | Banker | `users.is_banker` | `/bank` only |
 
 - **Staff PINs** are 4–8 digits and separate from passphrases, which players see whenever a host signs off a mission. They're stored hashed (PBKDF2), so **Show PW** can't reveal them. Set them in **Users → Edit** or with `npm run set-staff-pin`.
@@ -192,6 +195,25 @@ Each player has a bank account per session (everyone starts at $0 each event), i
   - The bank works while the session is active or paused.
 - Balances come from the `bank_ledger` view: mission deposits + push-mission deposits + `bank_transactions`, which holds banker withdrawals and corrections.
 
+### Award ceremony
+
+At the end of the night a host opens **Awards** from the admin header (or `/awards`) on a laptop or TV. It defaults to the running session, and any other session can be picked from the intro screen. **Recalculate** refreshes the results.
+
+**Controls:** tap the screen, or press Space or →, to reveal the winner, then again to move on. ← goes back, and **Fullscreen** hides the browser.
+
+| # | Award | Winner |
+| --- | --- | --- |
+| 1 | Social Butterfly | Most *different* agents who signed off their missions |
+| 2 | Partners in Crime | The pair with the most sign-offs between them (pairs who vouched both ways rank first) |
+| 3 | The Vault | Most money left unspent in the bank |
+| 4–6 | First Past the Post: Act I / II / III | First to complete every regular mission in that act |
+| 7 | Top Agent | Most money earned (deposits, ignoring spending) |
+
+- **One award each:** Top Agent, Partners in Crime, Social Butterfly and The Vault never go to someone who already won one of them. They're assigned in that order, so if a leader already has an award, it passes to the next-best player. Each slide still shows the top three, plus a note when this happens.
+- **First Past the Post is exempt:** it always goes to whoever really finished first, even if they win another award or several acts.
+- **Ties** go to whoever reached the score first.
+- **Empty awards:** if nobody qualifies (e.g. nobody finished Act III), the slide says so.
+
 ### Running a session (hosts)
 
 1. **Sessions → Create New Session.** Name it and pick participants. It starts as a *draft*.
@@ -234,6 +256,7 @@ The live database also contains tables left over from earlier versions of the ga
 ## Troubleshooting
 
 - **App loads but nothing works:** open the browser console. `src/api/db.js` logs whether it connected to Neon.
+- **Times look hours off:** the database stores timestamps in UTC without a timezone. `src/api/timestamps.js`, registered in `src/api/db.js`, makes the app read them as UTC. Check that the registration is still there.
 - **"No guest in this session matched that passphrase":** the signer must be a participant in the active session, checked in (`ishere = true`), and not the mission owner.
 - **"That passphrase matches more than one guest":** two participants share a passphrase. Run `npm run reassign-passphrases`.
 - **Scripts say "Missing database URL":** set `POSTGRES_URL` in `server/.env`.

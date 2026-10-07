@@ -9,6 +9,7 @@ import * as phaseMissions from './api/phaseMissions.js';
 import * as pushMissions from './api/pushMissions.js';
 import * as staff from './api/staff.js';
 import * as bank from './api/bank.js';
+import * as awards from './api/awards.js';
 
 // Assemble the neonApi object with all functions
 export const neonApi = {
@@ -32,6 +33,9 @@ export const neonApi = {
   getStatement: bank.getStatement,
   getBalances: bank.getBalances,
   recordTransaction: bank.recordTransaction,
+
+  // Awards
+  getAwards: awards.getAwards,
   
   // Sessions
   getAllSessions: sessions.getAllSessions,
