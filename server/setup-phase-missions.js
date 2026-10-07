@@ -1,74 +1,18 @@
-import { neon } from '@neondatabase/serverless';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+// Replaces the mission catalogue (phase_missions) with the missions defined below.
+// DESTRUCTIVE: also deletes every player_missions row, i.e. all mission progress
+// for every session. Run setup-neon.js first so the tables exist.
+//
+// Usage: cd server && npm run seed-missions -- --yes
+import { sql } from './db.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-dotenv.config({ path: join(__dirname, '.env') });
-dotenv.config({ path: join(__dirname, '..', '.env') });
-
-const DATABASE_URL = process.env.POSTGRES_URL || process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.error('Missing database URL. Set POSTGRES_URL or DATABASE_URL in your .env');
+if (!process.argv.includes('--yes')) {
+  console.error('This deletes all phase missions and ALL player mission progress.');
+  console.error('Re-run with --yes to continue:  npm run seed-missions -- --yes');
   process.exit(1);
 }
 
-const sql = neon(DATABASE_URL);
-
 async function setupPhaseMissions() {
   try {
-    console.log('Setting up phase_missions table (non-destructive)...');
-
-    // Create table if it doesn't exist (global — no session_id)
-    await sql`
-      CREATE TABLE IF NOT EXISTS phase_missions (
-        id SERIAL PRIMARY KEY,
-        phase INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        mission_body TEXT NOT NULL,
-        completion_type VARCHAR(10) NOT NULL CHECK (completion_type IN ('phrase', 'signoff')),
-        success_key TEXT,
-        signoff_prompt_template TEXT,
-        variable_pool JSONB,
-        variable_source VARCHAR(20) DEFAULT 'pool',
-        signer_constraint VARCHAR(20) CHECK (signer_constraint IN ('any', 'new_signer', 'same_signer', 'admin_only')),
-        same_signer_mission_id INTEGER REFERENCES phase_missions(id),
-        sort_order INTEGER NOT NULL DEFAULT 0,
-        bounty INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `;
-
-    // Ensure all columns exist
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS phase INTEGER`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS title TEXT`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS mission_body TEXT`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS completion_type VARCHAR(10)`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS success_key TEXT`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS signoff_prompt_template TEXT`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS variable_pool JSONB`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS variable_source VARCHAR(20) DEFAULT 'pool'`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS signer_constraint VARCHAR(20)`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS same_signer_mission_id INTEGER`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS bounty INTEGER DEFAULT 0`;
-    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()`;
-
-    // Remove session_id if it exists (missions are now global, not per-session)
-    await sql`ALTER TABLE phase_missions DROP COLUMN IF EXISTS session_id`;
-
-    // Widen phase constraint to allow phase 0
-    await sql`ALTER TABLE phase_missions DROP CONSTRAINT IF EXISTS phase_missions_phase_check`;
-    await sql`ALTER TABLE phase_missions ADD CONSTRAINT phase_missions_phase_check CHECK (phase IN (0, 1, 2, 3))`;
-
-    // Widen signer_constraint to include admin_only
-    await sql`ALTER TABLE phase_missions DROP CONSTRAINT IF EXISTS phase_missions_signer_constraint_check`;
-    await sql`ALTER TABLE phase_missions ADD CONSTRAINT phase_missions_signer_constraint_check CHECK (signer_constraint IN ('any', 'new_signer', 'same_signer', 'admin_only'))`;
-
-    console.log('✓ Table schema up to date');
-
     // Clear old data and reseed
     const existing = await sql`SELECT count(*) as cnt FROM phase_missions`;
     if (existing[0].cnt > 0) {
@@ -140,12 +84,6 @@ async function setupPhaseMissions() {
     }
 
     console.log('\n✓ Phase missions seeded successfully');
-
-    // Indexes
-    await sql`CREATE INDEX IF NOT EXISTS idx_phase_missions_phase ON phase_missions(phase)`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_phase_missions_sort ON phase_missions(phase, sort_order)`;
-    console.log('✓ Indexes verified');
-
   } catch (err) {
     console.error('Error setting up phase missions:', err);
     process.exit(1);

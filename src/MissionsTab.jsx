@@ -83,7 +83,11 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
       )}
 
       {phaseOrder.map(phase => {
-        const phaseMissions = missions.filter(m => Number(m.phase) === phase)
+        // Culminating missions stay secret until every other mission in the phase is done
+        const phaseMissions = missions
+          .filter(m => Number(m.phase) === phase)
+          .filter(m => !m.isCulminating || m.culminatingUnlocked || m.completed)
+          .sort((a, b) => Number(!!b.isCulminating) - Number(!!a.isCulminating))
         if (phaseMissions.length === 0) return null
         const isLocked = phase < cp
 
@@ -100,9 +104,12 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
                 {fullCardMissions.map(mission => (
                   <div
                     key={mission.playerMissionId}
-                    className="mission-card clickable"
+                    className={`mission-card clickable${mission.isCulminating ? ' mission-card--push mission-card--culminating' : ''}`}
                     onClick={() => onMissionClick(mission.playerMissionId)}
                   >
+                    {mission.isCulminating && (
+                      <div className="push-mission-card-label">CULMINATING MISSION · SEE YOUR HANDLER</div>
+                    )}
                     <div className="mission-header">
                       <h3>{mission.title}</h3>
                       {mission.bounty > 0 && (

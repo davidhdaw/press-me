@@ -1,392 +1,196 @@
-# Press Me - Spy Game Application
+# Press Me
 
-A React-based spy game application with Neon database backend, featuring team-based missions, agent authentication, and real-time mission tracking. The frontend connects directly to Neon database using serverless functions - no Express server required.
+A phone-based companion app for a live, in-person spy party game. Guests sign in on their phones and receive missions in acts ("phases"), carry them out in the room, and prove completion by getting another guest to sign off with their secret passphrase. Hosts run the night from an admin dashboard: starting the session, advancing phases, sending ad-hoc missions, and paying out bounties.
 
-## 🎯 Game Overview
+## Architecture
 
-Press Me is an interactive spy game where players take on the role of secret agents competing in teams. Players receive missions, complete objectives, and earn points for their team while avoiding detection by opposing agents.
+- **Frontend:** React 19 single-page app built with Vite, routed with `react-router-dom`.
+- **Database:** Neon (serverless Postgres).
+- **No backend.** The browser talks to Neon directly through `@neondatabase/serverless`; all game logic lives in `src/api/`. The `server/` folder only holds Node scripts you run by hand to set up and maintain the database.
 
-### Key Features
-- **Team-based gameplay** (Red vs Blue teams)
-- **Dynamic mission assignment** with 15-minute time limits
-- **Agent authentication** with codename system
-- **Real-time mission tracking** and completion
-- **Intelligence sharing** between team members
-- **Mission categories**: Social, Sabotage, Team, and Object missions
+> **Security model:** the database connection string is compiled into the browser bundle, passphrases are stored in plain text, and admin checks happen client-side. The app is hosted on Vercel only so guests don't need to join local wi-fi; they reach it through per-player QR/NFC login links, groups are small, and there's little to gain from attacking it, so this is an accepted trade-off. Revisit it if the game ever handles anything sensitive.
 
-## 🚀 Quick Start
-
-### Prerequisites
-- **Node.js** (v16 or higher)
-- **npm** or **yarn**
-- **Neon database account** (free tier available at [neon.tech](https://neon.tech))
-
-### 1. Clone the Repository
-```bash
-git clone <repository-url>
-cd press-me
-```
-
-### 2. Install Dependencies
-
-**Frontend:**
-```bash
-npm install
-```
-
-**Server scripts (for database setup):**
-```bash
-cd server
-npm install
-cd ..
-```
-
-### 3. Database Setup
-
-**Create Neon Database:**
-1. Sign up for a free account at [neon.tech](https://neon.tech)
-2. Create a new project
-3. Copy your connection string from the Neon dashboard
-
-**Configure Environment:**
-```bash
-cd server
-cp env.example .env
-```
-
-Edit `server/.env` with your Neon connection string:
-```env
-POSTGRES_URL=postgresql://username:password@host/database?sslmode=require
-```
-
-**Initialize Database:**
-```bash
-cd server
-npm run setup-db-neon
-```
-
-This will create all tables and seed initial data.
-
-### 4. Start the Application
-
-**Frontend only (no backend server needed):**
-```bash
-npm run dev
-```
-
-The application runs on: http://localhost:5173
-
-### 5. Access the Game
-
-**For Regular Players:**
-1. Open http://localhost:5173 in your browser
-2. Enter your agent alias (e.g., "Swift Spider", "Invisible Mouse", or "Swift_Spider")
-3. You'll be redirected to the passphrase entry page (`/login/{encodedAlias}`). This allows you to have users skip steps 1 and 2 when given a QRcode or NFC with their unique agent login.
-4. Enter your passphrase (you'll see a hint showing all words except the last word)
-5. After successful authentication, you'll be taken to the dashboard
-6. View your mission briefing by navigating to the mission page (if needed)
-
-**For Admins:**
-1. Navigate to http://localhost:5173/admin/login
-2. Enter your full name (e.g., "David Daw" or "Nikki Thayer")
-3. Enter your passphrase when prompted
-4. You'll be taken to the Admin Dashboard where you can create and manage game sessions
-
-## 🎮 How to Play
-
-### Agent Login (Two-Step Process)
-
-**Step 1: Enter Alias**
-- Enter your agent alias on the home page
-- Format: "Alias1 Alias2" (e.g., "Swift Spider")
-- Also accepts: "Alias1_Alias2" or "Alias1Alias2" (case-insensitive)
-- If the alias is valid, you'll be redirected to the passphrase page
-
-**Step 2: Enter Passphrase**
-- You'll see a hint showing all words of your passphrase except the last word
-- Enter the last word of your passphrase to complete authentication
-- Example: If your passphrase is "Not every bird is an eagle.", the hint shows "Not every bird is an" and you enter "eagle."
-
-**Security Features:**
-- Failed login attempts are logged and tracked
-- After 5 failed attempts, the system locks out with a security warning
-- You must contact a host to unlock your account after lockout
-
-### Mission System
-- **Mission Types:**
-  - **Social**: Interact with other players
-  - **Sabotage**: Disrupt other players' activities
-  - **Team**: Coordinate with teammates
-  - **Object**: Find or identify specific items
-
-- **Mission Assignment:**
-  - Missions are assigned for 15 minutes
-  - Use "REFRESH MISSIONS" to get new assignments
-  - Each mission has a success key for completion
-
-### Team Competition
-- **Red Team** vs **Blue Team**
-- Complete missions to earn points for your team
-- Track team progress and compete for victory
-
-## 👨‍💼 Admin Panel
-
-### Admin Login
-
-Admins have a separate login flow using their real names instead of aliases.
-
-**Step 1: Access Admin Login**
-- Navigate to `/admin/login` in your browser
-- Or click the "ADMIN" button on the dashboard (if you're already logged in as an admin)
-
-**Step 2: Enter Your Full Name**
-- Enter your full name: "First Last" (e.g., "David Daw" or "Nikki Thayer")
-- The system validates that you are an admin user
-- If valid, you'll be redirected to the passphrase entry page
-
-**Step 3: Enter Passphrase**
-- You'll see a hint showing all words of your passphrase except the last word
-- Enter the last word of your passphrase to complete authentication
-- After successful authentication, you'll be taken to the Admin Dashboard
-
-**Admin Users:**
-- Admin status is stored in the database (`is_admin` field)
-- Only users with `is_admin = true` can access the admin panel
-- Default admin users: David Daw (Swift Spider) and Nikki Thayer (Normal Hawk)
-
-### Creating and Starting a Session
-
-**1. Create a New Session**
-- Click "Create New Session" button in the Admin Dashboard
-- Enter a session name (e.g., "Game Night - January 2024")
-- Set the mission refresh interval (default: 15 minutes)
-  - This determines how often missions will be reassigned to players
-- Select players to include in the session
-  - Use "Select All" to quickly select all active players
-  - Or individually check/uncheck players
-- Click "Create Session"
-- The session will be created in "draft" status
-
-**2. Start the Session**
-- Find your session in the sessions list
-- Click "Start Session" button
-- Confirm the action
-- The system will:
-  - Change session status to "active"
-  - Assign missions to all selected players
-  - Begin tracking mission completion
-  - Start the mission refresh timer
-
-**3. Managing Active Sessions**
-
-**View Session Data:**
-- When a session is active, you'll see:
-  - Session participants and their assigned missions
-  - Mission completion status for each player
-  - Countdown timer for next mission reassignment
-  - Refresh button to manually reload session data
-
-**Session Controls:**
-- **Open/Close Voting**: Control whether players can submit intel
-- **Pause Session**: Temporarily pause the session (missions won't refresh)
-- **End Session**: Permanently end the session
-- **Reset Session**: Clear all missions, completions, and intel (use with caution!)
-
-**4. Editing Sessions**
-- Draft, paused, or ended sessions can be edited
-- Click "Edit" to modify:
-  - Session name
-  - Mission refresh interval
-  - Participant list
-- Active sessions cannot be edited (pause or end first)
-
-**5. Mission Management**
-
-**Automatic Reassignment:**
-- Missions automatically reassign based on the refresh interval
-- The countdown timer shows when the next reassignment will occur
-- Reassignments happen automatically in the background
-
-**Manual Mission Completion:**
-- Admins can manually complete missions for players
-- Click "Complete Mission" on any uncompleted mission
-- Confirm the action
-- The player will receive intel (if applicable) and the mission will be marked complete
-
-**6. Session Statuses**
-
-- **Draft**: Session created but not started (can be edited)
-- **Active**: Session is running (missions assigned, timer active)
-- **Paused**: Session temporarily paused (can be resumed or ended)
-- **Ended**: Session permanently ended (can be edited or reset)
-
-
-## 🛠️ Development
-
-### Project Structure
 ```
 press-me/
-├── src/                    # React frontend
-│   ├── App.jsx            # Main app component
-│   ├── Dashboard.jsx      # Mission dashboard
-│   ├── Login.jsx          # Authentication
-│   ├── Mission.jsx        # Mission briefing
-│   ├── AdminDashboard.jsx # Admin interface
-│   ├── neonApi.js         # Neon database API (direct connection)
-│   └── App.css            # Styles
-├── server/                # Database setup scripts (not a running server)
-│   ├── setup-neon.js     # Database setup script
-│   ├── reset-users.js    # User management utility
-│   ├── database.sql      # Database schema reference
-│   ├── check-user-missions.js    # Debugging utility
-│   ├── dump-mission-tables.js    # Debugging utility
-│   └── generate-login-urls.js   # Utility script
-├── arduino/               # Arduino sketches
-│   └── arduino_serial_test.ino
-└── public/                # Static assets
+├── src/
+│   ├── App.jsx              # Routes; keeps the signed-in user in localStorage ('spyUser')
+│   ├── Login.jsx            # Player sign-in (name or alias)
+│   ├── Dashboard.jsx        # Player view: missions, sign-offs, push missions, bounty payout
+│   ├── MissionsTab.jsx      # Mission list grouped by phase
+│   ├── AgentTab.jsx         # Reveal-on-tap passphrase
+│   ├── AdminLogin.jsx       # Host sign-in (name + passphrase)
+│   ├── AdminDashboard.jsx   # Host view: Sessions / Missions / Users / Push tabs
+│   ├── neonApi.js           # Single `neonApi` object the components call
+│   └── api/
+│       ├── db.js            # Neon connection (browser)
+│       ├── auth.js          # Player and admin sign-in, login logging
+│       ├── users.js
+│       ├── sessions.js      # Session lifecycle and phase advancement
+│       ├── phaseMissions.js # Mission catalogue, assignment, completion, sign-off rules
+│       └── pushMissions.js  # Host-to-player ad-hoc missions
+├── server/                  # Database scripts (not a running server)
+│   ├── db.js                # Shared connection, reads server/.env
+│   ├── setup-neon.js        # Creates all tables — schema source of truth
+│   ├── setup-phase-missions.js  # Seeds the mission catalogue (destructive)
+│   ├── generate-login-urls.js   # Per-player one-tap login URLs for QR/NFC
+│   └── update-passphrases.js    # Reassigns single-word passphrases
+├── arduino/                 # Experimental button-logger sketch (not wired into the app)
+├── mission_ideas.md         # Design notes for the current mission set
+└── public/                  # Favicon and briefing seal image
 ```
 
-### Architecture
+## Setup
 
-This application uses a **serverless architecture**:
-- **Frontend**: React SPA that connects directly to Neon database
-- **Database**: Neon PostgreSQL (serverless)
-- **Database API**: All database logic is in `src/neonApi.js`
+Prerequisites: Node.js 18+ and a Neon project ([neon.tech](https://neon.tech), free tier is fine).
 
-The `server/` folder contains utility scripts for database setup and maintenance, but there is no running server.
-
-### Database Schema
-
-The database includes the following tables:
-
-**Core Tables:**
-- `users` - Agent information (firstname, lastname, alias_1, alias_2, team, passphrase, score, is_admin)
-- `missions` - Legacy mission system
-- `teams` - Team information and points
-- `intel` - Intelligence clues
-- `login_logs` - Login attempt tracking
-
-**Mission Tables:**
-- `book_missions` - Book-based missions with team-specific clues
-- `passphrase_missions` - Passphrase completion missions
-- `object_missions` - Object identification missions
-
-**Game Management:**
-- `sessions` - Game session management
-- `agent_intel` - Agent knowledge tracking
-- `assignment_timestamp` - Mission assignment timing
-
-See `server/setup-neon.js` for the complete schema definition.
-
-## 🔧 Configuration
-
-### Environment Variables
-Create `server/.env`:
-```env
-POSTGRES_URL=postgresql://username:password@host/database?sslmode=require
+```bash
+npm install                       # frontend
+cd server && npm install          # database scripts
 ```
 
-Get your connection string from the Neon dashboard.
+### Point the app at your database
 
-### Adding New Missions
-1. Edit `server/setup-neon.js`
-2. Add mission objects to the appropriate arrays (book_missions, passphrase_missions, or object_missions)
-3. Run `npm run setup-db-neon` in the server directory to recreate database with new missions
+The connection string lives in **two** places:
 
-### Customizing Agents
-1. Edit `server/setup-neon.js`
-2. Modify the users array in the setupNeonDatabase function
-3. Run `npm run setup-db-neon` to recreate database with new agents
+1. `server/.env` — used by the scripts. Copy `server/env.example` and set `POSTGRES_URL`.
+2. `src/api/db.js` — used by the browser. Update `DATABASE_URL` there too.
 
-### Utility Scripts
+### Create the tables
 
-The `server/` directory contains utility scripts for database maintenance and debugging:
+```bash
+cd server
+npm run setup-db
+```
 
-**Database Setup:**
-- `setup-neon.js` - Main database setup script (creates all tables and seeds data)
-- `reset-users.js` - Reset users table (note: currently uses local PostgreSQL, may need updating for Neon)
+This only creates missing tables and indexes and never touches existing data, so it is safe to re-run after pulling schema changes. Add new tables or columns here (`CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`).
 
-**Debugging Utilities:**
-- `check-user-missions.js` - Check which missions are assigned to a specific user
-  - Usage: `cd server && node check-user-missions.js [userId]` (or no args to check all users)
-- `dump-mission-tables.js` - Generate a dump of all mission tables and assignments
-  - Usage: `cd server && node dump-mission-tables.js`
-  - Creates a timestamped dump file in the server directory
-- `generate-login-urls.js` - Generate login URLs for all users (useful for creating QR codes/NFC tags)
-  - Usage: `cd server && node generate-login-urls.js`
+### Seed the missions
 
-## 🐛 Troubleshooting
+```bash
+cd server
+npm run seed-missions -- --yes
+```
 
-### Database Connection Issues
-- Verify your Neon connection string in `server/.env` is correct
-- Check that your Neon database is active in the Neon dashboard
-- Ensure `POSTGRES_URL` environment variable is set correctly
-- Check browser console for connection errors
+⚠️ This deletes the whole mission catalogue **and every player's mission progress in every session**, then inserts the missions defined in `setup-phase-missions.js`. Missions can also be added and edited without a reseed from the admin dashboard's **Missions** tab.
 
-### Mission Issues
-- Reset all data: `cd server && npm run setup-db-neon`
-- Check mission assignments: `cd server && node check-user-missions.js [userId]`
-- Generate mission dump: `cd server && node dump-mission-tables.js`
+### Create the first host
 
-### Setup Script Issues
-- Ensure `POSTGRES_URL` is set in `server/.env` file
-- Check that you have write permissions on the Neon database
-- Verify all required tables are created: `cd server && node check-user-missions.js` (will fail if tables don't exist)
-- Test Neon connection: `cd server && node -e "import('@neondatabase/serverless').then(m => { const sql = m.neon(process.env.POSTGRES_URL); sql\`SELECT NOW()\`.then(r => console.log('Connected:', r)).catch(e => console.error('Connection failed:', e)) })"`
+A fresh database has no users, and new users are added from the admin dashboard's **Users** tab, so insert the first host by hand (Neon SQL editor or `psql`):
 
-### Frontend Issues
-- Clear browser cache
-- Check browser console for errors
-- Verify Neon database connection string is correct
-- Check that database tables exist (run setup script if needed)
+```sql
+INSERT INTO users (id, firstname, lastname, alias_1, alias_2, passphrase, is_admin)
+VALUES (1, 'Jane', 'Host', 'Silent', 'Owl', 'raven', true);
+```
 
-## 📝 Game Customization
+### Run it
 
-### Mission Types
-The game supports 4 mission types:
-- **Social**: Player interaction missions
-- **Sabotage**: Disruption missions  
-- **Team**: Team coordination missions
-- **Object**: Item identification missions
+```bash
+npm run dev       # http://localhost:5173, also exposed on your LAN for guests' phones
+npm run build     # production build in dist/
+npm run lint
+```
 
-### Time Limits
-- Mission assignment: 15 minutes (configurable per session)
-- Configurable in session settings via Admin Dashboard
+`vercel.json` rewrites every path to `index.html` so client-side routes work if you deploy to Vercel.
 
-### Team System
-- Two teams: Red and Blue
-- Point-based scoring
-- Team-specific missions available
+## How the game works
 
-## 🔒 Security Notes
+### Signing in
 
-- Passphrases are stored in plain text (development only)
-- Login attempts are logged with IP addresses
-- Security lockout after 5 failed attempts
-- No rate limiting implemented
-- CORS enabled for development
+- **Players** go to `/` and enter their real name (`First Last`) or their two-word alias (`Swift Spider`, `swift_spider`, or `SwiftSpider`). No passphrase is needed to sign in. Only users with `ishere = true` can sign in.
+- **One-tap login:** `/login/<base64 of name or alias>` signs a player straight in, which is handy on a QR code or NFC tag. `cd server && npm run login-urls` prints one for every player.
+- **Hosts** go to `/admin/login`, enter their name, see their passphrase with the last word hidden, and type the last word (or the whole phrase). Requires `is_admin = true`.
 
-## 📄 License
+Sign-ins are recorded in `login_logs`. The signed-in user is cached in `localStorage`, so a refresh keeps them signed in.
 
-This project is for educational and entertainment purposes.
+### Passphrases and sign-offs
 
-## 🤝 Contributing
+Every guest has a secret passphrase, which they can reveal on their **Agent** tab. Passphrases are how missions get verified: when you finish a mission, a witness types *their* passphrase into *your* phone. The app checks it against every other checked-in participant in the session to identify the signer. Matching ignores case and punctuation, and either the full phrase or just its last word is accepted.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+Passphrases must be unique within a session. `npm run reassign-passphrases` previews a fresh set of distinct single words, and `-- --apply` writes them.
 
-## 📞 Support
+### Phases and missions
 
-For issues or questions:
-1. Check the troubleshooting section
-2. Review browser console for errors
-3. Verify Neon database connection
-4. Check that all dependencies are installed
-5. Ensure database tables are set up (run `npm run setup-db-neon` in server directory)
+`phase_missions` is the global catalogue. Each mission belongs to a phase:
 
----
+| Phase | Name | Current missions |
+| --- | --- | --- |
+| 0 | Icebreaker | Introduce yourself to three different people |
+| 1 | Act I | Operation Live to Serve, House Always Wins, Thin Blue Liar, MLM, New Hire |
+| 2 | Act II | Operation Lost Shirt, False Fracas, Don't I Know You?, But Is It Art?, Prodigal Son |
+| 3 | Act III | Operation Foreign Investment, Stop Where You Are, Over There |
 
-**Happy Spying! 🕵️‍♂️🕵️‍♀️**
+When a session starts, every participant gets all phase 0 missions. **Advance to Phase N** gives everyone the next phase's missions and locks the previous phase, so locked missions can't be completed any more. Each player's copy of a mission is a row in `player_missions`.
+
+Mission options (editable in the **Missions** tab):
+
+- **Completion type**
+  - `signoff`: a witness confirms with their passphrase. All current missions use this.
+  - `phrase`: the player types an answer that's checked against `success_key`.
+- **Signer constraint** (sign-off missions only)
+  - `any`: any other participant.
+  - `new_signer`: someone who hasn't yet signed any of this player's missions. Used by the icebreakers.
+  - `same_signer`: must be whoever signed the linked mission. Prodigal Son must be signed by the New Hire signer.
+  - `admin_only`: a host must sign.
+- **Variables:** `{variable}` in the mission body is filled per player.
+  - `pool`: a random pick from a comma-separated list.
+  - `participants`: another player's name, paired so A↔B are assigned to each other. Used by False Fracas.
+- **Sign-off prompt:** the sentence the witness sees before signing, for example "`{player_name}` served me food…".
+- **Culminating:** hidden until the player finishes the rest of the phase. See below.
+- **Bounty:** play-money reward. After completion the player's phone shows the bounty, and a host taps **Mark as paid** once they've handed it over.
+
+### Culminating missions
+
+A mission marked **Culminating** (a checkbox in the Missions tab) is a phase's finale. Every player is assigned it when the phase starts, but it stays hidden on their phone until they've completed every other mission in that phase. Admin force-completes count toward that.
+
+- When it unlocks, the phone announces it ("Phase N complete … see your handler for more information") once, and the mission appears at the top of the list as a highlighted card.
+- Ticking **Culminating** defaults the mission to a host sign-off (`admin_only`) with the body "See your handler for more information." Both can be changed.
+- The server refuses to complete a culminating mission before it's unlocked.
+- In the admin **Users** tab, a **Waiting for a handler** box lists everyone with an unlocked, unfinished culminating mission. Each player card shows the mission's progress, e.g. "hidden until 3/5 done".
+- Like any mission, it locks when you advance past its phase.
+
+### Push missions
+
+From the **Push** tab a host can send a one-off mission (title, body, bounty) to a single player during an active session. It pops up on the player's phone to acknowledge. When the host marks it complete, the player sees the completion and the bounty is paid out the same way.
+
+### Running a session (hosts)
+
+1. **Sessions → Create New Session.** Name it and pick participants. It starts as a *draft*.
+2. **Start Session.** Status becomes *active* and phase 0 is assigned. Only one session can be active at a time.
+3. **Advance to Phase 1 / 2 / 3** as the night progresses.
+4. Watch per-player progress in the expanded session. **Complete Mission** force-completes a stuck mission.
+5. **Pause / Resume** as needed, then **End Session**.
+6. **Reset** (paused or ended sessions only) clears all mission progress and returns the session to draft.
+
+Players' phones poll every 5 seconds for session changes, missions, and push missions.
+
+### Adding and editing players (including mid-game)
+
+The **Users** tab lists every user, with an **Edit** button on each player and on each participant card in the active session.
+
+- **Add Player** creates a new user or picks an existing one (a returning guest). If a session is active, it also adds them to it and assigns the **current phase's** missions straight away. Earlier phases are locked, so they're skipped, and later phases include them automatically when you advance. Missions that pair players ("start a fight with `{variable}`") pair late joiners with each other first; otherwise with a random existing player.
+- After saving, the modal shows the player's login link, ready to copy onto a QR code or NFC tag.
+- **Edit** changes name, aliases, passphrase, checked-in status, or host status. It's safe mid-game: missions reference players by id. Changing an alias changes the player's login link. A changed passphrase appears on the player's phone the next time they open or reveal it.
+- Names, aliases and passphrases (by last word) must be unique, because they're what sign-in and sign-off match on. Duplicates are rejected.
+- Adding participants to a **paused** session via **Edit** also assigns them the current phase's missions.
+
+## Database
+
+Tables used by the app (defined in `server/setup-neon.js`):
+
+| Table | Purpose |
+| --- | --- |
+| `users` | Guests and hosts: name, two-word alias, passphrase, `ishere`, `is_admin` |
+| `login_logs` | Sign-in attempts |
+| `sessions` | Game nights: status, participants, `current_phase` |
+| `phase_missions` | Mission catalogue |
+| `player_missions` | Per-session, per-player mission state: completion, signer, bounty paid |
+| `push_missions` | Host-sent ad-hoc missions and their acknowledge/complete/seen/paid state |
+
+The live database also contains tables left over from earlier versions of the game (`book_missions`, `agent_intel`, `teams`, `missions_legacy`, `button_events`, and others), plus unused `users.team`, `users.score`, and `sessions.voting_open` columns. Nothing reads them.
+
+## Troubleshooting
+
+- **App loads but nothing works:** open the browser console. `src/api/db.js` logs whether it connected to Neon.
+- **"No guest in this session matched that passphrase":** the signer must be a participant in the active session, checked in (`ishere = true`), and not the mission owner.
+- **"That passphrase matches more than one guest":** two participants share a passphrase. Run `npm run reassign-passphrases`.
+- **Scripts say "Missing database URL":** set `POSTGRES_URL` in `server/.env`.

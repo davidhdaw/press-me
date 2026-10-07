@@ -106,12 +106,61 @@ export async function updateSession(sessionId, { name, userIds }) {
       `
     }
 
+    // Players added to a session that has already started (i.e. paused) need
+    // the current phase's missions, or they'll have nothing to do on resume.
+    if (userIds !== undefined && currentStatus === 'paused') {
+      const before = new Set(session[0].participant_user_ids || [])
+      const added = userIds.map(id => Number(id)).filter(id => !before.has(id))
+      if (added.length > 0) {
+        await assignPhaseToPlayers(sessionId, session[0].current_phase || 0, added)
+      }
+    }
+
     return {
       success: true,
       session: result[0]
     }
   } catch (error) {
     console.error('Error updating session:', error)
+    throw error
+  }
+}
+
+// Add one player to a running (active or paused) session mid-game and give them
+// the current phase's missions. Earlier phases are locked, so they're skipped;
+// later phases include the player automatically when the host advances.
+export async function addPlayerToSession(sessionId, userId) {
+  try {
+    const session = await sql`
+      SELECT * FROM sessions WHERE id = ${sessionId}
+    `
+    if (session.length === 0) throw new Error('Session not found')
+
+    const { status, current_phase } = session[0]
+    if (status !== 'active' && status !== 'paused') {
+      throw new Error(`Session is ${status}; edit the session to change its players instead`)
+    }
+
+    const id = Number(userId)
+    if ((session[0].participant_user_ids || []).includes(id)) {
+      throw new Error('That player is already in this session')
+    }
+
+    await sql`
+      UPDATE sessions
+      SET participant_user_ids = array_append(participant_user_ids, ${id}::integer)
+      WHERE id = ${sessionId}
+    `
+
+    const assigned = await assignPhaseToPlayers(sessionId, current_phase || 0, [id])
+
+    return {
+      success: true,
+      phase: current_phase || 0,
+      missionCount: assigned.missionCount
+    }
+  } catch (error) {
+    console.error('Error adding player to session:', error)
     throw error
   }
 }
@@ -284,17 +333,6 @@ export async function endSession(sessionId) {
   } catch (error) {
     console.error('Error ending session:', error)
     throw error
-  }
-}
-
-// Check if missions can be assigned (only if there's an active session)
-export async function canAssignMissions() {
-  try {
-    const activeSession = await getActiveSession()
-    return activeSession !== null
-  } catch (error) {
-    console.error('Error checking if missions can be assigned:', error)
-    return false
   }
 }
 

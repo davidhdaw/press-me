@@ -12,18 +12,15 @@ import * as pushMissions from './api/pushMissions.js';
 export const neonApi = {
   // Users
   getUsers: users.getUsers,
-  getUserScore: users.getUserScore,
   getUserPassphrase: users.getUserPassphrase,
   createUser: users.createUser,
+  updateUser: users.updateUser,
   
   // Auth
-  logLogin: auth.logLogin,
   signInByName: auth.signInByName,
   signInByAlias: auth.signInByAlias,
-  authenticate: auth.authenticate,
   validateAdminName: auth.validateAdminName,
   authenticateAdmin: auth.authenticateAdmin,
-  getLoginStats: auth.getLoginStats,
   
   // Sessions
   getAllSessions: sessions.getAllSessions,
@@ -34,17 +31,15 @@ export const neonApi = {
   pauseSession: sessions.pauseSession,
   resumeSession: sessions.resumeSession,
   endSession: sessions.endSession,
-  canAssignMissions: sessions.canAssignMissions,
   resetSession: sessions.resetSession,
+  addPlayerToSession: sessions.addPlayerToSession,
 
   // Phase Missions
   createPhaseMission: phaseMissions.createPhaseMission,
   getPhaseMissions: phaseMissions.getPhaseMissions,
   updatePhaseMission: phaseMissions.updatePhaseMission,
   deletePhaseMission: phaseMissions.deletePhaseMission,
-  assignPhaseToPlayers: phaseMissions.assignPhaseToPlayers,
   getPlayerMissions: phaseMissions.getPlayerMissions,
-  getSessionParticipants: phaseMissions.getSessionParticipants,
   completePhaseMission: phaseMissions.completePhaseMission,
   signOffMission: phaseMissions.signOffMission,
   adminCompletePhaseMission: phaseMissions.adminCompletePhaseMission,

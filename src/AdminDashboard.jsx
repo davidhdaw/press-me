@@ -12,6 +12,10 @@ function getPlayerLoginUrl(user) {
   return `${PRODUCTION_URL}/login/${encodeURIComponent(base64Alias)}`
 }
 
+const EMPTY_PLAYER_FORM = {
+  firstname: '', lastname: '', alias_1: '', alias_2: '', passphrase: '', is_admin: false, ishere: true
+}
+
 // Helper function to format timestamp with proper timezone handling
 function formatTimestamp(timestamp) {
   if (!timestamp) return ''
@@ -128,23 +132,25 @@ function AdminDashboard({ currentUser, onLogout }) {
     variablePool: '',
     variableSource: 'pool',
     signerConstraint: 'any',
-    sameSigerMissionId: null,
+    sameSignerMissionId: null,
     sortOrder: 0,
-    bounty: 0
+    bounty: 0,
+    isCulminating: false
   })
   const [phaseMissions, setPhaseMissions] = useState([])
   const [loadingPhaseMissions, setLoadingPhaseMissions] = useState(false)
 
-  // Add user state
-  const [showAddUserModal, setShowAddUserModal] = useState(false)
-  const [addingUser, setAddingUser] = useState(false)
-  const [newUserForm, setNewUserForm] = useState({
-    firstname: '', lastname: '', alias_1: '', alias_2: '', passphrase: '', is_admin: false
-  })
+  // Add/edit player modal state
+  const [playerModal, setPlayerModal] = useState(null) // null | { mode: 'add' } | { mode: 'edit', user }
+  const [playerForm, setPlayerForm] = useState(EMPTY_PLAYER_FORM)
+  const [addSource, setAddSource] = useState('new') // 'new' | 'existing'
+  const [existingUserId, setExistingUserId] = useState('')
+  const [addToSession, setAddToSession] = useState(true)
+  const [savingPlayer, setSavingPlayer] = useState(false)
+  const [playerResult, setPlayerResult] = useState(null) // { user, message } shown after a save
 
   // Users tab state
   const [usersTabList, setUsersTabList] = useState([])
-  const [loadingUsersTab, setLoadingUsersTab] = useState(false)
   const [showPassphrases, setShowPassphrases] = useState(false)
   const [expandedSessions, setExpandedSessions] = useState(new Set())
 
@@ -537,9 +543,10 @@ function AdminDashboard({ currentUser, onLogout }) {
         variablePool: mission.variable_pool ? mission.variable_pool.join(', ') : '',
         variableSource: mission.variable_source || 'pool',
         signerConstraint: mission.signer_constraint || 'any',
-        sameSigerMissionId: mission.same_signer_mission_id || null,
+        sameSignerMissionId: mission.same_signer_mission_id || null,
         sortOrder: mission.sort_order || 0,
-        bounty: mission.bounty || 0
+        bounty: mission.bounty || 0,
+        isCulminating: !!mission.is_culminating
       })
     } else {
       setMissionForm({
@@ -552,9 +559,10 @@ function AdminDashboard({ currentUser, onLogout }) {
         variablePool: '',
         variableSource: 'pool',
         signerConstraint: 'any',
-        sameSigerMissionId: null,
+        sameSignerMissionId: null,
         sortOrder: 0,
-        bounty: 0
+        bounty: 0,
+        isCulminating: false
       })
     }
     setShowMissionModal(true)
@@ -580,9 +588,10 @@ function AdminDashboard({ currentUser, onLogout }) {
       variablePool: poolArray && poolArray.length > 0 ? poolArray : null,
       variableSource: missionForm.variableSource,
       signerConstraint: missionForm.completionType === 'signoff' ? missionForm.signerConstraint : null,
-      sameSigerMissionId: missionForm.signerConstraint === 'same_signer' ? missionForm.sameSigerMissionId : null,
+      sameSignerMissionId: missionForm.signerConstraint === 'same_signer' ? missionForm.sameSignerMissionId : null,
       sortOrder: missionForm.sortOrder,
-      bounty: parseInt(missionForm.bounty) || 0
+      bounty: parseInt(missionForm.bounty) || 0,
+      isCulminating: missionForm.isCulminating
     }
 
     try {
@@ -610,34 +619,90 @@ function AdminDashboard({ currentUser, onLogout }) {
 
   const loadUsersTab = async () => {
     try {
-      setLoadingUsersTab(true)
       const users = await neonApi.getUsers()
       setUsersTabList(users || [])
     } catch (error) {
       console.error('Error loading users:', error)
       setUsersTabList([])
-    } finally {
-      setLoadingUsersTab(false)
     }
   }
 
-  const handleAddUser = async () => {
-    const { firstname, lastname, alias_1, alias_2, passphrase } = newUserForm
-    if (!firstname || !lastname || !alias_1 || !alias_2 || !passphrase) {
-      alert('All fields are required.')
-      return
-    }
+  const openAddPlayer = () => {
+    setPlayerForm(EMPTY_PLAYER_FORM)
+    setAddSource('new')
+    setExistingUserId('')
+    setAddToSession(true)
+    setPlayerResult(null)
+    setPlayerModal({ mode: 'add' })
+    if (usersTabList.length === 0) loadUsersTab()
+  }
+
+  const openEditPlayer = (user) => {
+    setPlayerForm({
+      firstname: user.firstname || '',
+      lastname: user.lastname || '',
+      alias_1: user.alias_1 || '',
+      alias_2: user.alias_2 || '',
+      passphrase: user.passphrase || '',
+      is_admin: !!user.is_admin,
+      ishere: user.ishere !== false
+    })
+    setPlayerResult(null)
+    setPlayerModal({ mode: 'edit', user })
+  }
+
+  const closePlayerModal = () => {
+    if (savingPlayer) return
+    setPlayerModal(null)
+    setPlayerResult(null)
+  }
+
+  const handleSavePlayer = async () => {
+    setSavingPlayer(true)
     try {
-      setAddingUser(true)
-      await neonApi.createUser(newUserForm)
-      setShowAddUserModal(false)
-      setNewUserForm({ firstname: '', lastname: '', alias_1: '', alias_2: '', passphrase: '', is_admin: false })
+      let user
+      let message
+      if (playerModal.mode === 'edit') {
+        user = await neonApi.updateUser(playerModal.user.id, playerForm)
+        const aliasChanged = user.alias_1 !== playerModal.user.alias_1 || user.alias_2 !== playerModal.user.alias_2
+        message = aliasChanged
+          ? 'Saved. Their alias changed, so their login link has changed too — give them the new one below.'
+          : 'Saved.'
+      } else {
+        if (addSource === 'existing') {
+          if (!existingUserId) throw new Error('Choose a player')
+          user = usersTabList.find(u => u.id === Number(existingUserId))
+          if (!user.ishere) user = await neonApi.updateUser(user.id, { ishere: true })
+        } else {
+          user = await neonApi.createUser(playerForm)
+        }
+        message = `${user.firstname} ${user.lastname} is ready.`
+        if (activeSession && addToSession) {
+          try {
+            const result = await neonApi.addPlayerToSession(activeSession.id, user.id)
+            message = `${user.firstname} ${user.lastname} joined ${activeSession.name} with ${result.missionCount} Phase ${result.phase} mission${result.missionCount === 1 ? '' : 's'}.`
+          } catch (error) {
+            message = `${user.firstname} ${user.lastname} was saved but NOT added to ${activeSession.name}: ${error.message} Retry with Add Player → Existing player.`
+          }
+        }
+      }
+      setPlayerResult({ user, message })
       await loadUsersTab()
-      alert(`User ${firstname} ${lastname} created!`)
+      if (activeSession) {
+        await loadSessions()
+      }
     } catch (error) {
-      alert(`Error creating user: ${error.message || 'Please try again.'}`)
+      alert(error.message || 'Something went wrong. Please try again.')
     } finally {
-      setAddingUser(false)
+      setSavingPlayer(false)
+    }
+  }
+
+  const copyLoginUrl = async (url) => {
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      window.prompt('Copy this login link:', url)
     }
   }
 
@@ -831,6 +896,7 @@ function AdminDashboard({ currentUser, onLogout }) {
                           </div>
                         </div>
                         <span className="mission-meta">
+                          {m.is_culminating && <span className="mission-tag tag-culminating">culminating</span>}
                           <span className="mission-tag tag-completion">{m.completion_type}</span>
                           {m.bounty ? <span className="mission-tag tag-bounty">{`$${m.bounty}`}</span> : null}
                           {m.signer_constraint && m.signer_constraint !== 'any' ? <span className="mission-tag tag-constraint">{m.signer_constraint.replace(/_/g, ' ')}</span> : null}
@@ -857,6 +923,9 @@ function AdminDashboard({ currentUser, onLogout }) {
                 <div className="admin-section-header-row">
                   <h2>Active: {activeSession.name} — Phase {activeSession.current_phase || 0}/3</h2>
                   <div className="session-controls">
+                    <button onClick={openAddPlayer} className="button-primary">
+                      Add Player
+                    </button>
                     <button
                       onClick={() => setShowPassphrases(p => !p)}
                       className={`button-secondary${showPassphrases ? ' active' : ''}`}
@@ -895,6 +964,23 @@ function AdminDashboard({ currentUser, onLogout }) {
                     </button>
                   </div>
                 </div>
+                {(() => {
+                  const currentPhase = activeSession.current_phase || 0
+                  const waiting = playerMissions.filter(m =>
+                    m.culminatingUnlocked && !m.completed && m.phase >= currentPhase
+                  )
+                  if (waiting.length === 0) return null
+                  return (
+                    <div className="handler-queue">
+                      <strong>Waiting for a handler:</strong>
+                      <ul>
+                        {waiting.map(m => (
+                          <li key={m.playerMissionId}>{m.playerName} — {m.title}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )
+                })()}
                 {loadingSessionData ? (
                   <div className="admin-placeholder">
                     <p>Loading session data...</p>
@@ -911,7 +997,8 @@ function AdminDashboard({ currentUser, onLogout }) {
                       return (
                         <div key={user.id} className="participant-card">
                           <div className="participant-header">
-                            {user.firstname} {user.lastname}
+                            <span>{user.firstname} {user.lastname}</span>
+                            <button onClick={() => openEditPlayer(user)} className="button-small">Edit</button>
                           </div>
                           {showPassphrases && user.passphrase && (
                             <div className="participant-passphrase">{user.passphrase}</div>
@@ -931,10 +1018,18 @@ function AdminDashboard({ currentUser, onLogout }) {
                                     {phaseMissions.map(m => (
                                       <div
                                         key={m.playerMissionId}
-                                        className={`phase-mission-row${m.completed ? ' completed' : ''}${isLocked && !m.completed ? ' locked' : ''}`}
+                                        className={`phase-mission-row${m.completed ? ' completed' : ''}${isLocked && !m.completed ? ' locked' : ''}${m.culminatingUnlocked && !m.completed && !isLocked ? ' culminating-ready' : ''}`}
                                       >
                                         <div>
+                                          {m.isCulminating && <span className="mission-tag tag-culminating">culminating</span>}
                                           <strong>{m.title}</strong>
+                                          {m.isCulminating && !m.completed && !isLocked && (
+                                            <span className="mission-type">
+                                              {m.culminatingUnlocked
+                                                ? ' — unlocked, see handler'
+                                                : ` — hidden until ${phaseMissions.filter(x => !x.isCulminating && x.completed).length}/${phaseMissions.filter(x => !x.isCulminating).length} done`}
+                                            </span>
+                                          )}
                                           {m.variableValue && (
                                             <span className="mission-variable"> [{m.variableValue}]</span>
                                           )}
@@ -973,6 +1068,33 @@ function AdminDashboard({ currentUser, onLogout }) {
                 <p className="admin-empty-message">No active session. Start a session from the Sessions tab to see participants here.</p>
               </div>
             )}
+
+            <div className="admin-section">
+              <div className="admin-section-header-row">
+                <h2>All Users ({usersTabList.length})</h2>
+                <div className="session-controls">
+                  {!activeSession && (
+                    <button onClick={openAddPlayer} className="button-primary">Add Player</button>
+                  )}
+                  <button onClick={loadUsersTab} className="button-secondary">Refresh</button>
+                </div>
+              </div>
+              <ul className="user-list">
+                {usersTabList.map(user => (
+                  <li key={user.id} className={`user-row${user.ishere ? '' : ' away'}`}>
+                    <div>
+                      <strong>{user.firstname} {user.lastname}</strong>
+                      <span className="user-row-meta">
+                        {user.alias_1} {user.alias_2}
+                        {user.is_admin && ' · host'}
+                        {!user.ishere && ' · not checked in'}
+                      </span>
+                    </div>
+                    <button onClick={() => openEditPlayer(user)} className="button-small">Edit</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </>
         )}
 
@@ -1234,6 +1356,27 @@ function AdminDashboard({ currentUser, onLogout }) {
                 </select>
               </div>
               <div className="admin-form-group">
+                <label className="admin-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={missionForm.isCulminating}
+                    onChange={(e) => {
+                      const isCulminating = e.target.checked
+                      // Culminating missions are run by a handler, so default to a host sign-off
+                      setMissionForm(isCulminating ? {
+                        ...missionForm,
+                        isCulminating,
+                        completionType: 'signoff',
+                        signerConstraint: 'admin_only',
+                        missionBody: missionForm.missionBody || 'See your handler for more information.'
+                      } : { ...missionForm, isCulminating })
+                    }}
+                  />
+                  Culminating mission
+                </label>
+                <p className="admin-form-hint">Hidden from each player until they've completed every other mission in this phase.</p>
+              </div>
+              <div className="admin-form-group">
                 <label>Title</label>
                 <input
                   type="text"
@@ -1304,8 +1447,8 @@ function AdminDashboard({ currentUser, onLogout }) {
                     <div className="admin-form-group">
                       <label>Same Signer As Mission</label>
                       <select
-                        value={missionForm.sameSigerMissionId || ''}
-                        onChange={(e) => setMissionForm({ ...missionForm, sameSigerMissionId: e.target.value ? parseInt(e.target.value) : null })}
+                        value={missionForm.sameSignerMissionId || ''}
+                        onChange={(e) => setMissionForm({ ...missionForm, sameSignerMissionId: e.target.value ? parseInt(e.target.value) : null })}
                       >
                         <option value="">-- Select mission --</option>
                         {phaseMissions
@@ -1394,48 +1537,115 @@ function AdminDashboard({ currentUser, onLogout }) {
         </div>
       )}
 
-      {/* Add User Modal */}
-      {showAddUserModal && (
-        <div className="admin-modal-overlay" onClick={() => setShowAddUserModal(false)}>
-          <div className="admin-modal-content" onClick={(e) => e.stopPropagation()}>
+      {/* Add / Edit Player Modal */}
+      {playerModal && (
+        <div className="admin-modal-overlay" onClick={closePlayerModal}>
+          <div className="admin-modal-content player-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
-              <h2>Add User</h2>
-              <button className="admin-modal-close" onClick={() => setShowAddUserModal(false)}>x</button>
+              <h2>{playerModal.mode === 'edit' ? `Edit ${playerModal.user.firstname} ${playerModal.user.lastname}` : 'Add Player'}</h2>
+              <button className="admin-modal-close" onClick={closePlayerModal} disabled={savingPlayer}>x</button>
             </div>
-            <div className="admin-modal-body">
-              <div className="admin-form-group">
-                <label>First Name</label>
-                <input type="text" value={newUserForm.firstname} onChange={(e) => setNewUserForm({ ...newUserForm, firstname: e.target.value })} placeholder="First name" disabled={addingUser} />
-              </div>
-              <div className="admin-form-group">
-                <label>Last Name</label>
-                <input type="text" value={newUserForm.lastname} onChange={(e) => setNewUserForm({ ...newUserForm, lastname: e.target.value })} placeholder="Last name" disabled={addingUser} />
-              </div>
-              <div className="admin-form-group">
-                <label>Alias 1</label>
-                <input type="text" value={newUserForm.alias_1} onChange={(e) => setNewUserForm({ ...newUserForm, alias_1: e.target.value })} placeholder="First alias word" disabled={addingUser} />
-              </div>
-              <div className="admin-form-group">
-                <label>Alias 2</label>
-                <input type="text" value={newUserForm.alias_2} onChange={(e) => setNewUserForm({ ...newUserForm, alias_2: e.target.value })} placeholder="Second alias word" disabled={addingUser} />
-              </div>
-              <div className="admin-form-group">
-                <label>Passphrase</label>
-                <input type="text" value={newUserForm.passphrase} onChange={(e) => setNewUserForm({ ...newUserForm, passphrase: e.target.value })} placeholder="Login passphrase" disabled={addingUser} />
-              </div>
-              <div className="admin-form-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input type="checkbox" checked={newUserForm.is_admin} onChange={(e) => setNewUserForm({ ...newUserForm, is_admin: e.target.checked })} disabled={addingUser} />
-                  Admin
-                </label>
-              </div>
-            </div>
-            <div className="admin-modal-footer">
-              <button className="button-secondary" onClick={() => setShowAddUserModal(false)} disabled={addingUser}>Cancel</button>
-              <button className="button-primary" onClick={handleAddUser} disabled={addingUser}>
-                {addingUser ? 'Creating...' : 'Create User'}
-              </button>
-            </div>
+
+            {playerResult ? (
+              <>
+                <div className="admin-modal-body">
+                  <p>{playerResult.message}</p>
+                  <div className="admin-form-group">
+                    <label>Login link (for their QR code / NFC tag)</label>
+                    <div className="login-url-row">
+                      <input type="text" readOnly value={getPlayerLoginUrl(playerResult.user)} onFocus={(e) => e.target.select()} />
+                      <button className="button-secondary" onClick={() => copyLoginUrl(getPlayerLoginUrl(playerResult.user))}>Copy</button>
+                    </div>
+                  </div>
+                  <p className="user-row-meta">Passphrase: {playerResult.user.passphrase}</p>
+                </div>
+                <div className="admin-modal-footer">
+                  {playerModal.mode === 'add' && (
+                    <button className="button-secondary" onClick={openAddPlayer}>Add Another</button>
+                  )}
+                  <button className="button-primary" onClick={closePlayerModal}>Done</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="admin-modal-body">
+                  {playerModal.mode === 'add' && (
+                    <div className="admin-form-group">
+                      <label>Player</label>
+                      <select value={addSource} onChange={(e) => setAddSource(e.target.value)} disabled={savingPlayer}>
+                        <option value="new">New player</option>
+                        <option value="existing">Existing player (returning guest)</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {playerModal.mode === 'add' && addSource === 'existing' ? (
+                    <div className="admin-form-group">
+                      <label>Choose Player</label>
+                      <select value={existingUserId} onChange={(e) => setExistingUserId(e.target.value)} disabled={savingPlayer}>
+                        <option value="">Select…</option>
+                        {usersTabList.filter(u => !activeSession?.participant_user_ids?.includes(u.id)).map(u => (
+                          <option key={u.id} value={u.id}>{u.firstname} {u.lastname} ({u.alias_1} {u.alias_2})</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="admin-form-group">
+                        <label>First Name</label>
+                        <input type="text" value={playerForm.firstname} onChange={(e) => setPlayerForm({ ...playerForm, firstname: e.target.value })} disabled={savingPlayer} />
+                      </div>
+                      <div className="admin-form-group">
+                        <label>Last Name</label>
+                        <input type="text" value={playerForm.lastname} onChange={(e) => setPlayerForm({ ...playerForm, lastname: e.target.value })} disabled={savingPlayer} />
+                      </div>
+                      <div className="admin-form-group">
+                        <label>Alias 1</label>
+                        <input type="text" value={playerForm.alias_1} onChange={(e) => setPlayerForm({ ...playerForm, alias_1: e.target.value })} placeholder="e.g. Swift" disabled={savingPlayer} />
+                      </div>
+                      <div className="admin-form-group">
+                        <label>Alias 2</label>
+                        <input type="text" value={playerForm.alias_2} onChange={(e) => setPlayerForm({ ...playerForm, alias_2: e.target.value })} placeholder="e.g. Spider" disabled={savingPlayer} />
+                        {playerModal.mode === 'edit' && <p className="user-row-meta">Changing the alias changes their login link.</p>}
+                      </div>
+                      <div className="admin-form-group">
+                        <label>Passphrase</label>
+                        <input type="text" value={playerForm.passphrase} onChange={(e) => setPlayerForm({ ...playerForm, passphrase: e.target.value })} placeholder="One memorable word" disabled={savingPlayer} />
+                      </div>
+                      {playerModal.mode === 'edit' && (
+                        <div className="admin-form-group">
+                          <label className="admin-checkbox-label">
+                            <input type="checkbox" checked={playerForm.ishere} onChange={(e) => setPlayerForm({ ...playerForm, ishere: e.target.checked })} disabled={savingPlayer} />
+                            Checked in (can sign in and sign off missions)
+                          </label>
+                        </div>
+                      )}
+                      <div className="admin-form-group">
+                        <label className="admin-checkbox-label">
+                          <input type="checkbox" checked={playerForm.is_admin} onChange={(e) => setPlayerForm({ ...playerForm, is_admin: e.target.checked })} disabled={savingPlayer} />
+                          Host (admin)
+                        </label>
+                      </div>
+                    </>
+                  )}
+
+                  {playerModal.mode === 'add' && activeSession && (
+                    <div className="admin-form-group">
+                      <label className="admin-checkbox-label">
+                        <input type="checkbox" checked={addToSession} onChange={(e) => setAddToSession(e.target.checked)} disabled={savingPlayer} />
+                        Add to {activeSession.name} and assign Phase {activeSession.current_phase || 0} missions
+                      </label>
+                    </div>
+                  )}
+                </div>
+                <div className="admin-modal-footer">
+                  <button className="button-secondary" onClick={closePlayerModal} disabled={savingPlayer}>Cancel</button>
+                  <button className="button-primary" onClick={handleSavePlayer} disabled={savingPlayer}>
+                    {savingPlayer ? 'Saving...' : playerModal.mode === 'edit' ? 'Save' : 'Add Player'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

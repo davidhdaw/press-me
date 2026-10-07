@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
-import './helpers.js'
 import Login from './Login'
 import Dashboard from './Dashboard'
 import AdminDashboard from './AdminDashboard'
@@ -17,6 +16,15 @@ function App() {
     setCurrentUser(userData)
     setIsLoggedIn(true)
     localStorage.setItem('spyUser', JSON.stringify(userData))
+  }
+
+  // Merge fresh fields (e.g. a passphrase a host changed mid-game) into the session
+  const handleUserUpdate = (fields) => {
+    setCurrentUser(prev => {
+      const next = { ...prev, ...fields }
+      localStorage.setItem('spyUser', JSON.stringify(next))
+      return next
+    })
   }
 
   const handleLogout = () => {
@@ -56,10 +64,9 @@ function App() {
                 agentId={currentUser?.id}
                 firstName={currentUser?.firstname}
                 lastName={currentUser?.lastname}
-                alias1={currentUser?.alias_1}
-                alias2={currentUser?.alias_2}
                 currentUser={currentUser}
                 onLogout={handleLogout}
+                onUserUpdate={handleUserUpdate}
               />
             ) : (
               <Navigate to="/" replace />

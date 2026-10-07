@@ -1574,6 +1574,14 @@
   margin-bottom: var(--unit-xs);
 }
 
+.mission-card--culminating {
+  border-left-color: var(--yellow);
+}
+
+.mission-card--culminating .push-mission-card-label {
+  color: var(--yellow);
+}
+
 .mission-card--completed.mission-card--push {
   background-color: var(--black);
   border-left: 3px solid var(--green);

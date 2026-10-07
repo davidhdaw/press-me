@@ -42,11 +42,6 @@ function formatWitnessSignedAt(iso) {
   return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-function firstNameFromFullName(name) {
-  if (name == null || String(name).trim() === '') return null
-  return String(name).trim().split(/\s+/)[0]
-}
-
 function BriefingModalPanel({ isClosing, onClose, passphrase }) {
   return (
     <div className={`modal briefing-modal ${isClosing ? 'closing' : ''}`}>
@@ -73,11 +68,11 @@ function BriefingModalPanel({ isClosing, onClose, passphrase }) {
   )
 }
 
-function DashboardFooter({ currentUser, onLogout }) {
+function DashboardFooter({ currentUser, onLogout, onUserUpdate }) {
   const navigate = useNavigate()
   return (
     <footer className="dashboard-footer">
-      <AgentTab currentUser={currentUser} />
+      <AgentTab currentUser={currentUser} onUserUpdate={onUserUpdate} />
       <div className="dashboard-footer-actions">
         {isAdmin(currentUser) && (
           <button type="button" className="admin-button button-min" onClick={() => navigate('/admin/login')}>
@@ -90,7 +85,28 @@ function DashboardFooter({ currentUser, onLogout }) {
   )
 }
 
-function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, currentUser }) {
+// Which culminating-mission unlocks this phone has already announced
+const CULMINATING_SEEN_KEY = 'culminatingSeen'
+
+function readCulminatingSeen() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(CULMINATING_SEEN_KEY) || '[]'))
+  } catch {
+    return new Set()
+  }
+}
+
+function markCulminatingSeen(playerMissionId) {
+  try {
+    const seen = readCulminatingSeen()
+    seen.add(playerMissionId)
+    localStorage.setItem(CULMINATING_SEEN_KEY, JSON.stringify([...seen]))
+  } catch {
+    // Without storage the announcement may repeat after a reload; harmless
+  }
+}
+
+function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, currentUser }) {
   const [missions, setMissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -130,6 +146,9 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   const [showPayoutPushModal, setShowPayoutPushModal] = useState(false)
   const [isPayoutPushClosing, setIsPayoutPushClosing] = useState(false)
   const [showPayoutPushStamp, setShowPayoutPushStamp] = useState(false)
+
+  const [unlockedCulminating, setUnlockedCulminating] = useState(null)
+  const [isUnlockClosing, setIsUnlockClosing] = useState(false)
 
   // ── Session & mission data fetching ────────────────────────────────────────
 
@@ -293,6 +312,32 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
     } finally {
       setLoading(false)
     }
+  }
+
+  // ── Culminating mission unlock announcement ────────────────────────────────
+
+  // Announce a newly unlocked culminating mission once nothing else is on screen
+  // (e.g. after the player closes the success screen for their last mission).
+  useEffect(() => {
+    if (unlockedCulminating || showMissionModal || showPushMissionModal || showBriefingModal) return
+    const seen = readCulminatingSeen()
+    const next = missions.find(m =>
+      m.culminatingUnlocked && !m.completed && !m.phaseLocked && !seen.has(m.playerMissionId)
+    )
+    if (next) {
+      setIsUnlockClosing(false)
+      setUnlockedCulminating(next)
+    }
+  }, [missions, unlockedCulminating, showMissionModal, showPushMissionModal, showBriefingModal])
+
+  const acknowledgeCulminatingUnlock = () => {
+    if (!unlockedCulminating) return
+    markCulminatingSeen(unlockedCulminating.playerMissionId)
+    setIsUnlockClosing(true)
+    setTimeout(() => {
+      setUnlockedCulminating(null)
+      setIsUnlockClosing(false)
+    }, 300)
   }
 
   // ── Push mission modal ─────────────────────────────────────────────────────
@@ -554,7 +599,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               </div>
             </div>
           </div>
-          <DashboardFooter currentUser={currentUser} onLogout={onLogout} />
+          <DashboardFooter currentUser={currentUser} onLogout={onLogout} onUserUpdate={onUserUpdate} />
         </div>
         {showBriefingModal && (
           <BriefingModalPanel isClosing={isBriefingClosing} onClose={closeBriefingModal} passphrase={currentUser?.passphrase} />
@@ -582,7 +627,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               </div>
             </div>
           </div>
-          <DashboardFooter currentUser={currentUser} onLogout={onLogout} />
+          <DashboardFooter currentUser={currentUser} onLogout={onLogout} onUserUpdate={onUserUpdate} />
         </div>
         {showBriefingModal && (
           <BriefingModalPanel isClosing={isBriefingClosing} onClose={closeBriefingModal} passphrase={currentUser?.passphrase} />
@@ -614,7 +659,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
             />
           </div>
         </div>
-        <DashboardFooter currentUser={currentUser} onLogout={onLogout} />
+        <DashboardFooter currentUser={currentUser} onLogout={onLogout} onUserUpdate={onUserUpdate} />
       </div>
 
       {showBriefingModal && (
@@ -923,6 +968,29 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {unlockedCulminating && !showPushMissionModal && (
+        <div className={`modal push-mission-modal ${isUnlockClosing ? 'closing' : ''}`}>
+          <div className="modal-header">
+            <span className="push-mission-badge push-mission-badge--complete">
+              PHASE {unlockedCulminating.phase} COMPLETE
+            </span>
+          </div>
+          <div className="modal-content">
+            <h2>{unlockedCulminating.title}</h2>
+            <p>You've completed every mission in this phase and unlocked a culminating mission.</p>
+            <p><strong>See your handler for more information.</strong></p>
+            {unlockedCulminating.bounty > 0 && (
+              <div className="push-mission-bounty">Bounty: ${unlockedCulminating.bounty}</div>
+            )}
+          </div>
+          <div className="push-mission-footer">
+            <button type="button" onClick={acknowledgeCulminatingUnlock} className="push-mission-ack-button">
+              ACKNOWLEDGED
+            </button>
+          </div>
         </div>
       )}
 
