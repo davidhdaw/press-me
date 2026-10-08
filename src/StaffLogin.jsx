@@ -44,7 +44,8 @@ function StaffLogin() {
       navigate(destinationFor(result.staff, next), { replace: true })
     } catch (err) {
       console.error('Staff login error:', err)
-      setError('Could not reach the database. Try again.')
+      const offline = err instanceof TypeError && /fetch|network/i.test(err.message)
+      setError(offline ? 'Could not reach the database. Try again.' : `Sign-in failed: ${err.message}`)
     } finally {
       setLoading(false)
     }
