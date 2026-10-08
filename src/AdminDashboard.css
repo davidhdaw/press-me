@@ -1211,31 +1211,15 @@ body:has(.admin-dashboard) {
   padding: 0;
 }
 
-.bank-account-row {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--unit-sm);
-  padding: var(--unit-sm) var(--unit-xs);
-  background: none;
-  border: none;
-  border-bottom: 1px solid #ddd;
-  cursor: pointer;
-  text-align: left;
-  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 1.1rem;
-  color: var(--black);
-}
 
-.bank-account-row:hover {
-  background-color: rgba(238, 205, 69, 0.3);
-}
 
 .bank-account-balance {
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: 1.4rem;
   font-variant-numeric: tabular-nums;
+  align-self: center;
+  transition: color 0.2s ease;
 }
 
 .bank-balance-card {
@@ -1281,18 +1265,7 @@ body:has(.admin-dashboard) {
   gap: var(--unit-sm);
 }
 
-.bank-correction-row select {
-  width: auto;
-  padding: var(--unit-sm);
-  border-radius: 4px;
-  background: var(--white);
-  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 1.1rem;
-}
 
-.bank-correction-toggle {
-  margin-bottom: var(--unit-base);
-}
 
 .bank-feedback {
   background-color: var(--green);
@@ -1306,4 +1279,132 @@ body:has(.admin-dashboard) {
 .bank-feedback--error {
   background-color: var(--red);
   color: var(--white);
+}
+
+/* Bank: quick-spend list (one row per player) */
+.bank-page {
+  padding-bottom: 160px; /* room for the Undo bar */
+}
+
+.bank-list-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--white);
+  padding-bottom: var(--unit-xs);
+}
+
+.bank-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--unit-xs) var(--unit-sm);
+  padding: var(--unit-sm) 0;
+  border-bottom: 1px solid #ddd;
+  transition: background-color 0.4s ease;
+}
+
+.bank-row--flash {
+  background-color: rgba(149, 175, 110, 0.35);
+  transition: none;
+}
+
+.bank-row-name {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--black);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.15rem;
+}
+
+.bank-quick {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--unit-sm);
+}
+
+.bank-quick button {
+  min-height: 48px;
+  min-width: 0;
+  padding: 0 4px;
+  border: 2px solid var(--black);
+  border-radius: 6px;
+  background-color: var(--yellow);
+  color: var(--black);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation; /* no double-tap zoom delay */
+}
+
+.bank-quick button:active:not(:disabled) {
+  background-color: var(--black);
+  color: var(--yellow);
+}
+
+.bank-quick button:disabled {
+  background-color: transparent;
+  border-color: #ccc;
+  color: #bbb;
+  cursor: not-allowed;
+}
+
+/* Recent spends with Undo, pinned to the bottom of the screen */
+.bank-recent {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  background-color: var(--black);
+  color: var(--white);
+  padding: var(--unit-xs) var(--unit-base) calc(var(--unit-xs) + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.bank-recent-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--unit-sm);
+  padding: 4px 0;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.05rem;
+}
+
+.bank-recent-row + .bank-recent-row {
+  border-top: 1px solid rgba(245, 231, 203, 0.15);
+  opacity: 0.75;
+}
+
+.bank-recent-row button {
+  min-height: 36px;
+  padding: 0 var(--unit-base);
+  border: 2px solid var(--yellow);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--yellow);
+  font-family: inherit;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.bank-correction-row input {
+  border: 2px solid var(--black);
+}
+
+.bank-correction-row input:first-child {
+  flex: 0 0 35%;
+}
+
+.bank-form .button-secondary {
+  width: 100%;
 }

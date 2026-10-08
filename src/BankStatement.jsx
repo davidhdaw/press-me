@@ -12,8 +12,8 @@ function formatTime(value) {
 const ENTRY_LABELS = {
   mission: 'Mission',
   push: 'Special ops',
-  withdrawal: 'Withdrawal',
-  adjustment: 'Correction',
+  withdrawal: 'Spent at the bank',
+  adjustment: 'Added by the bank',
 }
 
 export function StatementList({ entries }) {
@@ -27,7 +27,7 @@ export function StatementList({ entries }) {
           <div>
             <strong>{e.note || ENTRY_LABELS[e.kind]}</strong>
             <span className="bank-statement-meta">
-              {ENTRY_LABELS[e.kind]} · {formatTime(e.createdAt)}{e.byName ? ` · ${e.byName}` : ''}
+              {[e.note && ENTRY_LABELS[e.kind], formatTime(e.createdAt), e.byName].filter(Boolean).join(' · ')}
             </span>
           </div>
           <span className={`bank-amount ${e.amount < 0 ? 'bank-amount--out' : 'bank-amount--in'}`}>

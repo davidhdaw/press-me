@@ -80,9 +80,34 @@ export async function recordTransaction({ sessionId, userId, kind, amount, note,
       const { balance } = await getStatement(sessionId, userId);
       throw new Error(`Not enough money: balance is $${balance.toLocaleString()}`);
     }
-    return getStatement(sessionId, userId);
+    return { ...(await getStatement(sessionId, userId)), transactionId: inserted[0].id };
   } catch (error) {
     console.error('Error recording bank transaction:', error);
+    throw error;
+  }
+}
+
+// Undo a banker's own recent withdrawal (a mis-tap at the prize table). The
+// row is deleted rather than reversed so the player's history stays clean.
+// Only withdrawals, only by the banker who made them, only within a few minutes.
+const UNDO_MINUTES = 5;
+
+export async function undoTransaction(transactionId, staffId) {
+  try {
+    const deleted = await sql`
+      DELETE FROM bank_transactions
+      WHERE id = ${transactionId}
+        AND created_by = ${staffId}
+        AND kind = 'withdrawal'
+        AND created_at > NOW() - (${UNDO_MINUTES}::int * INTERVAL '1 minute')
+      RETURNING session_id, user_id
+    `;
+    if (deleted.length === 0) {
+      throw new Error(`Can't undo that any more (only your own spends from the last ${UNDO_MINUTES} minutes). Use Add money instead.`);
+    }
+    return getStatement(deleted[0].session_id, deleted[0].user_id);
+  } catch (error) {
+    console.error('Error undoing bank transaction:', error);
     throw error;
   }
 }

@@ -33,6 +33,7 @@ export const neonApi = {
   getStatement: bank.getStatement,
   getBalances: bank.getBalances,
   recordTransaction: bank.recordTransaction,
+  undoTransaction: bank.undoTransaction,
 
   // Awards
   getAwards: awards.getAwards,

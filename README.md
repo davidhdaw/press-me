@@ -186,12 +186,11 @@ Each player has a bank account per session (everyone starts at $0 each event), i
 
 - **Deposits are automatic.** Completing a mission deposits its bounty, whether by sign-off, answer, or a host's **Complete** button. So does a completed push mission. The amount is recorded at completion (`player_missions.bounty_awarded`), so editing a mission's bounty later doesn't change anyone's history.
 - **Players** see their balance in a **BANK** strip at the bottom of their phone. Tapping it opens their statement. The mission success screen says "$400 deposited!".
-- **Bankers** use `/bank` (hosts reach it from the admin header):
-  1. Search for the player by name or alias.
-  2. Enter the amount and what it's for (e.g. "rubber duck"), then **Withdraw**.
-  3. **Correct a mistake** adds or removes money with a required reason.
-  - A balance can never go below zero; the check happens in the same database statement as the withdrawal.
-  - Every transaction records which banker made it, and shows in both the banker's and the player's history.
+- **Bankers** use `/bank` (hosts reach it from the admin header). It's built for a busy prize table:
+  - Every player row has **−$100 / −$500 / −$1,000** buttons. One tap deducts immediately, with no confirmation or note. Buttons grey out when the player can't afford them. Search narrows the list by name or alias.
+  - Mistakes are fixed with **Undo** in the bar pinned to the bottom of the screen. It shows the banker's last few deductions, and Undo works for 5 minutes, only on their own deductions. An undone deduction is deleted, so it doesn't clutter the player's history.
+  - **Adding money** takes more steps on purpose: tap the player's name, enter an amount and a required reason, then confirm. The same screen has **Spend another amount** for odd prices, plus the full history.
+  - A balance can never go below zero; the check happens in the same database statement as the deduction. Every transaction records which banker made it, and the player sees it in their statement.
   - The bank works while the session is active or paused.
 - Balances come from the `bank_ledger` view: mission deposits + push-mission deposits + `bank_transactions`, which holds banker withdrawals and corrections.
 
