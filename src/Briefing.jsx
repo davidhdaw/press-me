@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 
-// The informant's recording. The .m4a is a compressed copy of the .wav
-// (afconvert -f m4af -d aac -b 128000; ~0.5 MB instead of 6 MB on party wi-fi);
-// the .wav is the fallback. If neither loads, the button says so and points
-// players at the transcript.
-const RECORDING_SOURCES = [
-  { src: '/honeybear-intro-message.m4a', type: 'audio/mp4' },
-  { src: '/honeybear-intro-message.wav', type: 'audio/wav' },
+// Recordings are served as a compressed .m4a (afconvert -f m4af -d aac -b 128000;
+// ~0.5 MB instead of 5-6 MB on party wi-fi) with the original .wav as fallback.
+// If neither loads, the button says so and points players at the transcript.
+const recordingSources = (name) => [
+  { src: `/${name}.m4a`, type: 'audio/mp4' },
+  { src: `/${name}.wav`, type: 'audio/wav' },
 ]
 
 const BUTTON_LABELS = {
@@ -17,7 +16,9 @@ const BUTTON_LABELS = {
   unavailable: 'Recording unavailable',
 }
 
-function RecordingButton() {
+// name: file name in public/ without extension
+export function RecordingButton({ name }) {
+  const sources = recordingSources(name)
   const audioRef = useRef(null)
   const [state, setState] = useState('idle')
   const [progress, setProgress] = useState(0)
@@ -49,13 +50,13 @@ function RecordingButton() {
           if (duration) setProgress(currentTime / duration)
         }}
       >
-        {RECORDING_SOURCES.map((source, i) => (
+        {sources.map((source, i) => (
           <source
             key={source.src}
             src={source.src}
             type={source.type}
             // Errors fire on <source>, not <audio>; only the last one means nothing played
-            onError={i === RECORDING_SOURCES.length - 1 ? () => setState('unavailable') : undefined}
+            onError={i === sources.length - 1 ? () => setState('unavailable') : undefined}
           />
         ))}
       </audio>
@@ -94,7 +95,7 @@ function BriefingModalPanel({ isClosing, onClose, passphrase }) {
             Or just read the transcript. Make your own choices.
           </p>
 
-          <RecordingButton />
+          <RecordingButton name="honeybear-intro-message" />
 
           <details className="briefing-transcript">
             <summary>Read the transcript</summary>

@@ -1765,3 +1765,22 @@
   letter-spacing: 3px;
   text-transform: uppercase;
 }
+
+/* /reveal: the briefing's look as a full page (it has no close button) */
+.modal.briefing-modal.reveal-page .modal-content {
+  padding-top: var(--unit-base);
+}
+
+.modal.briefing-modal .reveal-back {
+  margin-top: 28px;
+  text-align: center;
+}
+
+.modal.briefing-modal .reveal-back a {
+  color: var(--black);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}

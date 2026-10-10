@@ -6,6 +6,7 @@ import Dashboard from './Dashboard'
 import AdminDashboard from './AdminDashboard'
 import BankPage from './BankPage'
 import AwardsPage from './AwardsPage'
+import RevealPage from './RevealPage'
 import StaffLogin from './StaffLogin'
 import StaffGate from './StaffGate'
 
@@ -102,6 +103,8 @@ function App() {
             </StaffGate>
           }
         />
+        {/* Hidden message found via an NFC tag at the party; no login needed */}
+        <Route path="/reveal" element={<RevealPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
