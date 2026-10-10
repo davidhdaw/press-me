@@ -147,7 +147,9 @@ function AdminDashboard({ staff, onLogout }) {
     }
   }
 
-  const loadActiveSessionData = async (session) => {
+  // silent: background refresh, so no loading placeholder and keep the current
+  // data if it fails
+  const loadActiveSessionData = async (session, { silent = false } = {}) => {
     if (!session || !session.participant_user_ids || session.participant_user_ids.length === 0) {
       setSessionUsers([])
       setPlayerMissions([])
@@ -155,7 +157,7 @@ function AdminDashboard({ staff, onLogout }) {
     }
 
     try {
-      setLoadingSessionData(true)
+      if (!silent) setLoadingSessionData(true)
 
       const allUsersResult = await neonApi.getUsers()
       const sessionUserIds = new Set(session.participant_user_ids.map(id => Number(id)))
@@ -166,25 +168,40 @@ function AdminDashboard({ staff, onLogout }) {
       setPlayerMissions(missions || [])
     } catch (error) {
       console.error('Error loading active session data:', error)
-      setSessionUsers([])
-      setPlayerMissions([])
+      if (!silent) {
+        setSessionUsers([])
+        setPlayerMissions([])
+      }
     } finally {
-      setLoadingSessionData(false)
+      if (!silent) setLoadingSessionData(false)
     }
   }
 
-  const loadPushMissionHistory = async () => {
+  const loadPushMissionHistory = async ({ silent = false } = {}) => {
     if (!activeSession) return
     try {
-      setLoadingPushHistory(true)
+      if (!silent) setLoadingPushHistory(true)
       const history = await neonApi.getAllPushMissionsForSession(activeSession.id)
       setPushMissionHistory(history || [])
     } catch (error) {
       console.error('Error loading push mission history:', error)
     } finally {
-      setLoadingPushHistory(false)
+      if (!silent) setLoadingPushHistory(false)
     }
   }
+
+  // Keep the live views current without anyone pressing Refresh: players
+  // finish missions, unlock culminating missions (the handler queue) and
+  // complete push missions from their own phones
+  useEffect(() => {
+    if (!activeSession || (activeTab !== 'users' && activeTab !== 'push')) return
+    const interval = setInterval(() => {
+      if (activeTab === 'users') loadActiveSessionData(activeSession, { silent: true })
+      if (activeTab === 'push') loadPushMissionHistory({ silent: true })
+    }, 15000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, activeSession])
 
   const handleSendPushMission = async () => {
     setSendingPushMission(true)

@@ -233,7 +233,7 @@ At the end of the night a host opens **Awards** from the admin header (or `/awar
 5. **Pause / Resume** as needed, then **End Session**.
 6. **Reset** (paused or ended sessions only) clears all mission progress and returns the session to draft.
 
-Players' phones poll every 5 seconds for session changes, missions, and push missions.
+Players' phones poll the database: missions and push missions every 5 seconds, session status and bank balance every 10. The admin **Users** and **Push** tabs refresh the running session every 15 seconds, the bank screen every 15, and staff sign-ins are rechecked every minute.
 
 ### Adding and editing players (including mid-game)
 
