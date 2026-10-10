@@ -91,11 +91,11 @@ function BriefingModalPanel({ isClosing, onClose, passphrase }) {
 
           <p>
             We have an opportunity to infiltrate the organization for the CEO’s annual company party on <strong>Saturday, October 10</strong>.
-            Your mission is to uncover and stop whatever the CEO is planning. We've prepared a series of smaller missions that will help you locate the device.
+            Your mission is to uncover and stop whatever the CEO is planning. We've prepared a series of smaller missions to help you.
             You can do missions in any order.
           </p>
           <p>
-            Due to the severity of the threat, we may have sent a few too many agents to retrieve the device.
+            Due to the severity of the threat, we may have sent a few too many agents.
             If you see a fellow agent in disguise, please help them maintain their cover by playing along.
             You can also sign off on their missions using your secret passphrase: <strong>{passphrase || '—'}</strong>.
           </p>
