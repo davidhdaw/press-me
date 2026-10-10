@@ -385,25 +385,27 @@ export async function resetSession(sessionId) {
       throw new Error('No participants in session')
     }
     
-    // Clear player_missions for this session
-    await sql`
-      DELETE FROM player_missions WHERE session_id = ${sessionId}
-    `
-
-    // Reset session status back to 'draft' and clear timestamps and phase
-    await sql`
-      UPDATE sessions
-      SET status = 'draft',
-          started_at = NULL,
-          paused_at = NULL,
-          ended_at = NULL,
-          current_phase = 0
-      WHERE id = ${sessionId}
-    `
+    // Clear everything the session accumulated, in one transaction: bank
+    // transactions first (sign-off payments reference player_missions), push
+    // missions, mission progress; then back to draft at phase 0
+    await sql.transaction([
+      sql`DELETE FROM bank_transactions WHERE session_id = ${sessionId}`,
+      sql`DELETE FROM push_missions WHERE session_id = ${sessionId}`,
+      sql`DELETE FROM player_missions WHERE session_id = ${sessionId}`,
+      sql`
+        UPDATE sessions
+        SET status = 'draft',
+            started_at = NULL,
+            paused_at = NULL,
+            ended_at = NULL,
+            current_phase = 0
+        WHERE id = ${sessionId}
+      `,
+    ])
 
     return {
       success: true,
-      message: 'Session reset successfully. All player missions cleared. Session status reset to draft.'
+      message: 'Session reset: missions, bank and push missions cleared; back to draft.'
     }
   } catch (error) {
     console.error('Error resetting session:', error)

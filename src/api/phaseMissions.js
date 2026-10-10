@@ -515,13 +515,15 @@ export async function signOffMission(playerMissionId, signerPassphrase, paymentA
     const enteredPassphrase = normalizePassphrase(signerPassphrase || '');
     if (!enteredPassphrase) throw new Error('Passphrase required');
 
-    // Witnesses: players in this session. "CEO" missions instead need the CEO,
-    // a host who isn't a player, so only hosts' passphrases count for those
-    // (and hosts' passphrases count for nothing else unless they're playing).
+    // Witnesses: players in this session. Host-only and "CEO" missions instead
+    // need a host, and hosts usually aren't players, so only hosts' passphrases
+    // count for those (and hosts' passphrases count for nothing else unless
+    // they're playing).
     const ceoMission = mission.signer_constraint === 'ceo';
+    const hostMission = ceoMission || mission.signer_constraint === 'admin_only';
     const candidates = await sql`
       SELECT id, firstname, lastname, passphrase, is_admin FROM users
-      WHERE CASE WHEN ${ceoMission}::boolean THEN is_admin
+      WHERE CASE WHEN ${hostMission}::boolean THEN is_admin
                  ELSE id = ANY(${participantIds}::integer[]) END
         AND id != ${mission.user_id}
         AND ishere = true
@@ -533,7 +535,9 @@ export async function signOffMission(playerMissionId, signerPassphrase, paymentA
       throw new Error(
         ceoMission
           ? 'That passphrase isn’t the CEO’s. Only the CEO can sign off this mission.'
-          : 'No guest in this session matched that passphrase. They must be checked in and not the mission owner.'
+          : hostMission
+            ? 'That passphrase isn’t a host’s. A host has to sign off this mission.'
+            : 'No guest in this session matched that passphrase. They must be checked in and not the mission owner.'
       );
     }
     if (matches.length > 1) {
