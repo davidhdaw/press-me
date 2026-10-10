@@ -130,6 +130,10 @@ Sign-ins are recorded in `login_logs`. The signed-in player is cached in `localS
 - Five wrong PINs for a name within 15 minutes locks that name out for 15 minutes.
 - Old `/admin/login` links redirect to `/staff`.
 
+### Briefing
+
+Players see the briefing ([src/Briefing.jsx](src/Briefing.jsx)) the first time they open the dashboard, and again from the **Briefing** row at any time. It includes the informant's recording: put the audio file at `public/briefing-recording.mp3`. Until it exists, the play button shows "Recording unavailable" and points players to the transcript. When you rewrite the briefing, change `BRIEFING_SEEN_KEY` in `Dashboard.jsx` so everyone sees the new version once.
+
 ### Passphrases and sign-offs
 
 Every guest has a secret passphrase, which they can reveal on their **Agent** tab. Passphrases are how missions get verified: when you finish a mission, a witness types *their* passphrase into *your* phone. The app checks it against every other checked-in participant in the session to identify the signer. Matching ignores case and punctuation, and either the full phrase or just its last word is accepted.

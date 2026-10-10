@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { neonApi } from './neonApi'
 import BankStrip from './BankStrip'
+import BriefingModalPanel from './Briefing'
 import AgentTab from './AgentTab'
 import MissionsTab, { BriefingMissionRow } from './MissionsTab'
 
@@ -50,32 +51,6 @@ function DepositNotice({ amount }) {
   )
 }
 
-function BriefingModalPanel({ isClosing, onClose, passphrase }) {
-  return (
-    <div className={`modal briefing-modal ${isClosing ? 'closing' : ''}`}>
-      <div className="modal-header">
-        <button type="button" onClick={onClose} className="close-button">Close</button>
-      </div>
-      <div className="modal-content">
-        <div className="backstory-card briefing-modal-card">
-          <img className="briefing-modal-seal" src="/briefing-seal.png" alt="" />
-          <h4>Briefing - TOP SECRET!!!</h4>
-          <p>We've been following the movements of a mysterious hacker known as <strong>tha_h4ck3rG0d</strong> and have reason to believe they are planning to detonate a doomsday device at some point on the evening of <strong>Saturday, May 16</strong>.</p>
-          <p>The device itself is located somewhere on the premises of <strong>MacGuffin Toys</strong>. You will be infiltrating the environment as part of their annual company party.</p>
-          <p>Initial intelligence suggests the company's employees are not very bright.</p>
-          <p>Your mission is to determine the location of this doomsday device and disable it. We've prepared a series of smaller missions that will help you locate the device. You can do missions in any order.</p>
-          <p>
-            Due to the severity of the threat, we may have sent a few too many agents to retrieve the device.
-            If you see a fellow agent in disguise, please help them maintain their cover by playing along.
-            You can also sign off on their missions using your secret passphrase: <strong>{passphrase || '—'}</strong>.
-          </p>
-          <p><strong>Good luck, have fun, and don't get caught.</strong></p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function DashboardFooter({ currentUser, onLogout, onUserUpdate, bankSessionId, bankRefreshKey }) {
   return (
     <footer className="dashboard-footer">
@@ -87,6 +62,9 @@ function DashboardFooter({ currentUser, onLogout, onUserUpdate, bankSessionId, b
     </footer>
   )
 }
+
+// Bump this whenever the briefing changes so every player sees the new one once
+const BRIEFING_SEEN_KEY = 'briefingSeen:oct10'
 
 // Which culminating-mission unlocks this phone has already announced
 const CULMINATING_SEEN_KEY = 'culminatingSeen'
@@ -134,7 +112,7 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
   const [isInActiveSession, setIsInActiveSession] = useState(false)
   const [sessionCheckLoading, setSessionCheckLoading] = useState(true)
 
-  const [showBriefingModal, setShowBriefingModal] = useState(() => !localStorage.getItem('briefingSeen'))
+  const [showBriefingModal, setShowBriefingModal] = useState(() => !localStorage.getItem(BRIEFING_SEEN_KEY))
   const [isBriefingClosing, setIsBriefingClosing] = useState(false)
 
   const [pushMissions, setPushMissions] = useState([])
@@ -381,7 +359,7 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
 
   const closeBriefingModal = () => {
     setIsBriefingClosing(true)
-    localStorage.setItem('briefingSeen', '1')
+    localStorage.setItem(BRIEFING_SEEN_KEY, '1')
     setTimeout(() => {
       setShowBriefingModal(false)
       setIsBriefingClosing(false)
