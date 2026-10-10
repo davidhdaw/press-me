@@ -1398,6 +1398,7 @@ function AdminDashboard({ staff, onLogout }) {
                 >
                   <option value="phrase">Phrase (player types an answer)</option>
                   <option value="signoff">Sign-off (another player confirms)</option>
+                  <option value="reveal">Hidden message (completed by finding the /reveal NFC tag)</option>
                 </select>
               </div>
               {missionForm.completionType === 'phrase' && (

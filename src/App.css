@@ -1788,3 +1788,57 @@
 .game-over-banner {
   background-color: var(--green);
 }
+
+/* Missions completed somewhere other than the sign-off form (e.g. /reveal) */
+.modal.mission-modal .mission-handler-note {
+  margin-top: var(--unit-base);
+  padding: var(--unit-sm);
+  border: 2px dashed var(--black);
+  border-radius: 6px;
+  background: rgba(238, 205, 69, 0.35);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--black);
+  text-align: center;
+}
+
+/* /reveal: complete a hidden-message mission */
+.reveal-complete {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--unit-sm);
+  margin-top: 24px;
+  padding: var(--unit-base) var(--unit-sm);
+  border: 3px solid var(--black);
+  background-color: var(--yellow);
+  text-align: center;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.1rem;
+  color: var(--black);
+}
+
+.reveal-complete button {
+  min-height: 52px;
+  width: 100%;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--black);
+  color: var(--yellow);
+  font-family: inherit;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.reveal-complete--done {
+  background-color: var(--green);
+}
+
+.reveal-complete-error {
+  color: #b5432f;
+  font-weight: 600;
+}

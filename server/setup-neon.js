@@ -59,7 +59,7 @@ async function setupNeonDatabase() {
         phase INTEGER NOT NULL CHECK (phase IN (0, 1, 2, 3)),
         title TEXT NOT NULL,
         mission_body TEXT NOT NULL,
-        completion_type VARCHAR(10) NOT NULL CHECK (completion_type IN ('phrase', 'signoff')),
+        completion_type VARCHAR(10) NOT NULL CHECK (completion_type IN ('phrase', 'signoff', 'reveal')),
         success_key TEXT,
         signoff_prompt_template TEXT,
         variable_pool JSONB,
@@ -150,6 +150,9 @@ async function setupNeonDatabase() {
     // Columns added after the first release. ADD COLUMN IF NOT EXISTS is a no-op
     // on databases that already have them.
     await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS is_culminating BOOLEAN NOT NULL DEFAULT false`;
+    // 'reveal': completed by visiting the hidden /reveal page (an NFC tag)
+    await sql`ALTER TABLE phase_missions DROP CONSTRAINT IF EXISTS phase_missions_completion_type_check`;
+    await sql`ALTER TABLE phase_missions ADD CONSTRAINT phase_missions_completion_type_check CHECK (completion_type IN ('phrase', 'signoff', 'reveal'))`;
     // 'ceo': only a host's passphrase (the CEO, who isn't a player) signs it off
     await sql`ALTER TABLE phase_missions DROP CONSTRAINT IF EXISTS phase_missions_signer_constraint_check`;
     await sql`ALTER TABLE phase_missions ADD CONSTRAINT phase_missions_signer_constraint_check CHECK (signer_constraint IN ('any', 'new_signer', 'same_signer', 'admin_only', 'ceo'))`;

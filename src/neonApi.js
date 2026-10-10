@@ -60,6 +60,8 @@ export const neonApi = {
   completePhaseMission: phaseMissions.completePhaseMission,
   signOffMission: phaseMissions.signOffMission,
   adminCompletePhaseMission: phaseMissions.adminCompletePhaseMission,
+  getRevealMission: phaseMissions.getRevealMission,
+  completeRevealMission: phaseMissions.completeRevealMission,
   getAllPlayerMissionsForSession: phaseMissions.getAllPlayerMissionsForSession,
 
   // Sessions (new)

@@ -614,6 +614,71 @@ export async function signOffMission(playerMissionId, signerPassphrase, paymentA
   }
 }
 
+// ── Hidden-message completion (/reveal) ─────────────────────────────────────
+// Missions with completion_type 'reveal' are completed by finding the hidden
+// message page (an NFC tag at the party). Same rules as any completion: the
+// mission must be unlocked, not in a locked phase, and not already done.
+
+async function revealMissionsFor(userId) {
+  return sql`
+    SELECT pm.*, ph.title, ph.phase, ph.bounty, ph.is_culminating, ph.culminating_first_only,
+           s.current_phase, s.id AS session_id
+    FROM player_missions pm
+    JOIN phase_missions ph ON ph.id = pm.mission_id
+    JOIN sessions s ON s.id = pm.session_id
+    WHERE pm.user_id = ${userId}
+      AND ph.completion_type = 'reveal'
+      AND s.status IN ('active', 'paused')
+    ORDER BY ph.phase, ph.sort_order
+  `;
+}
+
+// What the /reveal page should offer this player: the first reveal mission
+// they can complete right now, or one they've already completed (to say so).
+export async function getRevealMission(userId) {
+  try {
+    const rows = await revealMissionsFor(userId);
+    for (const r of rows) {
+      if (r.completed) continue;
+      if (r.phase < r.current_phase || r.current_phase > FINAL_PHASE) continue;
+      try {
+        await assertCulminatingUnlocked(r);
+      } catch {
+        continue; // not unlocked yet: don't spoil it
+      }
+      return { playerMissionId: r.id, title: r.title, bounty: r.bounty || 0, completed: false };
+    }
+    const done = rows.find(r => r.completed);
+    return done ? { playerMissionId: done.id, title: done.title, bounty: done.bounty_awarded || 0, completed: true } : null;
+  } catch (error) {
+    console.error('Error fetching reveal mission:', error);
+    throw error;
+  }
+}
+
+export async function completeRevealMission(playerMissionId, userId) {
+  try {
+    const rows = (await revealMissionsFor(userId)).filter(r => r.id === playerMissionId);
+    if (rows.length === 0) throw new Error('Mission not found');
+    const mission = rows[0];
+    if (mission.completed) throw new Error('Mission already completed');
+    if (mission.phase < mission.current_phase || mission.current_phase > FINAL_PHASE) throw new Error('This phase is locked');
+    await assertCulminatingUnlocked(mission);
+
+    const updated = await sql`
+      UPDATE player_missions
+      SET completed = true, completed_at = NOW(), bounty_awarded = ${mission.bounty || 0}
+      WHERE id = ${playerMissionId} AND completed = false
+      RETURNING id
+    `;
+    if (updated.length === 0) throw new Error('Mission already completed');
+    return { title: mission.title, bounty: mission.bounty || 0 };
+  } catch (error) {
+    console.error('Error completing reveal mission:', error);
+    throw error;
+  }
+}
+
 // ── Admin Force-Complete ────────────────────────────────────────────────────
 
 export async function adminCompletePhaseMission(playerMissionId) {

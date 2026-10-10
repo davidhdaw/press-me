@@ -614,6 +614,12 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
                 <h2>{selectedMission.title}</h2>
                 <p style={{ whiteSpace: 'pre-line' }}>{selectedMission.missionBody}</p>
 
+                {selectedMission.completionType === 'reveal' && !selectedMission.completed && (
+                  <div className="mission-handler-note">
+                    Find the hidden message to complete this mission.
+                  </div>
+                )}
+
                 {selectedMission.completionType === 'phrase' && (
                   <div className="field-group">
                     <label htmlFor="mission-success-key">Your Answer</label>

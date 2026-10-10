@@ -138,6 +138,8 @@ Players see the briefing ([src/Briefing.jsx](src/Briefing.jsx)) the first time t
 
 `/reveal` is a hidden page for an NFC tag at the party. It plays Honeybear's second recording (`public/honeybear-culminating-mission.wav`, served as the compressed `.m4a`) and has a tap-to-open transcript. No login is needed. "Back to my missions" goes to the dashboard for a signed-in player, or the sign-in page otherwise. Write the full address (e.g. `https://press-me-iota.vercel.app/reveal`) to the tag.
 
+Finding the page is also how **hidden-message missions** are completed. That's a third completion type, used by **A Voice in the Wilderness**. A signed-in player who has one unlocked and not yet done sees a **Complete mission** button on `/reveal`, and tapping it deposits the bounty. The usual rules apply: the mission must be unlocked, not in a locked phase, and not already done. Everyone else sees just the message. The mission itself tells players to find the hidden message, and hosts can still use **Complete**.
+
 ### Passphrases and sign-offs
 
 Every guest has a secret passphrase, which they can reveal on their **Agent** tab. Passphrases are how missions get verified: when you finish a mission, a witness types *their* passphrase into *your* phone. The app checks it against every other checked-in participant in the session to identify the signer. Matching ignores case and punctuation, and either the full phrase or just its last word is accepted.
@@ -161,7 +163,7 @@ When a session starts, every participant gets all phase 0 missions. **Advance to
 
 Mission options (editable in the **Missions** tab):
 
-- **Completion type**
+- **Completion type** (`signoff`, `phrase`, or `reveal`: completed by finding the `/reveal` page)
   - `signoff`: a witness confirms with their passphrase. All current missions use this.
   - `phrase`: the player types an answer that's checked against `success_key`.
 - **Signer constraint** (sign-off missions only)
