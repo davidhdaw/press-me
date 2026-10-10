@@ -1125,6 +1125,8 @@
 }
 
 .briefing-progress {
+  /* clear the button's 8px drop shadow, which takes no layout space */
+  margin-top: 14px;
   width: min(240px, 80%);
   height: 6px;
   border-radius: 3px;
@@ -1139,6 +1141,7 @@
 }
 
 .modal.briefing-modal .briefing-recording-note {
+  margin-top: 14px;
   font-size: 14px;
   opacity: 0.7;
   text-align: center;
