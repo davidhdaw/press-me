@@ -6,20 +6,22 @@ import { normalizePassphrase, passphraseMatchesStored } from './passphrase.js';
 export async function createPhaseMission({
   phase, title, missionBody, completionType,
   successKey, signoffPromptTemplate, variablePool,
-  variableSource, signerConstraint, sameSignerMissionId, sortOrder, bounty, isCulminating
+  variableSource, signerConstraint, sameSignerMissionId, sortOrder, bounty, isCulminating, firstOnly
 }) {
   try {
     const result = await sql`
       INSERT INTO phase_missions (
         phase, title, mission_body, completion_type,
         success_key, signoff_prompt_template, variable_pool,
-        variable_source, signer_constraint, same_signer_mission_id, sort_order, bounty, is_culminating
+        variable_source, signer_constraint, same_signer_mission_id, sort_order, bounty, is_culminating,
+        culminating_first_only
       ) VALUES (
         ${phase}, ${title}, ${missionBody}, ${completionType},
         ${successKey || null}, ${signoffPromptTemplate || null},
         ${variablePool ? JSON.stringify(variablePool) : null}::jsonb,
         ${variableSource || 'pool'}, ${signerConstraint || null}, ${sameSignerMissionId || null},
-        ${sortOrder || 0}, ${bounty || 0}, ${!!isCulminating}
+        ${sortOrder || 0}, ${bounty || 0}, ${!!isCulminating},
+        ${!!isCulminating && !!firstOnly}
       ) RETURNING *
     `;
     return result[0];
@@ -67,7 +69,8 @@ export async function updatePhaseMission(missionId, updates) {
         same_signer_mission_id = ${updates.sameSignerMissionId !== undefined ? updates.sameSignerMissionId : m.same_signer_mission_id},
         sort_order = ${updates.sortOrder ?? m.sort_order},
         bounty = ${updates.bounty !== undefined ? updates.bounty : m.bounty},
-        is_culminating = ${updates.isCulminating !== undefined ? !!updates.isCulminating : m.is_culminating}
+        is_culminating = ${updates.isCulminating !== undefined ? !!updates.isCulminating : m.is_culminating},
+        culminating_first_only = ${(updates.isCulminating ?? m.is_culminating) && (updates.firstOnly !== undefined ? !!updates.firstOnly : m.culminating_first_only)}
       WHERE id = ${missionId}
       RETURNING *
     `;
@@ -93,6 +96,39 @@ export async function deletePhaseMission(missionId) {
 // A culminating mission is hidden from the player until they've completed every
 // other (non-culminating) mission in the same phase. Unlock state is derived
 // from completions, so admin force-completes and sign-offs both count.
+
+// A "first agent only" culminating mission goes only to whoever finished the
+// phase's regular missions first (same rule as the First Past the Post award;
+// ties go to the lower user id). Returns { phase: userId }.
+async function firstFinishers(sessionId) {
+  const rows = await sql`
+    WITH per_player AS (
+      SELECT pm.user_id, ph.phase,
+             bool_and(pm.completed) AS done, MAX(pm.completed_at) AS finished_at
+      FROM player_missions pm
+      JOIN phase_missions ph ON ph.id = pm.mission_id
+      WHERE pm.session_id = ${sessionId} AND NOT ph.is_culminating
+      GROUP BY pm.user_id, ph.phase
+    )
+    SELECT DISTINCT ON (phase) phase, user_id
+    FROM per_player WHERE done
+    ORDER BY phase, finished_at, user_id
+  `;
+  return Object.fromEntries(rows.map(r => [r.phase, r.user_id]));
+}
+
+// Is this player's culminating mission row available to them?
+function culminatingState(r, unlocked, firsts) {
+  if (!r.is_culminating) return { culminatingUnlocked: false, culminatingClaimed: false };
+  const phaseDone = unlocked.has(r.phase);
+  if (!r.culminating_first_only) return { culminatingUnlocked: phaseDone, culminatingClaimed: false };
+  const first = firsts[r.phase];
+  return {
+    culminatingUnlocked: phaseDone && first === r.user_id,
+    // Finished the phase, but another agent got there first
+    culminatingClaimed: phaseDone && first !== undefined && first !== r.user_id,
+  };
+}
 
 // rows: one player's missions, each with { phase, isCulminating, completed }.
 // Returns a Set of phases whose culminating missions are unlocked.
@@ -120,6 +156,12 @@ async function assertCulminatingUnlocked(mission) {
   `;
   if (remaining[0].n > 0) {
     throw new Error(`Complete your other Phase ${mission.phase} missions first`);
+  }
+  if (mission.culminating_first_only) {
+    const firsts = await firstFinishers(mission.session_id);
+    if (firsts[mission.phase] !== mission.user_id) {
+      throw new Error('Another agent finished this phase first');
+    }
   }
 }
 
@@ -265,6 +307,7 @@ export async function getPlayerMissions(sessionId, userId) {
         ph.sort_order,
         ph.bounty,
         ph.is_culminating,
+        ph.culminating_first_only,
         signer.firstname as signer_firstname,
         signer.lastname as signer_lastname
       FROM player_missions pm
@@ -277,6 +320,7 @@ export async function getPlayerMissions(sessionId, userId) {
     const unlocked = unlockedPhases(rows.map(r => ({
       phase: r.phase, isCulminating: r.is_culminating, completed: r.completed
     })));
+    const firsts = rows.some(r => r.culminating_first_only) ? await firstFinishers(sessionId) : {};
 
     return rows.map(r => {
       let missionBody = r.mission_body;
@@ -309,7 +353,8 @@ export async function getPlayerMissions(sessionId, userId) {
         signerName: r.signer_firstname ? `${r.signer_firstname} ${r.signer_lastname}` : null,
         phaseLocked: r.phase < currentPhase,
         isCulminating: r.is_culminating,
-        culminatingUnlocked: r.is_culminating && unlocked.has(r.phase),
+        firstOnly: r.culminating_first_only,
+        ...culminatingState(r, unlocked, firsts),
         currentPhase
       };
     });
@@ -325,7 +370,7 @@ export async function completePhaseMission(playerMissionId, answer, userId) {
   try {
     const rows = await sql`
       SELECT pm.*, ph.completion_type, ph.success_key, ph.phase,
-             ph.bounty, ph.is_culminating, s.current_phase
+             ph.bounty, ph.is_culminating, ph.culminating_first_only, s.current_phase
       FROM player_missions pm
       JOIN phase_missions ph ON pm.mission_id = ph.id
       JOIN sessions s ON pm.session_id = s.id
@@ -375,7 +420,7 @@ export async function signOffMission(playerMissionId, signerPassphrase) {
   try {
     const rows = await sql`
       SELECT pm.*, ph.completion_type, ph.phase, ph.signer_constraint,
-             ph.same_signer_mission_id, ph.title, ph.bounty, ph.is_culminating,
+             ph.same_signer_mission_id, ph.title, ph.bounty, ph.is_culminating, ph.culminating_first_only,
              s.current_phase, s.id as session_id, s.participant_user_ids
       FROM player_missions pm
       JOIN phase_missions ph ON pm.mission_id = ph.id
@@ -534,6 +579,7 @@ export async function getAllPlayerMissionsForSession(sessionId) {
         ph.bounty,
         ph.signer_constraint,
         ph.is_culminating,
+        ph.culminating_first_only,
         u.firstname,
         u.lastname,
         signer.firstname as signer_firstname,
@@ -546,6 +592,7 @@ export async function getAllPlayerMissionsForSession(sessionId) {
       ORDER BY u.firstname, u.lastname, ph.phase, ph.sort_order, ph.id
     `;
 
+    const firsts = rows.some(r => r.culminating_first_only) ? await firstFinishers(sessionId) : {};
     const unlockedByUser = {};
     for (const userId of new Set(rows.map(r => r.user_id))) {
       unlockedByUser[userId] = unlockedPhases(rows.filter(r => r.user_id === userId).map(r => ({
@@ -562,7 +609,8 @@ export async function getAllPlayerMissionsForSession(sessionId) {
         playerMissionId: r.player_mission_id,
         userId: r.user_id,
         isCulminating: r.is_culminating,
-        culminatingUnlocked: r.is_culminating && unlockedByUser[r.user_id].has(r.phase),
+        firstOnly: r.culminating_first_only,
+        ...culminatingState(r, unlockedByUser[r.user_id], firsts),
         playerName: `${r.firstname} ${r.lastname}`,
         missionId: r.mission_id,
         phase: r.phase,

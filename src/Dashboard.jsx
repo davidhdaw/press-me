@@ -811,7 +811,11 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
           </div>
           <div className="modal-content">
             <h2>{unlockedCulminating.title}</h2>
-            <p>You've completed every mission in this phase and unlocked a culminating mission.</p>
+            <p>
+              {unlockedCulminating.firstOnly
+                ? "You're the first agent to complete every mission in this phase, and you've unlocked a special mission no one else will get."
+                : "You've completed every mission in this phase and unlocked a culminating mission."}
+            </p>
             <p><strong>See your handler for more information.</strong></p>
             {unlockedCulminating.bounty > 0 && (
               <div className="push-mission-bounty">Bounty: ${unlockedCulminating.bounty}</div>

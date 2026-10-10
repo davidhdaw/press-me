@@ -69,6 +69,7 @@ async function setupNeonDatabase() {
         sort_order INTEGER NOT NULL DEFAULT 0,
         bounty INTEGER DEFAULT 0,
         is_culminating BOOLEAN NOT NULL DEFAULT false,
+        culminating_first_only BOOLEAN NOT NULL DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `;
@@ -146,6 +147,8 @@ async function setupNeonDatabase() {
     // Columns added after the first release. ADD COLUMN IF NOT EXISTS is a no-op
     // on databases that already have them.
     await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS is_culminating BOOLEAN NOT NULL DEFAULT false`;
+    // Culminating mission that only the first agent to finish the phase gets
+    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS culminating_first_only BOOLEAN NOT NULL DEFAULT false`;
     // Bounty deposited when the mission was completed (snapshot, so editing a
     // mission's bounty later doesn't rewrite anyone's bank history)
     await sql`ALTER TABLE player_missions ADD COLUMN IF NOT EXISTS bounty_awarded INTEGER`;

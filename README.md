@@ -178,6 +178,7 @@ A mission marked **Culminating** (a checkbox in the Missions tab) is a phase's f
 - Ticking **Culminating** defaults the mission to a host sign-off (`admin_only`) with the body "See your handler for more information." Both can be changed.
 - The server refuses to complete a culminating mission before it's unlocked.
 - In the admin **Users** tab, a **Waiting for a handler** box lists everyone with an unlocked, unfinished culminating mission. Each player card shows the mission's progress, e.g. "hidden until 3/5 done".
+- **First agent only** (a second checkbox) gives the mission only to the first agent to finish the phase's other missions, using the same rule as the First Past the Post award. Nobody else ever sees it. In the admin view, everyone who finished later shows "another agent finished first", with no Complete button.
 - Like any mission, it locks when you advance past its phase.
 
 ### Push missions

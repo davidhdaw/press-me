@@ -70,7 +70,8 @@ function AdminDashboard({ staff, onLogout }) {
     sameSignerMissionId: null,
     sortOrder: 0,
     bounty: 0,
-    isCulminating: false
+    isCulminating: false,
+    firstOnly: false
   })
   const [phaseMissions, setPhaseMissions] = useState([])
   const [loadingPhaseMissions, setLoadingPhaseMissions] = useState(false)
@@ -474,7 +475,8 @@ function AdminDashboard({ staff, onLogout }) {
         sameSignerMissionId: mission.same_signer_mission_id || null,
         sortOrder: mission.sort_order || 0,
         bounty: mission.bounty || 0,
-        isCulminating: !!mission.is_culminating
+        isCulminating: !!mission.is_culminating,
+        firstOnly: !!mission.culminating_first_only
       })
     } else {
       setMissionForm({
@@ -490,7 +492,8 @@ function AdminDashboard({ staff, onLogout }) {
         sameSignerMissionId: null,
         sortOrder: 0,
         bounty: 0,
-        isCulminating: false
+        isCulminating: false,
+        firstOnly: false
       })
     }
     setShowMissionModal(true)
@@ -519,7 +522,8 @@ function AdminDashboard({ staff, onLogout }) {
       sameSignerMissionId: missionForm.signerConstraint === 'same_signer' ? missionForm.sameSignerMissionId : null,
       sortOrder: missionForm.sortOrder,
       bounty: parseInt(missionForm.bounty) || 0,
-      isCulminating: missionForm.isCulminating
+      isCulminating: missionForm.isCulminating,
+      firstOnly: missionForm.isCulminating && missionForm.firstOnly
     }
 
     try {
@@ -835,7 +839,7 @@ function AdminDashboard({ staff, onLogout }) {
                           </div>
                         </div>
                         <span className="mission-meta">
-                          {m.is_culminating && <span className="mission-tag tag-culminating">culminating</span>}
+                          {m.is_culminating && <span className="mission-tag tag-culminating">{m.culminating_first_only ? 'culminating · first only' : 'culminating'}</span>}
                           <span className="mission-tag tag-completion">{m.completion_type}</span>
                           {m.bounty ? <span className="mission-tag tag-bounty">{`$${m.bounty}`}</span> : null}
                           {m.signer_constraint && m.signer_constraint !== 'any' ? <span className="mission-tag tag-constraint">{m.signer_constraint.replace(/_/g, ' ')}</span> : null}
@@ -966,7 +970,9 @@ function AdminDashboard({ staff, onLogout }) {
                                             <span className="mission-type">
                                               {m.culminatingUnlocked
                                                 ? ' — unlocked, see handler'
-                                                : ` — hidden until ${phaseMissions.filter(x => !x.isCulminating && x.completed).length}/${phaseMissions.filter(x => !x.isCulminating).length} done`}
+                                                : m.culminatingClaimed
+                                                  ? ' — another agent finished first'
+                                                  : ` — hidden until ${phaseMissions.filter(x => !x.isCulminating && x.completed).length}/${phaseMissions.filter(x => !x.isCulminating).length} done${m.firstOnly ? ' (first agent only)' : ''}`}
                                             </span>
                                           )}
                                           {m.variableValue && (
@@ -979,7 +985,7 @@ function AdminDashboard({ staff, onLogout }) {
                                             </span>
                                           )}
                                         </div>
-                                        {!m.completed && !isLocked && (
+                                        {!m.completed && !isLocked && !m.culminatingClaimed && (
                                           <button
                                             onClick={() => handleRequestCompleteMission(m.playerMissionId, m.userId)}
                                             className="button-complete"
@@ -1316,6 +1322,19 @@ function AdminDashboard({ staff, onLogout }) {
                   Culminating mission
                 </label>
                 <p className="admin-form-hint">Hidden from each player until they've completed every other mission in this phase.</p>
+                {missionForm.isCulminating && (
+                  <>
+                    <label className="admin-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={missionForm.firstOnly}
+                        onChange={(e) => setMissionForm({ ...missionForm, firstOnly: e.target.checked })}
+                      />
+                      First agent only
+                    </label>
+                    <p className="admin-form-hint">Only the first agent to finish this phase gets it; nobody else ever sees it.</p>
+                  </>
+                )}
               </div>
               <div className="admin-form-group">
                 <label>Title</label>
