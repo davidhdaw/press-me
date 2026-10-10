@@ -728,6 +728,10 @@ body:has(.admin-dashboard) {
 }
 
 .participant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--unit-sm);
   font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
   font-weight: 700;
   font-size: 1.05em;
@@ -901,6 +905,12 @@ body:has(.admin-dashboard) {
   color: var(--white);
 }
 
+.tag-culminating {
+  background-color: var(--red);
+  color: var(--white);
+  margin-right: 6px;
+}
+
 .tag-variable {
   background-color: var(--yellow);
   color: var(--black);
@@ -1058,4 +1068,343 @@ body:has(.admin-dashboard) {
 .push-status-badge--completed {
   background-color: var(--green);
   color: var(--black);
+}
+
+/* Users tab */
+.button-small {
+  padding: 2px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  background-color: var(--white);
+  color: var(--black);
+  border: 2px solid var(--black);
+  border-radius: 4px;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.button-small:hover {
+  background-color: var(--black);
+  color: var(--white);
+}
+
+.user-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.user-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--unit-sm);
+  padding: var(--unit-xs) 0;
+  border-bottom: 1px solid #ddd;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+.user-row:last-child {
+  border-bottom: none;
+}
+
+.user-row.away {
+  opacity: 0.5;
+}
+
+.user-row-meta {
+  display: block;
+  font-family: 'Jost', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 0.8em;
+  color: #888;
+}
+
+.player-modal input[type="text"],
+.player-modal select {
+  border: 2px solid var(--black);
+  border-radius: 4px;
+}
+
+.player-modal select {
+  width: 100%;
+  padding: var(--unit-sm);
+  background: var(--white);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.1rem;
+}
+
+.admin-checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: var(--unit-sm);
+}
+
+.admin-checkbox-label input {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.login-url-row {
+  display: flex;
+  gap: var(--unit-sm);
+}
+
+/* Login links are case-sensitive base64; don't uppercase them */
+.login-url-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Culminating missions */
+.admin-form-hint {
+  font-family: 'Jost', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 0.8em;
+  color: #888;
+  margin: var(--unit-xs) 0 0;
+}
+
+.phase-mission-row.culminating-ready {
+  background-color: var(--yellow);
+  padding: 2px var(--unit-xs);
+  border-radius: 4px;
+}
+
+.handler-queue {
+  background-color: var(--yellow);
+  border: 2px solid var(--black);
+  border-radius: 4px;
+  padding: var(--unit-sm);
+  margin-bottom: var(--unit-sm);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+.handler-queue ul {
+  margin: var(--unit-xs) 0 0;
+  padding-left: var(--unit-base);
+}
+
+/* Staff */
+.staff-signed-in {
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  align-self: center;
+}
+
+/* Bank page */
+.bank-search {
+  border: 2px solid var(--black);
+  margin-bottom: var(--unit-sm);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1.1rem;
+}
+
+.bank-accounts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+
+
+.bank-account-balance {
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+  align-self: center;
+  transition: color 0.2s ease;
+}
+
+.bank-balance-card {
+  text-align: center;
+  padding: var(--unit-base) 0 var(--unit-sm);
+}
+
+.bank-balance-card h2 {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.bank-balance {
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.bank-form {
+  border: 2px solid var(--black);
+  border-radius: 4px;
+  padding: var(--unit-sm);
+  margin: var(--unit-sm) 0;
+}
+
+.bank-form h3 {
+  margin-top: 0;
+}
+
+.bank-form input[type="text"],
+.bank-form select {
+  border: 2px solid var(--black);
+}
+
+.bank-form .button-primary {
+  width: 100%;
+}
+
+.bank-correction-row {
+  display: flex;
+  gap: var(--unit-sm);
+}
+
+
+
+.bank-feedback {
+  background-color: var(--green);
+  border: 2px solid var(--black);
+  border-radius: 4px;
+  padding: var(--unit-sm);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-weight: 600;
+}
+
+.bank-feedback--error {
+  background-color: var(--red);
+  color: var(--white);
+}
+
+/* Bank: quick-spend list (one row per player) */
+.bank-page {
+  padding-bottom: 160px; /* room for the Undo bar */
+}
+
+.bank-list-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--white);
+  padding-bottom: var(--unit-xs);
+}
+
+.bank-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--unit-xs) var(--unit-sm);
+  padding: var(--unit-sm) 0;
+  border-bottom: 1px solid #ddd;
+  transition: background-color 0.4s ease;
+}
+
+.bank-row--flash {
+  background-color: rgba(149, 175, 110, 0.35);
+  transition: none;
+}
+
+.bank-row-name {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--black);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.15rem;
+}
+
+.bank-quick {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--unit-sm);
+}
+
+.bank-quick button {
+  min-height: 48px;
+  min-width: 0;
+  padding: 0 4px;
+  border: 2px solid var(--black);
+  border-radius: 6px;
+  background-color: var(--yellow);
+  color: var(--black);
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation; /* no double-tap zoom delay */
+}
+
+.bank-quick button:active:not(:disabled) {
+  background-color: var(--black);
+  color: var(--yellow);
+}
+
+.bank-quick button:disabled {
+  background-color: transparent;
+  border-color: #ccc;
+  color: #bbb;
+  cursor: not-allowed;
+}
+
+/* Recent spends with Undo, pinned to the bottom of the screen */
+.bank-recent {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  background-color: var(--black);
+  color: var(--white);
+  padding: var(--unit-xs) var(--unit-base) calc(var(--unit-xs) + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.bank-recent-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--unit-sm);
+  padding: 4px 0;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 1.05rem;
+}
+
+.bank-recent-row + .bank-recent-row {
+  border-top: 1px solid rgba(245, 231, 203, 0.15);
+  opacity: 0.75;
+}
+
+.bank-recent-row button {
+  min-height: 36px;
+  padding: 0 var(--unit-base);
+  border: 2px solid var(--yellow);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--yellow);
+  font-family: inherit;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.bank-correction-row input {
+  border: 2px solid var(--black);
+}
+
+.bank-correction-row input:first-child {
+  flex: 0 0 35%;
+}
+
+.bank-form .button-secondary {
+  width: 100%;
 }

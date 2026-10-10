@@ -14,48 +14,17 @@ export async function createPushMission({ sessionId, targetUserId, sentByUserId,
   }
 }
 
-export async function getPendingPushMissions(sessionId, userId) {
+// All of a player's push missions in one query; the phone works out which are
+// new, completed-but-unseen and acknowledged (it polls this every 5 seconds)
+export async function getPushMissionsForPlayer(sessionId, userId) {
   try {
     return await sql`
       SELECT * FROM push_missions
-      WHERE session_id = ${sessionId}
-        AND target_user_id = ${userId}
-        AND acknowledged = false
+      WHERE session_id = ${sessionId} AND target_user_id = ${userId}
       ORDER BY created_at ASC
     `;
   } catch (error) {
-    console.error('Error getting pending push missions:', error);
-    throw error;
-  }
-}
-
-export async function getCompletedUnseenPushMissions(sessionId, userId) {
-  try {
-    return await sql`
-      SELECT * FROM push_missions
-      WHERE session_id = ${sessionId}
-        AND target_user_id = ${userId}
-        AND completed = true
-        AND completion_seen = false
-      ORDER BY completed_at ASC
-    `;
-  } catch (error) {
-    console.error('Error getting completed unseen push missions:', error);
-    throw error;
-  }
-}
-
-export async function getAcknowledgedPushMissions(sessionId, userId) {
-  try {
-    return await sql`
-      SELECT * FROM push_missions
-      WHERE session_id = ${sessionId}
-        AND target_user_id = ${userId}
-        AND acknowledged = true
-      ORDER BY created_at DESC
-    `;
-  } catch (error) {
-    console.error('Error getting acknowledged push missions:', error);
+    console.error('Error getting push missions for player:', error);
     throw error;
   }
 }
@@ -104,22 +73,6 @@ export async function markCompletionSeen(pushMissionId, userId) {
     return result[0];
   } catch (error) {
     console.error('Error marking completion seen:', error);
-    throw error;
-  }
-}
-
-export async function markPushBountyPaid(pushMissionId) {
-  try {
-    const result = await sql`
-      UPDATE push_missions
-      SET bounty_paid = true
-      WHERE id = ${pushMissionId} AND completed = true
-      RETURNING *
-    `;
-    if (result.length === 0) throw new Error('Push mission not found or not completed');
-    return { success: true };
-  } catch (error) {
-    console.error('Error marking push bounty paid:', error);
     throw error;
   }
 }

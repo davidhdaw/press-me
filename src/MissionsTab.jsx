@@ -12,7 +12,7 @@ export function BriefingMissionRow({ onOpenBriefing }) {
   )
 }
 
-function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions, onPushMissionClick }) {
+function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions, paused, gameOver }) {
   if (!isInActiveSession) {
     return (
       <div className="tab-content">
@@ -33,6 +33,18 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
 
   return (
     <div className="tab-content">
+      {gameOver && (
+        <div className="game-paused-banner game-over-banner">
+          <strong>Mission complete</strong>
+          <span>The operation is over, agent. Gather round for the debrief and awards!</span>
+        </div>
+      )}
+      {paused && !gameOver && (
+        <div className="game-paused-banner">
+          <strong>Game paused</strong>
+          <span>Hold tight, agent. The hosts will resume shortly.</span>
+        </div>
+      )}
       <BriefingMissionRow onOpenBriefing={onOpenBriefing} />
 
       {(activePush.length > 0 || completedPush.length > 0) && (
@@ -58,21 +70,12 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
               {completedPush.map(pm => (
                 <div
                   key={`push-${pm.id}`}
-                  className="mission-card mission-card--completed mission-card--push clickable"
-                  onClick={() => onPushMissionClick && onPushMissionClick(pm)}
+                  className="mission-card mission-card--completed mission-card--push"
                 >
                   <div className="mission-card-completed-row">
                     <h3>{pm.title}</h3>
                     {pm.bounty > 0 && (
-                      <span
-                        className={
-                          pm.bounty_paid
-                            ? 'mission-bounty-badge mission-bounty-badge--paid'
-                            : 'mission-bounty-badge mission-bounty-badge--unpaid'
-                        }
-                      >
-                        {pm.bounty_paid ? 'PAID' : 'UNPAID'}
-                      </span>
+                      <span className="mission-bounty-badge mission-bounty-badge--paid">+${pm.bounty}</span>
                     )}
                   </div>
                 </div>
@@ -83,9 +86,13 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
       )}
 
       {phaseOrder.map(phase => {
-        const phaseMissions = missions.filter(m => Number(m.phase) === phase)
+        // Culminating missions stay secret until every other mission in the phase is done
+        const phaseMissions = missions
+          .filter(m => Number(m.phase) === phase)
+          .filter(m => !m.isCulminating || m.culminatingUnlocked || m.completed)
+          .sort((a, b) => Number(!!b.isCulminating) - Number(!!a.isCulminating))
         if (phaseMissions.length === 0) return null
-        const isLocked = phase < cp
+        const isLocked = phase < cp || gameOver
 
         const incomplete = m => !completedMissions.has(m.playerMissionId)
         const lockedIncomplete = phaseMissions.filter(m => isLocked && incomplete(m))
@@ -100,9 +107,12 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
                 {fullCardMissions.map(mission => (
                   <div
                     key={mission.playerMissionId}
-                    className="mission-card clickable"
+                    className={`mission-card clickable${mission.isCulminating ? ' mission-card--push mission-card--culminating' : ''}`}
                     onClick={() => onMissionClick(mission.playerMissionId)}
                   >
+                    {mission.isCulminating && (
+                      <div className="push-mission-card-label">CULMINATING MISSION · SEE YOUR HANDLER</div>
+                    )}
                     <div className="mission-header">
                       <h3>{mission.title}</h3>
                       {mission.bounty > 0 && (
@@ -125,16 +135,8 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
                   >
                     <div className="mission-card-completed-row">
                       <h3>{mission.title}</h3>
-                      {mission.bounty > 0 && (
-                        <span
-                          className={
-                            mission.bountyPaid
-                              ? 'mission-bounty-badge mission-bounty-badge--paid'
-                              : 'mission-bounty-badge mission-bounty-badge--unpaid'
-                          }
-                        >
-                          {mission.bountyPaid ? 'PAID' : 'UNPAID'}
-                        </span>
+                      {mission.bountyAwarded > 0 && (
+                        <span className="mission-bounty-badge mission-bounty-badge--paid">+${mission.bountyAwarded}</span>
                       )}
                     </div>
                   </div>

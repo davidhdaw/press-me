@@ -1,8 +1,4 @@
-import { neon } from '@neondatabase/serverless';
-
-// Neon database connection
-const DATABASE_URL = 'postgresql://neondb_owner:npg_3goAkB0KtVQP@ep-blue-shadow-afze8ju2-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
-const sql = neon(DATABASE_URL);
+import { sql } from './db.js';
 
 // Function to generate login URL from alias (matching Login.jsx logic exactly)
 // Login.jsx line 60: btoa(unescape(encodeURIComponent(alias)))

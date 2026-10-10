@@ -7,61 +7,71 @@ import * as auth from './api/auth.js';
 import * as sessions from './api/sessions.js';
 import * as phaseMissions from './api/phaseMissions.js';
 import * as pushMissions from './api/pushMissions.js';
+import * as staff from './api/staff.js';
+import * as bank from './api/bank.js';
+import * as awards from './api/awards.js';
 
 // Assemble the neonApi object with all functions
 export const neonApi = {
   // Users
   getUsers: users.getUsers,
-  getUserScore: users.getUserScore,
   getUserPassphrase: users.getUserPassphrase,
   createUser: users.createUser,
+  updateUser: users.updateUser,
   
   // Auth
-  logLogin: auth.logLogin,
   signInByName: auth.signInByName,
   signInByAlias: auth.signInByAlias,
-  authenticate: auth.authenticate,
-  validateAdminName: auth.validateAdminName,
-  authenticateAdmin: auth.authenticateAdmin,
-  getLoginStats: auth.getLoginStats,
+
+  // Staff (hosts and bankers)
+  staffLogin: staff.staffLogin,
+  getStaffSession: staff.getStaffSession,
+  staffLogout: staff.staffLogout,
+  setStaffPin: staff.setStaffPin,
+
+  // Bank
+  getStatement: bank.getStatement,
+  getBalances: bank.getBalances,
+  recordTransaction: bank.recordTransaction,
+  undoTransaction: bank.undoTransaction,
+
+  // Awards
+  getAwards: awards.getAwards,
   
   // Sessions
   getAllSessions: sessions.getAllSessions,
   getActiveSession: sessions.getActiveSession,
+  getCurrentSession: sessions.getCurrentSession,
   createSession: sessions.createSession,
   updateSession: sessions.updateSession,
   startSession: sessions.startSession,
   pauseSession: sessions.pauseSession,
   resumeSession: sessions.resumeSession,
   endSession: sessions.endSession,
-  canAssignMissions: sessions.canAssignMissions,
   resetSession: sessions.resetSession,
+  addPlayerToSession: sessions.addPlayerToSession,
 
   // Phase Missions
   createPhaseMission: phaseMissions.createPhaseMission,
   getPhaseMissions: phaseMissions.getPhaseMissions,
   updatePhaseMission: phaseMissions.updatePhaseMission,
   deletePhaseMission: phaseMissions.deletePhaseMission,
-  assignPhaseToPlayers: phaseMissions.assignPhaseToPlayers,
   getPlayerMissions: phaseMissions.getPlayerMissions,
-  getSessionParticipants: phaseMissions.getSessionParticipants,
   completePhaseMission: phaseMissions.completePhaseMission,
   signOffMission: phaseMissions.signOffMission,
   adminCompletePhaseMission: phaseMissions.adminCompletePhaseMission,
+  getRevealMission: phaseMissions.getRevealMission,
+  completeRevealMission: phaseMissions.completeRevealMission,
   getAllPlayerMissionsForSession: phaseMissions.getAllPlayerMissionsForSession,
-  markBountyPaid: phaseMissions.markBountyPaid,
 
   // Sessions (new)
   advancePhase: sessions.advancePhase,
 
   // Push Missions
   createPushMission: pushMissions.createPushMission,
-  getPendingPushMissions: pushMissions.getPendingPushMissions,
-  getCompletedUnseenPushMissions: pushMissions.getCompletedUnseenPushMissions,
-  getAcknowledgedPushMissions: pushMissions.getAcknowledgedPushMissions,
+  getPushMissionsForPlayer: pushMissions.getPushMissionsForPlayer,
   acknowledgePushMission: pushMissions.acknowledgePushMission,
   completePushMission: pushMissions.completePushMission,
   markCompletionSeen: pushMissions.markCompletionSeen,
-  markPushBountyPaid: pushMissions.markPushBountyPaid,
   getAllPushMissionsForSession: pushMissions.getAllPushMissionsForSession,
 };

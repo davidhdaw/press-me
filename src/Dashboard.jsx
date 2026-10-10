@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
 import { neonApi } from './neonApi'
-import { isAdmin } from './utils/admin.js'
+import BankStrip from './BankStrip'
+import BriefingModalPanel from './Briefing'
+import { FINAL_PHASE } from './api/game.js'
 import AgentTab from './AgentTab'
 import MissionsTab, { BriefingMissionRow } from './MissionsTab'
 
@@ -42,55 +43,57 @@ function formatWitnessSignedAt(iso) {
   return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-function firstNameFromFullName(name) {
-  if (name == null || String(name).trim() === '') return null
-  return String(name).trim().split(/\s+/)[0]
-}
-
-function BriefingModalPanel({ isClosing, onClose, passphrase }) {
+// payment: money a witness paid this player at sign-off, deposited alongside the bounty
+function DepositNotice({ amount, payment }) {
+  const total = amount + (payment?.amount || 0)
   return (
-    <div className={`modal briefing-modal ${isClosing ? 'closing' : ''}`}>
-      <div className="modal-header">
-        <button type="button" onClick={onClose} className="close-button">Close</button>
-      </div>
-      <div className="modal-content">
-        <div className="backstory-card briefing-modal-card">
-          <img className="briefing-modal-seal" src="/briefing-seal.png" alt="" />
-          <h4>Briefing - TOP SECRET!!!</h4>
-          <p>We've been following the movements of a mysterious hacker known as <strong>tha_h4ck3rG0d</strong> and have reason to believe they are planning to detonate a doomsday device at some point on the evening of <strong>Saturday, May 16</strong>.</p>
-          <p>The device itself is located somewhere on the premises of <strong>MacGuffin Toys</strong>. You will be infiltrating the environment as part of their annual company party.</p>
-          <p>Initial intelligence suggests the company's employees are not very bright.</p>
-          <p>Your mission is to determine the location of this doomsday device and disable it. We've prepared a series of smaller missions that will help you locate the device. You can do missions in any order.</p>
-          <p>
-            Due to the severity of the threat, we may have sent a few too many agents to retrieve the device.
-            If you see a fellow agent in disguise, please help them maintain their cover by playing along.
-            You can also sign off on their missions using your secret passphrase: <strong>{passphrase || '—'}</strong>.
-          </p>
-          <p><strong>Good luck, have fun, and don't get caught.</strong></p>
-        </div>
-      </div>
+    <div className="bounty-award">
+      <p className="bounty-award-amount">${total.toLocaleString()} deposited!</p>
+      <p className="bounty-award-lede">
+        {payment && `$${amount.toLocaleString()} bounty + $${payment.amount.toLocaleString()} from ${payment.from}. `}
+        It's in your bank. Tap BANK at the bottom of the screen to see your balance.
+      </p>
     </div>
   )
 }
 
-function DashboardFooter({ currentUser, onLogout }) {
-  const navigate = useNavigate()
+function DashboardFooter({ currentUser, onLogout, onUserUpdate, bankSessionId, bankRefreshKey }) {
   return (
     <footer className="dashboard-footer">
-      <AgentTab currentUser={currentUser} />
+      <BankStrip sessionId={bankSessionId} userId={currentUser?.id} refreshKey={bankRefreshKey} />
+      <AgentTab currentUser={currentUser} onUserUpdate={onUserUpdate} />
       <div className="dashboard-footer-actions">
-        {isAdmin(currentUser) && (
-          <button type="button" className="admin-button button-min" onClick={() => navigate('/admin/login')}>
-            ADMIN
-          </button>
-        )}
         <button type="button" className="logout-button button-min" onClick={onLogout}>LOGOUT</button>
       </div>
     </footer>
   )
 }
 
-function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, currentUser }) {
+// Bump this whenever the briefing changes so every player sees the new one once
+const BRIEFING_SEEN_KEY = 'briefingSeen:oct10'
+
+// Which culminating-mission unlocks this phone has already announced
+const CULMINATING_SEEN_KEY = 'culminatingSeen'
+
+function readCulminatingSeen() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(CULMINATING_SEEN_KEY) || '[]'))
+  } catch {
+    return new Set()
+  }
+}
+
+function markCulminatingSeen(playerMissionId) {
+  try {
+    const seen = readCulminatingSeen()
+    seen.add(playerMissionId)
+    localStorage.setItem(CULMINATING_SEEN_KEY, JSON.stringify([...seen]))
+  } catch {
+    // Without storage the announcement may repeat after a reload; harmless
+  }
+}
+
+function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, currentUser }) {
   const [missions, setMissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -101,6 +104,9 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   const [activeSessionId, setActiveSessionId] = useState(null)
   const [currentPhase, setCurrentPhase] = useState(0)
   const [signerPassphrase, setSignerPassphrase] = useState('')
+  // Missions that charge the witness at sign-off: amount they agree to, and what was paid
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [completedPayment, setCompletedPayment] = useState(null)
   const [signoffSuccessSignerName, setSignoffSuccessSignerName] = useState(null)
   const [signoffSignedAt, setSignoffSignedAt] = useState(null)
   const [signoffPhase, setSignoffPhase] = useState('brief')
@@ -112,12 +118,14 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   const [showMissionFailed, setShowMissionFailed] = useState(false)
   const [missionFailedMessage, setMissionFailedMessage] = useState(null)
   const [completedBounty, setCompletedBounty] = useState(0)
-  const [showBountyPaidStamp, setShowBountyPaidStamp] = useState(false)
-  const bountyPaidCloseTimerRef = useRef(null)
   const [isInActiveSession, setIsInActiveSession] = useState(false)
+  const [sessionPaused, setSessionPaused] = useState(false)
+  // Bumped when the phone wakes up / the tab comes back, to refresh everything
+  // at once instead of showing stale data until the next poll
+  const [wakeTick, setWakeTick] = useState(0)
   const [sessionCheckLoading, setSessionCheckLoading] = useState(true)
 
-  const [showBriefingModal, setShowBriefingModal] = useState(() => !localStorage.getItem('briefingSeen'))
+  const [showBriefingModal, setShowBriefingModal] = useState(() => !localStorage.getItem(BRIEFING_SEEN_KEY))
   const [isBriefingClosing, setIsBriefingClosing] = useState(false)
 
   const [pushMissions, setPushMissions] = useState([])
@@ -125,11 +133,9 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   const [showPushMissionModal, setShowPushMissionModal] = useState(false)
   const [isPushMissionClosing, setIsPushMissionClosing] = useState(false)
   const [pushMissionType, setPushMissionType] = useState('new')
-  const [showPushBountyPaidStamp, setShowPushBountyPaidStamp] = useState(false)
-  const [payoutPushMission, setPayoutPushMission] = useState(null)
-  const [showPayoutPushModal, setShowPayoutPushModal] = useState(false)
-  const [isPayoutPushClosing, setIsPayoutPushClosing] = useState(false)
-  const [showPayoutPushStamp, setShowPayoutPushStamp] = useState(false)
+
+  const [unlockedCulminating, setUnlockedCulminating] = useState(null)
+  const [isUnlockClosing, setIsUnlockClosing] = useState(false)
 
   // ── Session & mission data fetching ────────────────────────────────────────
 
@@ -137,7 +143,8 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
     const checkActiveSession = async () => {
       try {
         setSessionCheckLoading(true)
-        const activeSession = await neonApi.getActiveSession()
+        const activeSession = await neonApi.getCurrentSession()
+        setSessionPaused(activeSession?.status === 'paused')
         if (activeSession && activeSession.participant_user_ids) {
           const agentIdNum = Number(agentId)
           const participantIds = activeSession.participant_user_ids.map(id => Number(id))
@@ -186,11 +193,24 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   }, [missions, loading, sessionCheckLoading])
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const onWake = () => {
+      if (document.visibilityState === 'visible') setWakeTick(t => t + 1)
+    }
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('pageshow', onWake)
+    return () => {
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('pageshow', onWake)
+    }
+  }, [])
+
+  useEffect(() => {
+    const checkSession = async () => {
       try {
-        const activeSession = await neonApi.getActiveSession()
+        const activeSession = await neonApi.getCurrentSession()
+        setSessionPaused(activeSession?.status === 'paused')
         if (activeSession && activeSession.participant_user_ids) {
-          const userInSession = activeSession.participant_user_ids.includes(agentId)
+          const userInSession = activeSession.participant_user_ids.map(Number).includes(Number(agentId))
           if (userInSession !== isInActiveSession) {
             setIsInActiveSession(userInSession)
             if (!userInSession) setMissions([])
@@ -208,9 +228,11 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
       } catch (error) {
         console.error('Error checking session status:', error)
       }
-    }, 10000)
+    }
+    if (wakeTick > 0) checkSession()
+    const interval = setInterval(checkSession, 10000)
     return () => clearInterval(interval)
-  }, [agentId, isInActiveSession])
+  }, [agentId, isInActiveSession, wakeTick])
 
   useEffect(() => {
     if (!isInActiveSession || !activeSessionId) return
@@ -233,30 +255,35 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
       }
     }
 
+    if (wakeTick > 0) checkMissions()
     const interval = setInterval(checkMissions, 5000)
     return () => clearInterval(interval)
-  }, [agentId, isInActiveSession, activeSessionId])
+  }, [agentId, isInActiveSession, activeSessionId, wakeTick])
 
   useEffect(() => {
     if (!isInActiveSession || !activeSessionId) return
 
     const checkPushMissions = async () => {
       try {
-        const acknowledged = await neonApi.getAcknowledgedPushMissions(activeSessionId, agentId)
-        setPushMissions(acknowledged || [])
+        // One query; split into acknowledged / new / completed-but-unseen here
+        const all = (await neonApi.getPushMissionsForPlayer(activeSessionId, agentId)) || []
+        const at = (t) => new Date(t).getTime()
+        setPushMissions(all.filter(m => m.acknowledged).sort((a, b) => at(b.created_at) - at(a.created_at)))
 
         if (showPushMissionModal) return
 
-        const pending = await neonApi.getPendingPushMissions(activeSessionId, agentId)
-        if (pending && pending.length > 0) {
+        const pending = all.filter(m => !m.acknowledged)
+        if (pending.length > 0) {
           setPendingPushMission(pending[0])
           setPushMissionType('new')
           setShowPushMissionModal(true)
           return
         }
 
-        const completedUnseen = await neonApi.getCompletedUnseenPushMissions(activeSessionId, agentId)
-        if (completedUnseen && completedUnseen.length > 0) {
+        const completedUnseen = all
+          .filter(m => m.completed && !m.completion_seen)
+          .sort((a, b) => at(a.completed_at) - at(b.completed_at))
+        if (completedUnseen.length > 0) {
           setPendingPushMission(completedUnseen[0])
           setPushMissionType('completed')
           setShowPushMissionModal(true)
@@ -269,7 +296,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
     checkPushMissions()
     const interval = setInterval(checkPushMissions, 5000)
     return () => clearInterval(interval)
-  }, [agentId, isInActiveSession, activeSessionId, showPushMissionModal])
+  }, [agentId, isInActiveSession, activeSessionId, showPushMissionModal, wakeTick])
 
   const fetchMissions = async () => {
     try {
@@ -295,6 +322,32 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
     }
   }
 
+  // ── Culminating mission unlock announcement ────────────────────────────────
+
+  // Announce a newly unlocked culminating mission once nothing else is on screen
+  // (e.g. after the player closes the success screen for their last mission).
+  useEffect(() => {
+    if (unlockedCulminating || showMissionModal || showPushMissionModal || showBriefingModal) return
+    const seen = readCulminatingSeen()
+    const next = missions.find(m =>
+      m.culminatingUnlocked && !m.completed && !m.phaseLocked && !seen.has(m.playerMissionId)
+    )
+    if (next) {
+      setIsUnlockClosing(false)
+      setUnlockedCulminating(next)
+    }
+  }, [missions, unlockedCulminating, showMissionModal, showPushMissionModal, showBriefingModal])
+
+  const acknowledgeCulminatingUnlock = () => {
+    if (!unlockedCulminating) return
+    markCulminatingSeen(unlockedCulminating.playerMissionId)
+    setIsUnlockClosing(true)
+    setTimeout(() => {
+      setUnlockedCulminating(null)
+      setIsUnlockClosing(false)
+    }, 300)
+  }
+
   // ── Push mission modal ─────────────────────────────────────────────────────
 
   const handleAcknowledgePushMission = async () => {
@@ -310,59 +363,9 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
         setShowPushMissionModal(false)
         setIsPushMissionClosing(false)
         setPendingPushMission(null)
-        setShowPushBountyPaidStamp(false)
       }, 300)
     } catch (error) {
       console.error('Error acknowledging push mission:', error)
-    }
-  }
-
-  const handleMarkPushBountyPaid = async () => {
-    if (!pendingPushMission) return
-    try {
-      await neonApi.markPushBountyPaid(pendingPushMission.id)
-      setPushMissions(prev => prev.map(m =>
-        m.id === pendingPushMission.id ? { ...m, bounty_paid: true } : m
-      ))
-      setShowPushBountyPaidStamp(true)
-      setTimeout(() => {
-        handleAcknowledgePushMission()
-      }, 1100)
-    } catch (error) {
-      console.error('Error marking push bounty paid:', error)
-    }
-  }
-
-  const openPushMissionPayout = (pm) => {
-    setPayoutPushMission(pm)
-    setShowPayoutPushModal(true)
-    setIsPayoutPushClosing(false)
-    setShowPayoutPushStamp(false)
-  }
-
-  const closePayoutPushModal = () => {
-    setIsPayoutPushClosing(true)
-    setTimeout(() => {
-      setShowPayoutPushModal(false)
-      setIsPayoutPushClosing(false)
-      setPayoutPushMission(null)
-      setShowPayoutPushStamp(false)
-    }, 300)
-  }
-
-  const handlePayoutPushBountyPaid = async () => {
-    if (!payoutPushMission) return
-    try {
-      await neonApi.markPushBountyPaid(payoutPushMission.id)
-      setPushMissions(prev => prev.map(m =>
-        m.id === payoutPushMission.id ? { ...m, bounty_paid: true } : m
-      ))
-      setShowPayoutPushStamp(true)
-      setTimeout(() => {
-        closePayoutPushModal()
-      }, 1100)
-    } catch (error) {
-      console.error('Error marking push bounty paid:', error)
     }
   }
 
@@ -379,12 +382,9 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
     setSignoffSuccessSignerName(null)
     setSignoffPhase('brief')
     setSignerPassphrase('')
+    setPaymentAmount('')
+    setCompletedPayment(null)
     setSignoffSignedAt(null)
-    setShowBountyPaidStamp(false)
-    if (bountyPaidCloseTimerRef.current != null) {
-      clearTimeout(bountyPaidCloseTimerRef.current)
-      bountyPaidCloseTimerRef.current = null
-    }
   }
 
   const openBriefingModal = () => {
@@ -395,7 +395,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
 
   const closeBriefingModal = () => {
     setIsBriefingClosing(true)
-    localStorage.setItem('briefingSeen', '1')
+    localStorage.setItem(BRIEFING_SEEN_KEY, '1')
     setTimeout(() => {
       setShowBriefingModal(false)
       setIsBriefingClosing(false)
@@ -403,10 +403,6 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   }
 
   const openMissionModal = (missionId) => {
-    if (bountyPaidCloseTimerRef.current != null) {
-      clearTimeout(bountyPaidCloseTimerRef.current)
-      bountyPaidCloseTimerRef.current = null
-    }
     setShowBriefingModal(false)
     setIsBriefingClosing(false)
     setSelectedMissionId(missionId)
@@ -419,8 +415,9 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
     setSignoffSuccessSignerName(null)
     setSignoffPhase('brief')
     setSignerPassphrase('')
+    setPaymentAmount('')
+    setCompletedPayment(null)
     setSignoffSignedAt(null)
-    setShowBountyPaidStamp(false)
 
     const mission = missions.find(m => m.playerMissionId === missionId)
     if (mission?.completionType === 'signoff' && mission.completed) {
@@ -428,14 +425,10 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
       setSignoffPhase('witnessDone')
       setSignoffSuccessSignerName(mission.signerName || null)
       setSignoffSignedAt(mission.signedOffAt || null)
-      if (!mission.bountyPaid && mission.bounty > 0) {
-        setCompletedBounty(mission.bounty)
-      } else {
-        setCompletedBounty(0)
-      }
-    } else if (mission && mission.completed && !mission.bountyPaid && mission.bounty > 0) {
+      setCompletedBounty(mission.bountyAwarded || 0)
+    } else if (mission?.completed) {
       setShowMissionSuccess(true)
-      setCompletedBounty(mission.bounty)
+      setCompletedBounty(mission.bountyAwarded || 0)
     }
   }
 
@@ -474,7 +467,12 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
           setMissionErrors(prev => ({ ...prev, [playerMissionId]: 'The person signing off must enter their passphrase' }))
           return
         }
-        result = await neonApi.signOffMission(playerMissionId, signerPassphrase)
+        result = await neonApi.signOffMission(
+          playerMissionId,
+          signerPassphrase,
+          mission.paymentType ? parseInt(paymentAmount || mission.paymentMin, 10) : undefined
+        )
+        setCompletedPayment(result.payment || null)
       }
 
       setCompletedMissions(prev => new Set([...prev, playerMissionId]))
@@ -490,6 +488,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
             ? {
               ...m,
               completed: true,
+              bountyAwarded: result.bounty || 0,
               signerName: result.signerName ?? m.signerName,
               signedOffAt: result.signedOffAt ?? m.signedOffAt
             }
@@ -515,26 +514,9 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
     }
   }
 
-  const handleMarkBountyPaid = async (playerMissionId) => {
-    try {
-      await neonApi.markBountyPaid(playerMissionId)
-      setMissions(prev => prev.map(m =>
-        m.playerMissionId === playerMissionId ? { ...m, bountyPaid: true } : m
-      ))
-      setShowBountyPaidStamp(true)
-      if (bountyPaidCloseTimerRef.current != null) {
-        clearTimeout(bountyPaidCloseTimerRef.current)
-      }
-      bountyPaidCloseTimerRef.current = window.setTimeout(() => {
-        bountyPaidCloseTimerRef.current = null
-        setShowBountyPaidStamp(false)
-        setCompletedBounty(0)
-        closeMissionModal()
-      }, 1100)
-    } catch (error) {
-      console.error('Error marking bounty paid:', error)
-    }
-  }
+  // Footer bank strip: refetch whenever something new has been deposited
+  const bankSessionId = isInActiveSession ? activeSessionId : null
+  const bankRefreshKey = `${completedMissions.size}-${pushMissions.filter(m => m.completed).length}-${wakeTick}`
 
   // ── Loading state ─────────────────────────────────────────────────────────
 
@@ -554,7 +536,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               </div>
             </div>
           </div>
-          <DashboardFooter currentUser={currentUser} onLogout={onLogout} />
+          <DashboardFooter currentUser={currentUser} onLogout={onLogout} onUserUpdate={onUserUpdate} bankSessionId={bankSessionId} bankRefreshKey={bankRefreshKey} />
         </div>
         {showBriefingModal && (
           <BriefingModalPanel isClosing={isBriefingClosing} onClose={closeBriefingModal} passphrase={currentUser?.passphrase} />
@@ -582,7 +564,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               </div>
             </div>
           </div>
-          <DashboardFooter currentUser={currentUser} onLogout={onLogout} />
+          <DashboardFooter currentUser={currentUser} onLogout={onLogout} onUserUpdate={onUserUpdate} bankSessionId={bankSessionId} bankRefreshKey={bankRefreshKey} />
         </div>
         {showBriefingModal && (
           <BriefingModalPanel isClosing={isBriefingClosing} onClose={closeBriefingModal} passphrase={currentUser?.passphrase} />
@@ -594,7 +576,6 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
   // ── Normal render ──────────────────────────────────────────────────────────
 
   const selectedMission = missions.find(m => m.playerMissionId === selectedMissionId)
-  const bountyCollectCashLine = 'See David or Nikki to receive your cash.'
 
   return (
     <div className="dashboard-container">
@@ -610,11 +591,12 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               onMissionClick={openMissionModal}
               onOpenBriefing={openBriefingModal}
               pushMissions={pushMissions}
-              onPushMissionClick={openPushMissionPayout}
+              paused={sessionPaused}
+              gameOver={Number(currentPhase) > FINAL_PHASE}
             />
           </div>
         </div>
-        <DashboardFooter currentUser={currentUser} onLogout={onLogout} />
+        <DashboardFooter currentUser={currentUser} onLogout={onLogout} onUserUpdate={onUserUpdate} bankSessionId={bankSessionId} bankRefreshKey={bankRefreshKey} />
       </div>
 
       {showBriefingModal && (
@@ -631,6 +613,12 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               <div className="modal-content">
                 <h2>{selectedMission.title}</h2>
                 <p style={{ whiteSpace: 'pre-line' }}>{selectedMission.missionBody}</p>
+
+                {selectedMission.completionType === 'reveal' && !selectedMission.completed && (
+                  <div className="mission-handler-note">
+                    Find the hidden message to complete this mission.
+                  </div>
+                )}
 
                 {selectedMission.completionType === 'phrase' && (
                   <div className="field-group">
@@ -682,6 +670,18 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
                         Must be signed off by a host.
                       </p>
                     )}
+                    {selectedMission.signerConstraint === 'ceo' && (
+                      <p className="mission-signoff-hint mission-signoff-hint--constraint-emphasis">
+                        Must be signed off by the CEO.
+                      </p>
+                    )}
+                    {selectedMission.paymentType && (
+                      <p className="mission-signoff-hint mission-signoff-hint--constraint-emphasis">
+                        {selectedMission.paymentType === 'witness_to_player'
+                          ? `Your witness pays you at least $${selectedMission.paymentMin.toLocaleString()} from their bank account when they sign off.`
+                          : `Your witness pays at least $${selectedMission.paymentMin.toLocaleString()} from their bank account to MacGuffin Toys when they sign off.`}
+                      </p>
+                    )}
                     {missionErrors[selectedMissionId] && (
                       <div className="mission-error">{missionErrors[selectedMissionId]}</div>
                     )}
@@ -718,6 +718,11 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
                         Must be signed off by a host.
                       </p>
                     )}
+                    {selectedMission.signerConstraint === 'ceo' && (
+                      <p className="mission-signoff-hint mission-signoff-hint--constraint-emphasis">
+                        Must be signed off by the CEO.
+                      </p>
+                    )}
 
                     <div className="mission-witness-panel">
                       <p className="mission-witness-instruction">
@@ -732,6 +737,29 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
                             lastName,
                             selectedMission.variableValue
                           )}
+                        </div>
+                      )}
+
+                      {selectedMission.paymentType && (
+                        <div className="field-group mission-payment">
+                          <label htmlFor="signoff-payment">
+                            {selectedMission.paymentType === 'witness_to_player'
+                              ? `Witness pays ${firstName}`
+                              : 'Witness pays MacGuffin Toys'}
+                          </label>
+                          <div className="mission-payment-row">
+                            <span className="mission-payment-currency">$</span>
+                            <input
+                              id="signoff-payment"
+                              type="text"
+                              inputMode="numeric"
+                              value={paymentAmount === '' ? String(selectedMission.paymentMin) : paymentAmount}
+                              onChange={(e) => setPaymentAmount(e.target.value.replace(/\D/g, ''))}
+                            />
+                          </div>
+                          <p className="mission-signoff-hint">
+                            At least ${selectedMission.paymentMin.toLocaleString()}, taken from the witness's bank account when they sign off. Entering your passphrase agrees to pay.
+                          </p>
                         </div>
                       )}
 
@@ -770,12 +798,7 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
                   </>
                 )}
                 {selectedMission.completionType === 'signoff' && signoffPhase === 'witnessDone' && (
-                  <div className="mission-witness-panel mission-witness-panel--signed mission-payout-stamp-host">
-                    {showBountyPaidStamp && (
-                      <div className="bounty-paid-stamp-overlay" aria-hidden="true">
-                        <span className="bounty-paid-stamp-mark">PAID</span>
-                      </div>
-                    )}
+                  <div className="mission-witness-panel mission-witness-panel--signed">
                     {selectedMission.signoffPromptTemplate && (
                       <div className="mission-signoff-preview mission-signoff-preview--madlib">
                         {renderSignoffMadlibPreview(
@@ -787,25 +810,25 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
                       </div>
                     )}
                     <p className="mission-witness-signed-summary">
+                      {completedPayment && (
+                        <>
+                          {completedPayment.type === 'witness_to_house' &&
+                            `${signoffSuccessSignerName || selectedMission.signerName} invested $${completedPayment.amount.toLocaleString()} in MacGuffin Toys. `}
+                        </>
+                      )}
                       Signed by{' '}
                       <strong>{signoffSuccessSignerName || selectedMission.signerName}</strong>
                       {' '}
                       at {formatWitnessSignedAt(signoffSignedAt ?? selectedMission.signedOffAt)}.
                     </p>
-                    {completedBounty > 0 && !selectedMission.bountyPaid && (
+                    {(completedBounty > 0 || completedPayment?.type === 'witness_to_player') && (
                       <div className="mission-witness-bounty-wrap">
-                        <div className="bounty-award">
-                          <p className="bounty-award-amount">Bonus awarded: ${completedBounty}!</p>
-                          <p className="bounty-award-lede">{bountyCollectCashLine}</p>
-                          <button
-                            type="button"
-                            className="bounty-paid-button"
-                            disabled={showBountyPaidStamp}
-                            onClick={() => handleMarkBountyPaid(selectedMission.playerMissionId)}
-                          >
-                            Mark as paid
-                          </button>
-                        </div>
+                        <DepositNotice
+                          amount={completedBounty}
+                          payment={completedPayment?.type === 'witness_to_player'
+                            ? { amount: completedPayment.amount, from: signoffSuccessSignerName || selectedMission.signerName }
+                            : null}
+                        />
                       </div>
                     )}
                   </div>
@@ -838,25 +861,9 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
                 <div className="mission-success">
                   <p>Mission success</p>
                   <h2>{selectedMission.title}</h2>
-                  {completedBounty > 0 && !selectedMission.bountyPaid && (
-                    <div className="mission-phrase-payout-shell mission-payout-stamp-host">
-                      {showBountyPaidStamp && (
-                        <div className="bounty-paid-stamp-overlay" aria-hidden="true">
-                          <span className="bounty-paid-stamp-mark">PAID</span>
-                        </div>
-                      )}
-                      <div className="bounty-award">
-                        <p className="bounty-award-amount">Bonus awarded: ${completedBounty}!</p>
-                        <p className="bounty-award-lede">{bountyCollectCashLine}</p>
-                        <button
-                          type="button"
-                          className="bounty-paid-button"
-                          disabled={showBountyPaidStamp}
-                          onClick={() => handleMarkBountyPaid(selectedMission.playerMissionId)}
-                        >
-                          Mark as paid
-                        </button>
-                      </div>
+                  {completedBounty > 0 && (
+                    <div className="mission-phrase-payout-shell">
+                      <DepositNotice amount={completedBounty} />
                     </div>
                   )}
                 </div>
@@ -880,89 +887,50 @@ function Dashboard({ agentId, firstName, lastName, alias1, alias2, onLogout, cur
               <div className="push-mission-bounty">Bounty: ${pendingPushMission.bounty}</div>
             )}
             {pushMissionType === 'completed' && pendingPushMission.bounty > 0 && (
-              <div className="mission-phrase-payout-shell mission-payout-stamp-host" style={{ marginTop: 'var(--unit-base)' }}>
-                {showPushBountyPaidStamp && (
-                  <div className="bounty-paid-stamp-overlay" aria-hidden="true">
-                    <span className="bounty-paid-stamp-mark">PAID</span>
-                  </div>
-                )}
-                <div className="bounty-award">
-                  <p className="bounty-award-amount">Bonus awarded: ${pendingPushMission.bounty}!</p>
-                  <p className="bounty-award-lede">{bountyCollectCashLine}</p>
-                  <button
-                    type="button"
-                    className="bounty-paid-button"
-                    disabled={showPushBountyPaidStamp}
-                    onClick={handleMarkPushBountyPaid}
-                  >
-                    Mark as paid
-                  </button>
-                </div>
+              <div className="mission-phrase-payout-shell" style={{ marginTop: 'var(--unit-base)' }}>
+                <DepositNotice amount={pendingPushMission.bounty} />
               </div>
             )}
           </div>
-          {pushMissionType === 'new' && (
-            <div className="push-mission-footer">
-              <button
-                type="button"
-                onClick={handleAcknowledgePushMission}
-                className="push-mission-ack-button"
-              >
-                ACKNOWLEDGED
-              </button>
-            </div>
-          )}
-          {pushMissionType === 'completed' && pendingPushMission.bounty === 0 && (
-            <div className="push-mission-footer">
-              <button
-                type="button"
-                onClick={handleAcknowledgePushMission}
-                className="push-mission-ack-button"
-              >
-                ACKNOWLEDGED
-              </button>
-            </div>
-          )}
+          <div className="push-mission-footer">
+            <button
+              type="button"
+              onClick={handleAcknowledgePushMission}
+              className="push-mission-ack-button"
+            >
+              ACKNOWLEDGED
+            </button>
+          </div>
         </div>
       )}
 
-      {showPayoutPushModal && payoutPushMission && (
-        <div className={`modal push-mission-modal ${isPayoutPushClosing ? 'closing' : ''}`}>
+      {unlockedCulminating && !showPushMissionModal && (
+        <div className={`modal push-mission-modal ${isUnlockClosing ? 'closing' : ''}`}>
           <div className="modal-header">
-            <button type="button" onClick={closePayoutPushModal} className="close-button">Close</button>
+            <span className="push-mission-badge push-mission-badge--complete">
+              PHASE {unlockedCulminating.phase} COMPLETE
+            </span>
           </div>
           <div className="modal-content">
-            <h2>{payoutPushMission.title}</h2>
-            <p style={{ whiteSpace: 'pre-line' }}>{payoutPushMission.mission_body}</p>
-            {payoutPushMission.bounty > 0 && !payoutPushMission.bounty_paid && (
-              <div className="mission-phrase-payout-shell mission-payout-stamp-host" style={{ marginTop: 'var(--unit-base)' }}>
-                {showPayoutPushStamp && (
-                  <div className="bounty-paid-stamp-overlay" aria-hidden="true">
-                    <span className="bounty-paid-stamp-mark">PAID</span>
-                  </div>
-                )}
-                <div className="bounty-award">
-                  <p className="bounty-award-amount">Bonus awarded: ${payoutPushMission.bounty}!</p>
-                  <p className="bounty-award-lede">{bountyCollectCashLine}</p>
-                  <button
-                    type="button"
-                    className="bounty-paid-button"
-                    disabled={showPayoutPushStamp}
-                    onClick={handlePayoutPushBountyPaid}
-                  >
-                    Mark as paid
-                  </button>
-                </div>
-              </div>
+            <h2>{unlockedCulminating.title}</h2>
+            <p>
+              {unlockedCulminating.firstOnly
+                ? "You're the first agent to complete every mission in this phase, and you've unlocked a special mission no one else will get."
+                : "You've completed every mission in this phase and unlocked a culminating mission."}
+            </p>
+            <p><strong>See your handler for more information.</strong></p>
+            {unlockedCulminating.bounty > 0 && (
+              <div className="push-mission-bounty">Bounty: ${unlockedCulminating.bounty}</div>
             )}
-            {payoutPushMission.bounty > 0 && payoutPushMission.bounty_paid && (
-              <div className="push-mission-bounty" style={{ marginTop: 'var(--unit-base)' }}>
-                Bonus: ${payoutPushMission.bounty} — PAID
-              </div>
-            )}
+          </div>
+          <div className="push-mission-footer">
+            <button type="button" onClick={acknowledgeCulminatingUnlock} className="push-mission-ack-button">
+              ACKNOWLEDGED
+            </button>
           </div>
         </div>
       )}
+
     </div>
   )
 }

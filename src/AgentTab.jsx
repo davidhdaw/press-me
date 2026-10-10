@@ -1,22 +1,20 @@
 import { useState, useEffect } from 'react'
 import { neonApi } from './neonApi'
 
-function AgentTab({ currentUser }) {
+function AgentTab({ currentUser, onUserUpdate }) {
   const [passphraseVisible, setPassphraseVisible] = useState(false)
-  const [passphrase, setPassphrase] = useState(currentUser?.passphrase || null)
+  const passphrase = currentUser?.passphrase || null
 
+  // Refresh from the database on load and on each reveal: a host may have
+  // changed it mid-game.
   useEffect(() => {
-    if (!passphrase && currentUser?.id) {
+    if (currentUser?.id) {
       neonApi.getUserPassphrase(currentUser.id).then(p => {
-        if (p) {
-          setPassphrase(p)
-          const stored = JSON.parse(localStorage.getItem('spyUser') || '{}')
-          stored.passphrase = p
-          localStorage.setItem('spyUser', JSON.stringify(stored))
-        }
+        if (p && p !== currentUser.passphrase) onUserUpdate?.({ passphrase: p })
       }).catch(() => {})
     }
-  }, [currentUser?.id, passphrase])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, passphraseVisible])
 
   useEffect(() => {
     if (passphraseVisible) {

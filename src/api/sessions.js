@@ -1,5 +1,6 @@
 import { sql } from './db.js';
 import { assignPhaseToPlayers } from './phaseMissions.js';
+import { FINAL_PHASE } from './game.js';
 
 // Get all sessions
 export async function getAllSessions() {
@@ -23,6 +24,24 @@ export async function getActiveSession() {
     return result.length > 0 ? result[0] : null
   } catch (error) {
     console.error('Error fetching active session:', error)
+    throw error
+  }
+}
+
+// The session players' phones show: the active one, or if the hosts have
+// paused the game, the most recently paused one (so missions and bank stay
+// visible during a pause instead of looking like the game hasn't started)
+export async function getCurrentSession() {
+  try {
+    const result = await sql`
+      SELECT * FROM sessions
+      WHERE status IN ('active', 'paused')
+      ORDER BY (status = 'active') DESC, paused_at DESC NULLS LAST
+      LIMIT 1
+    `
+    return result.length > 0 ? result[0] : null
+  } catch (error) {
+    console.error('Error fetching current session:', error)
     throw error
   }
 }
@@ -106,12 +125,61 @@ export async function updateSession(sessionId, { name, userIds }) {
       `
     }
 
+    // Players added to a session that has already started (i.e. paused) need
+    // the current phase's missions, or they'll have nothing to do on resume.
+    if (userIds !== undefined && currentStatus === 'paused') {
+      const before = new Set(session[0].participant_user_ids || [])
+      const added = userIds.map(id => Number(id)).filter(id => !before.has(id))
+      if (added.length > 0) {
+        await assignPhaseToPlayers(sessionId, session[0].current_phase || 0, added)
+      }
+    }
+
     return {
       success: true,
       session: result[0]
     }
   } catch (error) {
     console.error('Error updating session:', error)
+    throw error
+  }
+}
+
+// Add one player to a running (active or paused) session mid-game and give them
+// the current phase's missions. Earlier phases are locked, so they're skipped;
+// later phases include the player automatically when the host advances.
+export async function addPlayerToSession(sessionId, userId) {
+  try {
+    const session = await sql`
+      SELECT * FROM sessions WHERE id = ${sessionId}
+    `
+    if (session.length === 0) throw new Error('Session not found')
+
+    const { status, current_phase } = session[0]
+    if (status !== 'active' && status !== 'paused') {
+      throw new Error(`Session is ${status}; edit the session to change its players instead`)
+    }
+
+    const id = Number(userId)
+    if ((session[0].participant_user_ids || []).includes(id)) {
+      throw new Error('That player is already in this session')
+    }
+
+    await sql`
+      UPDATE sessions
+      SET participant_user_ids = array_append(participant_user_ids, ${id}::integer)
+      WHERE id = ${sessionId}
+    `
+
+    const assigned = await assignPhaseToPlayers(sessionId, current_phase || 0, [id])
+
+    return {
+      success: true,
+      phase: current_phase || 0,
+      missionCount: assigned.missionCount
+    }
+  } catch (error) {
+    console.error('Error adding player to session:', error)
     throw error
   }
 }
@@ -178,8 +246,10 @@ export async function advancePhase(sessionId) {
     if (session[0].status !== 'active') throw new Error('Session is not active')
 
     const currentPhase = session[0].current_phase || 0
-    if (currentPhase >= 3) throw new Error('Already at the final phase')
+    if (currentPhase > FINAL_PHASE) throw new Error('The game is already over')
 
+    // Advancing past the final act ends the game (assignPhaseToPlayers hands
+    // nothing out past it, and every mission is now in a locked phase)
     const nextPhase = currentPhase + 1
 
     const result = await sql`
@@ -194,7 +264,8 @@ export async function advancePhase(sessionId) {
     return {
       success: true,
       session: result[0],
-      newPhase: nextPhase
+      newPhase: nextPhase,
+      gameOver: nextPhase > FINAL_PHASE
     }
   } catch (error) {
     console.error('Error advancing phase:', error)
@@ -287,17 +358,6 @@ export async function endSession(sessionId) {
   }
 }
 
-// Check if missions can be assigned (only if there's an active session)
-export async function canAssignMissions() {
-  try {
-    const activeSession = await getActiveSession()
-    return activeSession !== null
-  } catch (error) {
-    console.error('Error checking if missions can be assigned:', error)
-    return false
-  }
-}
-
 // Reset a session: clear all player mission assignments and completions
 // Works for paused or ended sessions (does not require active session)
 export async function resetSession(sessionId) {
@@ -325,25 +385,27 @@ export async function resetSession(sessionId) {
       throw new Error('No participants in session')
     }
     
-    // Clear player_missions for this session
-    await sql`
-      DELETE FROM player_missions WHERE session_id = ${sessionId}
-    `
-
-    // Reset session status back to 'draft' and clear timestamps and phase
-    await sql`
-      UPDATE sessions
-      SET status = 'draft',
-          started_at = NULL,
-          paused_at = NULL,
-          ended_at = NULL,
-          current_phase = 0
-      WHERE id = ${sessionId}
-    `
+    // Clear everything the session accumulated, in one transaction: bank
+    // transactions first (sign-off payments reference player_missions), push
+    // missions, mission progress; then back to draft at phase 0
+    await sql.transaction([
+      sql`DELETE FROM bank_transactions WHERE session_id = ${sessionId}`,
+      sql`DELETE FROM push_missions WHERE session_id = ${sessionId}`,
+      sql`DELETE FROM player_missions WHERE session_id = ${sessionId}`,
+      sql`
+        UPDATE sessions
+        SET status = 'draft',
+            started_at = NULL,
+            paused_at = NULL,
+            ended_at = NULL,
+            current_phase = 0
+        WHERE id = ${sessionId}
+      `,
+    ])
 
     return {
       success: true,
-      message: 'Session reset successfully. All player missions cleared. Session status reset to draft.'
+      message: 'Session reset: missions, bank and push missions cleared; back to draft.'
     }
   } catch (error) {
     console.error('Error resetting session:', error)
