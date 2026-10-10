@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 
-// Drop the informant's recording at public/briefing-recording.mp3. Until it's
-// there, the button says so and points players at the transcript.
-const RECORDING_SRC = '/briefing-recording.mp3'
+// The informant's recording. The .m4a is a compressed copy of the .wav
+// (afconvert -f m4af -d aac -b 128000; ~0.5 MB instead of 6 MB on party wi-fi);
+// the .wav is the fallback. If neither loads, the button says so and points
+// players at the transcript.
+const RECORDING_SOURCES = [
+  { src: '/honeybear-intro-message.m4a', type: 'audio/mp4' },
+  { src: '/honeybear-intro-message.wav', type: 'audio/wav' },
+]
 
 const BUTTON_LABELS = {
   idle: 'Press to play',
@@ -35,17 +40,25 @@ function RecordingButton() {
     <div className="briefing-recording">
       <audio
         ref={audioRef}
-        src={RECORDING_SRC}
         preload="metadata"
         onPlay={() => setState('playing')}
         onPause={(e) => { if (!e.currentTarget.ended) setState('paused') }}
         onEnded={() => { setState('ended'); setProgress(1) }}
-        onError={() => setState('unavailable')}
         onTimeUpdate={(e) => {
           const { currentTime, duration } = e.currentTarget
           if (duration) setProgress(currentTime / duration)
         }}
-      />
+      >
+        {RECORDING_SOURCES.map((source, i) => (
+          <source
+            key={source.src}
+            src={source.src}
+            type={source.type}
+            // Errors fire on <source>, not <audio>; only the last one means nothing played
+            onError={i === RECORDING_SOURCES.length - 1 ? () => setState('unavailable') : undefined}
+          />
+        ))}
+      </audio>
       <button
         type="button"
         className={`briefing-press-button briefing-press-button--${state}`}

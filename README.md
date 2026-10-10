@@ -132,7 +132,7 @@ Sign-ins are recorded in `login_logs`. The signed-in player is cached in `localS
 
 ### Briefing
 
-Players see the briefing ([src/Briefing.jsx](src/Briefing.jsx)) the first time they open the dashboard, and again from the **Briefing** row at any time. It includes the informant's recording: put the audio file at `public/briefing-recording.mp3`. Until it exists, the play button shows "Recording unavailable" and points players to the transcript. When you rewrite the briefing, change `BRIEFING_SEEN_KEY` in `Dashboard.jsx` so everyone sees the new version once.
+Players see the briefing ([src/Briefing.jsx](src/Briefing.jsx)) the first time they open the dashboard, and again from the **Briefing** row at any time. It includes the informant's recording, `public/honeybear-intro-message.wav`. Phones load a compressed copy, `honeybear-intro-message.m4a` (about 0.5 MB instead of 6 MB), and fall back to the WAV. If you replace the recording, regenerate the copy with `afconvert -f m4af -d aac -b 128000 public/honeybear-intro-message.wav public/honeybear-intro-message.m4a`. If neither file loads, the play button shows "Recording unavailable" and points players to the transcript. When you rewrite the briefing, change `BRIEFING_SEEN_KEY` in `Dashboard.jsx` so everyone sees the new version once.
 
 ### Passphrases and sign-offs
 
