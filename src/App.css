@@ -1745,3 +1745,23 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* Shown on players' phones while the hosts have paused the session */
+.game-paused-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--unit-sm);
+  padding: var(--unit-sm);
+  background-color: var(--yellow);
+  color: var(--black);
+  border: 3px solid var(--black);
+  text-align: center;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+.game-paused-banner strong {
+  font-size: 1.3rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}

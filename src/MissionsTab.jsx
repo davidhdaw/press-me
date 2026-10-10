@@ -12,7 +12,7 @@ export function BriefingMissionRow({ onOpenBriefing }) {
   )
 }
 
-function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions }) {
+function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions, paused }) {
   if (!isInActiveSession) {
     return (
       <div className="tab-content">
@@ -33,6 +33,12 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
 
   return (
     <div className="tab-content">
+      {paused && (
+        <div className="game-paused-banner">
+          <strong>Game paused</strong>
+          <span>Hold tight, agent. The hosts will resume shortly.</span>
+        </div>
+      )}
       <BriefingMissionRow onOpenBriefing={onOpenBriefing} />
 
       {(activePush.length > 0 || completedPush.length > 0) && (

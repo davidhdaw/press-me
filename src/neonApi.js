@@ -41,6 +41,7 @@ export const neonApi = {
   // Sessions
   getAllSessions: sessions.getAllSessions,
   getActiveSession: sessions.getActiveSession,
+  getCurrentSession: sessions.getCurrentSession,
   createSession: sessions.createSession,
   updateSession: sessions.updateSession,
   startSession: sessions.startSession,
@@ -66,9 +67,7 @@ export const neonApi = {
 
   // Push Missions
   createPushMission: pushMissions.createPushMission,
-  getPendingPushMissions: pushMissions.getPendingPushMissions,
-  getCompletedUnseenPushMissions: pushMissions.getCompletedUnseenPushMissions,
-  getAcknowledgedPushMissions: pushMissions.getAcknowledgedPushMissions,
+  getPushMissionsForPlayer: pushMissions.getPushMissionsForPlayer,
   acknowledgePushMission: pushMissions.acknowledgePushMission,
   completePushMission: pushMissions.completePushMission,
   markCompletionSeen: pushMissions.markCompletionSeen,

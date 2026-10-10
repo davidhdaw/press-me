@@ -118,6 +118,10 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
   const [missionFailedMessage, setMissionFailedMessage] = useState(null)
   const [completedBounty, setCompletedBounty] = useState(0)
   const [isInActiveSession, setIsInActiveSession] = useState(false)
+  const [sessionPaused, setSessionPaused] = useState(false)
+  // Bumped when the phone wakes up / the tab comes back, to refresh everything
+  // at once instead of showing stale data until the next poll
+  const [wakeTick, setWakeTick] = useState(0)
   const [sessionCheckLoading, setSessionCheckLoading] = useState(true)
 
   const [showBriefingModal, setShowBriefingModal] = useState(() => !localStorage.getItem(BRIEFING_SEEN_KEY))
@@ -138,7 +142,8 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
     const checkActiveSession = async () => {
       try {
         setSessionCheckLoading(true)
-        const activeSession = await neonApi.getActiveSession()
+        const activeSession = await neonApi.getCurrentSession()
+        setSessionPaused(activeSession?.status === 'paused')
         if (activeSession && activeSession.participant_user_ids) {
           const agentIdNum = Number(agentId)
           const participantIds = activeSession.participant_user_ids.map(id => Number(id))
@@ -187,11 +192,24 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
   }, [missions, loading, sessionCheckLoading])
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const onWake = () => {
+      if (document.visibilityState === 'visible') setWakeTick(t => t + 1)
+    }
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('pageshow', onWake)
+    return () => {
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('pageshow', onWake)
+    }
+  }, [])
+
+  useEffect(() => {
+    const checkSession = async () => {
       try {
-        const activeSession = await neonApi.getActiveSession()
+        const activeSession = await neonApi.getCurrentSession()
+        setSessionPaused(activeSession?.status === 'paused')
         if (activeSession && activeSession.participant_user_ids) {
-          const userInSession = activeSession.participant_user_ids.includes(agentId)
+          const userInSession = activeSession.participant_user_ids.map(Number).includes(Number(agentId))
           if (userInSession !== isInActiveSession) {
             setIsInActiveSession(userInSession)
             if (!userInSession) setMissions([])
@@ -209,9 +227,11 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
       } catch (error) {
         console.error('Error checking session status:', error)
       }
-    }, 10000)
+    }
+    if (wakeTick > 0) checkSession()
+    const interval = setInterval(checkSession, 10000)
     return () => clearInterval(interval)
-  }, [agentId, isInActiveSession])
+  }, [agentId, isInActiveSession, wakeTick])
 
   useEffect(() => {
     if (!isInActiveSession || !activeSessionId) return
@@ -234,30 +254,35 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
       }
     }
 
+    if (wakeTick > 0) checkMissions()
     const interval = setInterval(checkMissions, 5000)
     return () => clearInterval(interval)
-  }, [agentId, isInActiveSession, activeSessionId])
+  }, [agentId, isInActiveSession, activeSessionId, wakeTick])
 
   useEffect(() => {
     if (!isInActiveSession || !activeSessionId) return
 
     const checkPushMissions = async () => {
       try {
-        const acknowledged = await neonApi.getAcknowledgedPushMissions(activeSessionId, agentId)
-        setPushMissions(acknowledged || [])
+        // One query; split into acknowledged / new / completed-but-unseen here
+        const all = (await neonApi.getPushMissionsForPlayer(activeSessionId, agentId)) || []
+        const at = (t) => new Date(t).getTime()
+        setPushMissions(all.filter(m => m.acknowledged).sort((a, b) => at(b.created_at) - at(a.created_at)))
 
         if (showPushMissionModal) return
 
-        const pending = await neonApi.getPendingPushMissions(activeSessionId, agentId)
-        if (pending && pending.length > 0) {
+        const pending = all.filter(m => !m.acknowledged)
+        if (pending.length > 0) {
           setPendingPushMission(pending[0])
           setPushMissionType('new')
           setShowPushMissionModal(true)
           return
         }
 
-        const completedUnseen = await neonApi.getCompletedUnseenPushMissions(activeSessionId, agentId)
-        if (completedUnseen && completedUnseen.length > 0) {
+        const completedUnseen = all
+          .filter(m => m.completed && !m.completion_seen)
+          .sort((a, b) => at(a.completed_at) - at(b.completed_at))
+        if (completedUnseen.length > 0) {
           setPendingPushMission(completedUnseen[0])
           setPushMissionType('completed')
           setShowPushMissionModal(true)
@@ -270,7 +295,7 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
     checkPushMissions()
     const interval = setInterval(checkPushMissions, 5000)
     return () => clearInterval(interval)
-  }, [agentId, isInActiveSession, activeSessionId, showPushMissionModal])
+  }, [agentId, isInActiveSession, activeSessionId, showPushMissionModal, wakeTick])
 
   const fetchMissions = async () => {
     try {
@@ -490,7 +515,7 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
 
   // Footer bank strip: refetch whenever something new has been deposited
   const bankSessionId = isInActiveSession ? activeSessionId : null
-  const bankRefreshKey = `${completedMissions.size}-${pushMissions.filter(m => m.completed).length}`
+  const bankRefreshKey = `${completedMissions.size}-${pushMissions.filter(m => m.completed).length}-${wakeTick}`
 
   // ── Loading state ─────────────────────────────────────────────────────────
 
@@ -565,6 +590,7 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
               onMissionClick={openMissionModal}
               onOpenBriefing={openBriefingModal}
               pushMissions={pushMissions}
+              paused={sessionPaused}
             />
           </div>
         </div>

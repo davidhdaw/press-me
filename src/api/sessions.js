@@ -27,6 +27,24 @@ export async function getActiveSession() {
   }
 }
 
+// The session players' phones show: the active one, or if the hosts have
+// paused the game, the most recently paused one (so missions and bank stay
+// visible during a pause instead of looking like the game hasn't started)
+export async function getCurrentSession() {
+  try {
+    const result = await sql`
+      SELECT * FROM sessions
+      WHERE status IN ('active', 'paused')
+      ORDER BY (status = 'active') DESC, paused_at DESC NULLS LAST
+      LIMIT 1
+    `
+    return result.length > 0 ? result[0] : null
+  } catch (error) {
+    console.error('Error fetching current session:', error)
+    throw error
+  }
+}
+
 // Create a new session (draft status - missions not assigned yet)
 export async function createSession({ name, userIds, createdBy }) {
   try {

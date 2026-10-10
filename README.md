@@ -163,7 +163,7 @@ Mission options (editable in the **Missions** tab):
   - `new_signer`: someone who hasn't yet signed any of this player's missions. Used by the icebreakers.
   - `same_signer`: must be whoever signed the linked mission. Prodigal Son must be signed by the New Hire signer.
   - `admin_only`: a host must sign.
-- **Variables:** `{variable}` in the mission body is filled per player.
+- **Variables:** `{variable}` in the mission body is filled per player. It's the only placeholder the app fills in, so other names like `{room}` will show up literally.
   - `pool`: a random pick from a comma-separated list.
   - `participants`: another player's name, paired so A↔B are assigned to each other. Used by False Fracas.
 - **Sign-off prompt:** the sentence the witness sees before signing, for example "`{player_name}` served me food…".
@@ -233,7 +233,7 @@ At the end of the night a host opens **Awards** from the admin header (or `/awar
 5. **Pause / Resume** as needed, then **End Session**.
 6. **Reset** (paused or ended sessions only) clears all mission progress and returns the session to draft.
 
-Players' phones poll the database: missions and push missions every 5 seconds, session status and bank balance every 10. The admin **Users** and **Push** tabs refresh the running session every 15 seconds, the bank screen every 15, and staff sign-ins are rechecked every minute.
+Players' phones poll the database: missions and push missions every 5 seconds, session status and bank balance every 10. Push missions are a single query per check. Phones also refresh immediately when they wake up or the tab comes back into view. If the hosts **pause** the session, phones keep showing missions and bank with a **GAME PAUSED** banner; sign-offs still work. The admin **Users** and **Push** tabs refresh the running session every 15 seconds, the bank screen every 15, and staff sign-ins are rechecked every minute.
 
 ### Adding and editing players (including mid-game)
 
