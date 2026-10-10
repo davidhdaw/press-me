@@ -177,6 +177,8 @@ async function setupNeonDatabase() {
     // Staff roles and login. is_admin = host. Staff PINs are separate from
     // passphrases, which players see during sign-offs.
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banker BOOLEAN NOT NULL DEFAULT false`;
+    // Whoever plays the CEO: only their passphrase signs off 'ceo' missions
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_ceo BOOLEAN NOT NULL DEFAULT false`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS staff_pin_hash TEXT`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS staff_pin_salt TEXT`;
 

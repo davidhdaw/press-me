@@ -5,7 +5,7 @@ import { passphraseLastWord } from './passphrase.js';
 export async function getUsers() {
   try {
     const result = await sql`
-      SELECT id, firstname, lastname, alias_1, alias_2, passphrase, ishere, is_admin, is_banker,
+      SELECT id, firstname, lastname, alias_1, alias_2, passphrase, ishere, is_admin, is_banker, is_ceo,
              (staff_pin_hash IS NOT NULL) AS has_staff_pin
       FROM users ORDER BY firstname
     `;
@@ -58,21 +58,21 @@ function assertPresent(fields) {
 }
 
 // Create a new user
-export async function createUser({ is_admin = false, is_banker = false, ...input }) {
+export async function createUser({ is_admin = false, is_banker = false, is_ceo = false, ...input }) {
   try {
     const f = trimFields(input)
     assertPresent(f)
     await assertUnique(f)
 
     const result = await sql`
-      INSERT INTO users (id, firstname, lastname, ishere, alias_1, alias_2, passphrase, is_admin, is_banker)
+      INSERT INTO users (id, firstname, lastname, ishere, alias_1, alias_2, passphrase, is_admin, is_banker, is_ceo)
       VALUES (
         (SELECT COALESCE(MAX(id), 0) + 1 FROM users),
         ${f.firstname}, ${f.lastname}, true,
         ${f.alias_1}, ${f.alias_2}, ${f.passphrase},
-        ${is_admin}, ${is_banker}
+        ${is_admin}, ${is_banker}, ${is_ceo}
       )
-      RETURNING id, firstname, lastname, alias_1, alias_2, passphrase, ishere, is_admin, is_banker
+      RETURNING id, firstname, lastname, alias_1, alias_2, passphrase, ishere, is_admin, is_banker, is_ceo
     `
     return result[0]
   } catch (error) {
@@ -84,7 +84,7 @@ export async function createUser({ is_admin = false, is_banker = false, ...input
 // Update a user's details. Safe mid-game: missions reference users by id.
 // Only fields that actually change are checked for clashes, so an edit never
 // fails because of some unrelated pre-existing duplicate.
-export async function updateUser(userId, { firstname, lastname, alias_1, alias_2, passphrase, ishere, is_admin, is_banker }) {
+export async function updateUser(userId, { firstname, lastname, alias_1, alias_2, passphrase, ishere, is_admin, is_banker, is_ceo }) {
   try {
     const current = await sql`SELECT * FROM users WHERE id = ${userId}`
     if (current.length === 0) throw new Error('User not found')
@@ -121,9 +121,10 @@ export async function updateUser(userId, { firstname, lastname, alias_1, alias_2
         passphrase = ${next.passphrase},
         ishere = ${ishere ?? u.ishere},
         is_admin = ${is_admin ?? u.is_admin},
-        is_banker = ${is_banker ?? u.is_banker}
+        is_banker = ${is_banker ?? u.is_banker},
+        is_ceo = ${is_ceo ?? u.is_ceo}
       WHERE id = ${userId}
-      RETURNING id, firstname, lastname, alias_1, alias_2, passphrase, ishere, is_admin, is_banker,
+      RETURNING id, firstname, lastname, alias_1, alias_2, passphrase, ishere, is_admin, is_banker, is_ceo,
                 (staff_pin_hash IS NOT NULL) AS has_staff_pin
     `
     return result[0]

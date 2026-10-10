@@ -15,7 +15,7 @@ function getPlayerLoginUrl(user) {
 
 const EMPTY_PLAYER_FORM = {
   firstname: '', lastname: '', alias_1: '', alias_2: '', passphrase: '',
-  is_admin: false, is_banker: false, ishere: true, staffPin: ''
+  is_admin: false, is_banker: false, is_ceo: false, ishere: true, staffPin: ''
 }
 
 // Timestamps arrive as Dates already in the right instant (see api/timestamps.js)
@@ -608,6 +608,7 @@ function AdminDashboard({ staff, onLogout }) {
       passphrase: user.passphrase || '',
       is_admin: !!user.is_admin,
       is_banker: !!user.is_banker,
+      is_ceo: !!user.is_ceo,
       ishere: user.ishere !== false,
       staffPin: ''
     })
@@ -1068,6 +1069,7 @@ function AdminDashboard({ staff, onLogout }) {
                         {user.alias_1} {user.alias_2}
                         {user.is_admin && ' · host'}
                         {user.is_banker && ' · banker'}
+                        {user.is_ceo && ' · CEO'}
                         {(user.is_admin || user.is_banker) && !user.has_staff_pin && ' (no staff PIN)'}
                         {!user.ishere && ' · not checked in'}
                       </span>
@@ -1648,6 +1650,10 @@ function AdminDashboard({ staff, onLogout }) {
                         <label className="admin-checkbox-label">
                           <input type="checkbox" checked={playerForm.is_banker} onChange={(e) => setPlayerForm({ ...playerForm, is_banker: e.target.checked })} disabled={savingPlayer} />
                           Banker (bank screen only)
+                        </label>
+                        <label className="admin-checkbox-label">
+                          <input type="checkbox" checked={playerForm.is_ceo} onChange={(e) => setPlayerForm({ ...playerForm, is_ceo: e.target.checked })} disabled={savingPlayer} />
+                          CEO (their passphrase signs off CEO missions)
                         </label>
                       </div>
                       {(playerForm.is_admin || playerForm.is_banker) && (

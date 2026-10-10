@@ -515,15 +515,16 @@ export async function signOffMission(playerMissionId, signerPassphrase, paymentA
     const enteredPassphrase = normalizePassphrase(signerPassphrase || '');
     if (!enteredPassphrase) throw new Error('Passphrase required');
 
-    // Witnesses: players in this session. Host-only and "CEO" missions instead
-    // need a host, and hosts usually aren't players, so only hosts' passphrases
-    // count for those (and hosts' passphrases count for nothing else unless
-    // they're playing).
+    // Witnesses: players in this session. "CEO" missions need whoever is
+    // marked as the CEO, and host-only missions need a host; neither has to
+    // be playing. Their passphrases count for nothing else unless they're in
+    // the session.
     const ceoMission = mission.signer_constraint === 'ceo';
-    const hostMission = ceoMission || mission.signer_constraint === 'admin_only';
+    const hostMission = mission.signer_constraint === 'admin_only';
     const candidates = await sql`
       SELECT id, firstname, lastname, passphrase, is_admin FROM users
-      WHERE CASE WHEN ${hostMission}::boolean THEN is_admin
+      WHERE CASE WHEN ${ceoMission}::boolean THEN is_ceo
+                 WHEN ${hostMission}::boolean THEN is_admin
                  ELSE id = ANY(${participantIds}::integer[]) END
         AND id != ${mission.user_id}
         AND ishere = true

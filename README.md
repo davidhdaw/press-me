@@ -124,6 +124,7 @@ Sign-ins are recorded in `login_logs`. The signed-in player is cached in `localS
 | --- | --- | --- |
 | Host | `users.is_admin` | `/admin` (everything), `/bank` and `/awards` |
 | Banker | `users.is_banker` | `/bank` only |
+| CEO | `users.is_ceo` | Not a staff login. Their passphrase is the only one that signs off **CEO missions** (Thin Blue Liar, Foreign Investment), even though they aren't a player. Set it in Users → Edit. |
 
 - **Staff PINs** are 4–8 digits and separate from passphrases, which players see whenever a host signs off a mission. They're stored hashed (PBKDF2), so **Show PW** can't reveal them. Set them in **Users → Edit** or with `npm run set-staff-pin`.
 - Signing in creates a row in `staff_sessions` (valid 24 hours). The browser keeps only the token. `/admin` and `/bank` look up the person's current roles through it on load and every minute, so removing a role takes effect on screens that are already open. Logging out deletes the token.
