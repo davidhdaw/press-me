@@ -662,6 +662,11 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
                         Must be signed off by a host.
                       </p>
                     )}
+                    {selectedMission.signerConstraint === 'ceo' && (
+                      <p className="mission-signoff-hint mission-signoff-hint--constraint-emphasis">
+                        Must be signed off by the CEO.
+                      </p>
+                    )}
                     {selectedMission.paymentType && (
                       <p className="mission-signoff-hint mission-signoff-hint--constraint-emphasis">
                         {selectedMission.paymentType === 'witness_to_player'
@@ -703,6 +708,11 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
                     {selectedMission.signerConstraint === 'admin_only' && (
                       <p className="mission-signoff-hint mission-signoff-hint--constraint-emphasis">
                         Must be signed off by a host.
+                      </p>
+                    )}
+                    {selectedMission.signerConstraint === 'ceo' && (
+                      <p className="mission-signoff-hint mission-signoff-hint--constraint-emphasis">
+                        Must be signed off by the CEO.
                       </p>
                     )}
 

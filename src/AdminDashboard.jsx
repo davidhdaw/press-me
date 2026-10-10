@@ -1427,6 +1427,7 @@ function AdminDashboard({ staff, onLogout }) {
                       <option value="new_signer">Must be a new signer</option>
                       <option value="same_signer">Must be the same signer as another mission</option>
                       <option value="admin_only">Admin only (hosts)</option>
+                      <option value="ceo">The CEO (a host's passphrase, even if they aren't playing)</option>
                     </select>
                   </div>
                   <div className="admin-form-group">

@@ -64,7 +64,7 @@ async function setupNeonDatabase() {
         signoff_prompt_template TEXT,
         variable_pool JSONB,
         variable_source VARCHAR(20) DEFAULT 'pool',
-        signer_constraint VARCHAR(20) CHECK (signer_constraint IN ('any', 'new_signer', 'same_signer', 'admin_only')),
+        signer_constraint VARCHAR(20) CHECK (signer_constraint IN ('any', 'new_signer', 'same_signer', 'admin_only', 'ceo')),
         same_signer_mission_id INTEGER REFERENCES phase_missions(id),
         sort_order INTEGER NOT NULL DEFAULT 0,
         bounty INTEGER DEFAULT 0,
@@ -150,6 +150,9 @@ async function setupNeonDatabase() {
     // Columns added after the first release. ADD COLUMN IF NOT EXISTS is a no-op
     // on databases that already have them.
     await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS is_culminating BOOLEAN NOT NULL DEFAULT false`;
+    // 'ceo': only a host's passphrase (the CEO, who isn't a player) signs it off
+    await sql`ALTER TABLE phase_missions DROP CONSTRAINT IF EXISTS phase_missions_signer_constraint_check`;
+    await sql`ALTER TABLE phase_missions ADD CONSTRAINT phase_missions_signer_constraint_check CHECK (signer_constraint IN ('any', 'new_signer', 'same_signer', 'admin_only', 'ceo'))`;
     // Culminating mission that only the first agent to finish the phase gets
     await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS culminating_first_only BOOLEAN NOT NULL DEFAULT false`;
     // Missions where the witness's sign-off also pays money (e.g. buying the
