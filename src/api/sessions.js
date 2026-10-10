@@ -1,5 +1,6 @@
 import { sql } from './db.js';
 import { assignPhaseToPlayers } from './phaseMissions.js';
+import { FINAL_PHASE } from './game.js';
 
 // Get all sessions
 export async function getAllSessions() {
@@ -245,8 +246,10 @@ export async function advancePhase(sessionId) {
     if (session[0].status !== 'active') throw new Error('Session is not active')
 
     const currentPhase = session[0].current_phase || 0
-    if (currentPhase >= 3) throw new Error('Already at the final phase')
+    if (currentPhase > FINAL_PHASE) throw new Error('The game is already over')
 
+    // Advancing past the final act ends the game (assignPhaseToPlayers hands
+    // nothing out past it, and every mission is now in a locked phase)
     const nextPhase = currentPhase + 1
 
     const result = await sql`
@@ -261,7 +264,8 @@ export async function advancePhase(sessionId) {
     return {
       success: true,
       session: result[0],
-      newPhase: nextPhase
+      newPhase: nextPhase,
+      gameOver: nextPhase > FINAL_PHASE
     }
   } catch (error) {
     console.error('Error advancing phase:', error)

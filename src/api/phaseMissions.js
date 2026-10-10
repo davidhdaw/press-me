@@ -1,5 +1,6 @@
 import { sql } from './db.js';
 import { normalizePassphrase, passphraseMatchesStored } from './passphrase.js';
+import { FINAL_PHASE } from './game.js';
 
 // ── Admin CRUD ──────────────────────────────────────────────────────────────
 
@@ -205,6 +206,9 @@ function pairPlayers(playerIds) {
 // everyone else's existing assignments untouched.
 export async function assignPhaseToPlayers(sessionId, phase, onlyUserIds = null) {
   try {
+    // Past the final act the game is over: nothing more to hand out
+    if (phase > FINAL_PHASE) return { success: true, phase, playerCount: 0, missionCount: 0 };
+
     const sessionResult = await sql`
       SELECT participant_user_ids FROM sessions WHERE id = ${sessionId}
     `;
@@ -356,7 +360,8 @@ export async function getPlayerMissions(sessionId, userId) {
         bounty: r.bounty || 0,
         bountyAwarded: r.bounty_awarded || 0,
         signerName: r.signer_firstname ? `${r.signer_firstname} ${r.signer_lastname}` : null,
-        phaseLocked: r.phase < currentPhase,
+        // Earlier phases lock; once the game is over everything does
+        phaseLocked: r.phase < currentPhase || currentPhase > FINAL_PHASE,
         isCulminating: r.is_culminating,
         firstOnly: r.culminating_first_only,
         ...culminatingState(r, unlocked, firsts),
@@ -390,7 +395,7 @@ export async function completePhaseMission(playerMissionId, answer, userId) {
     if (mission.user_id !== userId) throw new Error('Mission not assigned to you');
     if (mission.completed) throw new Error('Mission already completed');
     if (mission.completion_type !== 'phrase') throw new Error('This mission requires a sign-off, not a phrase');
-    if (mission.phase < mission.current_phase) throw new Error('This phase is locked');
+    if (mission.phase < mission.current_phase || mission.current_phase > FINAL_PHASE) throw new Error('This phase is locked');
     await assertCulminatingUnlocked(mission);
 
     const answerLower = answer?.toLowerCase().trim();
@@ -499,7 +504,7 @@ export async function signOffMission(playerMissionId, signerPassphrase, paymentA
 
     if (mission.completed) throw new Error('Mission already completed');
     if (mission.completion_type !== 'signoff') throw new Error('This mission requires a phrase answer, not a sign-off');
-    if (mission.phase < mission.current_phase) throw new Error('This phase is locked');
+    if (mission.phase < mission.current_phase || mission.current_phase > FINAL_PHASE) throw new Error('This phase is locked');
     await assertCulminatingUnlocked(mission);
 
     const participantIds = mission.participant_user_ids;

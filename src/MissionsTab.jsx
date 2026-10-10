@@ -12,7 +12,7 @@ export function BriefingMissionRow({ onOpenBriefing }) {
   )
 }
 
-function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions, paused }) {
+function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissions, onMissionClick, onOpenBriefing, pushMissions, paused, gameOver }) {
   if (!isInActiveSession) {
     return (
       <div className="tab-content">
@@ -33,7 +33,13 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
 
   return (
     <div className="tab-content">
-      {paused && (
+      {gameOver && (
+        <div className="game-paused-banner game-over-banner">
+          <strong>Mission complete</strong>
+          <span>The operation is over, agent. Gather round for the debrief and awards!</span>
+        </div>
+      )}
+      {paused && !gameOver && (
         <div className="game-paused-banner">
           <strong>Game paused</strong>
           <span>Hold tight, agent. The hosts will resume shortly.</span>
@@ -86,7 +92,7 @@ function MissionsTab({ isInActiveSession, missions, currentPhase, completedMissi
           .filter(m => !m.isCulminating || m.culminatingUnlocked || m.completed)
           .sort((a, b) => Number(!!b.isCulminating) - Number(!!a.isCulminating))
         if (phaseMissions.length === 0) return null
-        const isLocked = phase < cp
+        const isLocked = phase < cp || gameOver
 
         const incomplete = m => !completedMissions.has(m.playerMissionId)
         const lockedIncomplete = phaseMissions.filter(m => isLocked && incomplete(m))

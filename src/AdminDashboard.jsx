@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { neonApi } from './neonApi'
 import { isValidPin } from './api/pin.js'
+import { FINAL_PHASE, isGameOver } from './api/game.js'
 import './AdminDashboard.css'
 
 const PRODUCTION_URL = 'https://press-me-iota.vercel.app'
@@ -446,9 +447,13 @@ function AdminDashboard({ staff, onLogout }) {
   const handleAdvancePhase = async () => {
     if (!activeSession) return
     const currentPhase = activeSession.current_phase || 0
-    if (currentPhase >= 3) return
+    if (currentPhase > FINAL_PHASE) return
+    const ending = currentPhase === FINAL_PHASE
 
-    if (!window.confirm(`Advance to Phase ${currentPhase + 1}? This will lock Phase ${currentPhase} missions.`)) {
+    const question = ending
+      ? `End the game? Every mission locks and players see "mission complete". The bank and awards keep working.`
+      : `Advance to Phase ${currentPhase + 1}? This will lock Phase ${currentPhase} missions.`
+    if (!window.confirm(question)) {
       return
     }
 
@@ -456,7 +461,7 @@ function AdminDashboard({ staff, onLogout }) {
     try {
       await neonApi.advancePhase(activeSession.id)
       await loadSessions()
-      alert(`Advanced to Phase ${currentPhase + 1}!`)
+      alert(ending ? 'Game over! Run the awards whenever you are ready.' : `Advanced to Phase ${currentPhase + 1}!`)
     } catch (error) {
       alert(`Error advancing phase: ${error.message || 'Please try again.'}`)
     } finally {
@@ -783,9 +788,13 @@ function AdminDashboard({ staff, onLogout }) {
                                     )}
                                     {session.status === 'active' && (
                                       <>
-                                        {(session.current_phase || 0) < 3 && (
+                                        {!isGameOver(session) && (
                                           <button onClick={() => handleAdvancePhase()} className="button-primary" disabled={advancingPhase}>
-                                            {advancingPhase ? 'Advancing...' : `Advance to Phase ${(session.current_phase || 0) + 1}`}
+                                            {advancingPhase
+                                              ? 'Advancing...'
+                                              : (session.current_phase || 0) === FINAL_PHASE
+                                                ? 'End game'
+                                                : `Advance to Phase ${(session.current_phase || 0) + 1}`}
                                           </button>
                                         )}
                                         <button onClick={() => handlePauseSession(session.id)} className="button-secondary">Pause</button>
@@ -890,7 +899,7 @@ function AdminDashboard({ staff, onLogout }) {
             {activeSession && (
               <div className="admin-section">
                 <div className="admin-section-header-row">
-                  <h2>Active: {activeSession.name} — Phase {activeSession.current_phase || 0}/3</h2>
+                  <h2>Active: {activeSession.name} — {isGameOver(activeSession) ? 'Game over' : `Phase ${activeSession.current_phase || 0}/${FINAL_PHASE}`}</h2>
                   <div className="session-controls">
                     <button onClick={openAddPlayer} className="button-primary">
                       Add Player
@@ -936,7 +945,7 @@ function AdminDashboard({ staff, onLogout }) {
                 {(() => {
                   const currentPhase = activeSession.current_phase || 0
                   const waiting = playerMissions.filter(m =>
-                    m.culminatingUnlocked && !m.completed && m.phase >= currentPhase
+                    m.culminatingUnlocked && !m.completed && m.phase >= currentPhase && !isGameOver(activeSession)
                   )
                   if (waiting.length === 0) return null
                   return (
@@ -977,7 +986,7 @@ function AdminDashboard({ staff, onLogout }) {
                           ) : (
                             phases.map(phase => {
                               const phaseMissions = missions.filter(m => m.phase === phase)
-                              const isLocked = phase < currentPhase
+                              const isLocked = phase < currentPhase || isGameOver(activeSession)
                               return (
                                 <div key={phase} className="participant-phase">
                                   <div className={`phase-label${isLocked ? ' locked' : ''}`}>

@@ -157,6 +157,8 @@ Passphrases must be unique within a session. `npm run reassign-passphrases` prev
 
 When a session starts, every participant gets all phase 0 missions. **Advance to Phase N** gives everyone the next phase's missions and locks the previous phase, so locked missions can't be completed any more. Each player's copy of a mission is a row in `player_missions`.
 
+**Act II is the last act** (`FINAL_PHASE` in `src/api/game.js`). In Act II the admin button reads **End game**. Pressing it locks every mission, and phones show a "Mission complete" banner. The session stays open, so the bank keeps working and the awards screen picks it up. Missions in Act III stay in the catalogue but are never handed out. Each phase ends with a culminating mission: Wheels Within Wheels (phase 0, first agent only), A Voice in the Wilderness (Act I), and Press Me, I Talk (Act II).
+
 Mission options (editable in the **Missions** tab):
 
 - **Completion type**
@@ -220,7 +222,7 @@ At the end of the night a host opens **Awards** from the admin header (or `/awar
 | 1 | Social Butterfly | Most *different* agents who signed off their missions |
 | 2 | Partners in Crime | The pair with the most sign-offs between them (pairs who vouched both ways rank first) |
 | 3 | The Vault | Most money left unspent in the bank |
-| 4–6 | First Past the Post: Act I / II / III | First to complete every regular mission in that act |
+| 4–5 | First Past the Post: Act I / II | First to complete every regular mission in that act (one per act up to `FINAL_PHASE`) |
 | 7 | Top Agent | Most money earned (deposits, ignoring spending) |
 
 - **One award each:** Top Agent, Partners in Crime, Social Butterfly and The Vault never go to someone who already won one of them. They're assigned in that order, so if a leader already has an award, it passes to the next-best player. Each slide still shows the top three, plus a note when this happens.
@@ -235,7 +237,8 @@ At the end of the night a host opens **Awards** from the admin header (or `/awar
 3. **Advance to Phase 1 / 2 / 3** as the night progresses.
 4. Watch per-player progress in the expanded session. **Complete Mission** force-completes a stuck mission.
 5. **Pause / Resume** as needed, then **End Session**.
-6. **Reset** (paused or ended sessions only) clears all mission progress and returns the session to draft.
+6. **End game** after Act II, then run the **Awards**. Use **End Session** only once you're done with the bank and awards too.
+7. **Reset** (paused or ended sessions only) clears all mission progress and returns the session to draft.
 
 Players' phones poll the database: missions and push missions every 5 seconds, session status and bank balance every 10. Push missions are a single query per check. Phones also refresh immediately when they wake up or the tab comes back into view. If the hosts **pause** the session, phones keep showing missions and bank with a **GAME PAUSED** banner; sign-offs still work. The admin **Users** and **Push** tabs refresh the running session every 15 seconds, the bank screen every 15, and staff sign-ins are rechecked every minute.
 

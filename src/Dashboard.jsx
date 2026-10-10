@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { neonApi } from './neonApi'
 import BankStrip from './BankStrip'
 import BriefingModalPanel from './Briefing'
+import { FINAL_PHASE } from './api/game.js'
 import AgentTab from './AgentTab'
 import MissionsTab, { BriefingMissionRow } from './MissionsTab'
 
@@ -591,6 +592,7 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
               onOpenBriefing={openBriefingModal}
               pushMissions={pushMissions}
               paused={sessionPaused}
+              gameOver={Number(currentPhase) > FINAL_PHASE}
             />
           </div>
         </div>

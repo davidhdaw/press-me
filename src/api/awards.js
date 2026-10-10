@@ -1,4 +1,5 @@
 import { sql } from './db.js';
+import { FINAL_PHASE } from './game.js';
 
 // End-of-game award ceremony. getAwardsData() loads one session's raw facts;
 // computeAwards() ranks players and picks winners (pure, so it's easy to test).
@@ -12,7 +13,9 @@ const ACT_NAMES = { 1: 'Act I', 2: 'Act II', 3: 'Act III' };
 const UNIQUE_ALLOCATION_ORDER = ['top-agent', 'partners-in-crime', 'social-butterfly', 'the-vault'];
 
 // Presentation order: the strange ones first, Top Agent as the finale.
-const PRESENTATION_ORDER = ['social-butterfly', 'partners-in-crime', 'the-vault', 'fptp-1', 'fptp-2', 'fptp-3', 'top-agent'];
+// One First Past the Post award per act that's actually played.
+const ACTS = Array.from({ length: FINAL_PHASE }, (_, i) => i + 1);
+const PRESENTATION_ORDER = ['social-butterfly', 'partners-in-crime', 'the-vault', ...ACTS.map(p => `fptp-${p}`), 'top-agent'];
 
 export async function getAwardsData(sessionId) {
   const sessions = await sql`
@@ -114,7 +117,7 @@ export function computeAwards({ players, missions, ledger }) {
     .sort(byScoreThenTime);
 
   // First Past the Post: first to complete every regular mission in an act
-  for (const phase of [1, 2, 3]) {
+  for (const phase of ACTS) {
     const finishers = [];
     for (const id of playerIds) {
       const regular = missions.filter(m => m.user_id === id && m.phase === phase && !m.is_culminating);
@@ -135,7 +138,7 @@ export function computeAwards({ players, missions, ledger }) {
     winners[key] = pick || null;
     if (pick) pick.userIds.forEach(id => alreadyWon.add(id));
   }
-  for (const phase of [1, 2, 3]) winners[`fptp-${phase}`] = rankings[`fptp-${phase}`][0] || null;
+  for (const phase of ACTS) winners[`fptp-${phase}`] = rankings[`fptp-${phase}`][0] || null;
 
   const meta = {
     'social-butterfly': { title: 'Social Butterfly', description: 'Got the most different agents to vouch for them.' },
@@ -143,7 +146,7 @@ export function computeAwards({ players, missions, ledger }) {
     'the-vault': { title: 'The Vault', description: 'Finished with the most money still in the bank.' },
     'top-agent': { title: 'Top Agent', description: 'Earned the most money over the whole operation.' },
   };
-  for (const phase of [1, 2, 3]) {
+  for (const phase of ACTS) {
     meta[`fptp-${phase}`] = { title: `First Past the Post: ${ACT_NAMES[phase]}`, description: `First agent to complete every ${ACT_NAMES[phase]} mission.` };
   }
 

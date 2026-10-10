@@ -1784,3 +1784,7 @@
   letter-spacing: 1px;
   text-transform: uppercase;
 }
+
+.game-over-banner {
+  background-color: var(--green);
+}
