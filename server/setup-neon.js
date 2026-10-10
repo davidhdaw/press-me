@@ -70,6 +70,8 @@ async function setupNeonDatabase() {
         bounty INTEGER DEFAULT 0,
         is_culminating BOOLEAN NOT NULL DEFAULT false,
         culminating_first_only BOOLEAN NOT NULL DEFAULT false,
+        payment_type VARCHAR(20) CHECK (payment_type IN ('witness_to_player', 'witness_to_house')),
+        payment_min INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `;
@@ -114,9 +116,10 @@ async function setupNeonDatabase() {
         session_id INTEGER NOT NULL REFERENCES sessions(id),
         user_id INTEGER NOT NULL REFERENCES users(id),
         amount INTEGER NOT NULL CHECK (amount != 0),
-        kind VARCHAR(20) NOT NULL CHECK (kind IN ('withdrawal', 'adjustment')),
+        kind VARCHAR(20) NOT NULL,
         note TEXT,
         created_by INTEGER REFERENCES users(id),
+        player_mission_id INTEGER REFERENCES player_missions(id),
         created_at TIMESTAMP DEFAULT NOW() NOT NULL
       )
     `;
@@ -149,6 +152,19 @@ async function setupNeonDatabase() {
     await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS is_culminating BOOLEAN NOT NULL DEFAULT false`;
     // Culminating mission that only the first agent to finish the phase gets
     await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS culminating_first_only BOOLEAN NOT NULL DEFAULT false`;
+    // Missions where the witness's sign-off also pays money (e.g. buying the
+    // player's "art"): who gets paid, and the minimum amount
+    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS payment_type VARCHAR(20)`;
+    await sql`ALTER TABLE phase_missions ADD COLUMN IF NOT EXISTS payment_min INTEGER`;
+    await sql`ALTER TABLE phase_missions DROP CONSTRAINT IF EXISTS phase_missions_payment_type_check`;
+    await sql`ALTER TABLE phase_missions ADD CONSTRAINT phase_missions_payment_type_check CHECK (payment_type IN ('witness_to_player', 'witness_to_house'))`;
+    // Sign-off payments are bank_transactions of kind 'payment' tied to the mission
+    await sql`ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS player_mission_id INTEGER REFERENCES player_missions(id)`;
+    await sql`ALTER TABLE bank_transactions DROP CONSTRAINT IF EXISTS bank_transactions_kind_check`;
+    await sql`ALTER TABLE bank_transactions ADD CONSTRAINT bank_transactions_kind_check CHECK (kind IN ('withdrawal', 'adjustment', 'payment'))`;
+    // A mission can be paid for at most once (one debit, one credit)
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS uniq_bank_payment_debit ON bank_transactions(player_mission_id) WHERE kind = 'payment' AND amount < 0`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS uniq_bank_payment_credit ON bank_transactions(player_mission_id) WHERE kind = 'payment' AND amount > 0`;
     // Bounty deposited when the mission was completed (snapshot, so editing a
     // mission's bounty later doesn't rewrite anyone's bank history)
     await sql`ALTER TABLE player_missions ADD COLUMN IF NOT EXISTS bounty_awarded INTEGER`;

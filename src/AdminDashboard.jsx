@@ -71,7 +71,9 @@ function AdminDashboard({ staff, onLogout }) {
     sortOrder: 0,
     bounty: 0,
     isCulminating: false,
-    firstOnly: false
+    firstOnly: false,
+    paymentType: '',
+    paymentMin: 0
   })
   const [phaseMissions, setPhaseMissions] = useState([])
   const [loadingPhaseMissions, setLoadingPhaseMissions] = useState(false)
@@ -476,7 +478,9 @@ function AdminDashboard({ staff, onLogout }) {
         sortOrder: mission.sort_order || 0,
         bounty: mission.bounty || 0,
         isCulminating: !!mission.is_culminating,
-        firstOnly: !!mission.culminating_first_only
+        firstOnly: !!mission.culminating_first_only,
+        paymentType: mission.payment_type || '',
+        paymentMin: mission.payment_min || 0
       })
     } else {
       setMissionForm({
@@ -493,7 +497,9 @@ function AdminDashboard({ staff, onLogout }) {
         sortOrder: 0,
         bounty: 0,
         isCulminating: false,
-        firstOnly: false
+        firstOnly: false,
+        paymentType: '',
+        paymentMin: 0
       })
     }
     setShowMissionModal(true)
@@ -523,7 +529,9 @@ function AdminDashboard({ staff, onLogout }) {
       sortOrder: missionForm.sortOrder,
       bounty: parseInt(missionForm.bounty) || 0,
       isCulminating: missionForm.isCulminating,
-      firstOnly: missionForm.isCulminating && missionForm.firstOnly
+      firstOnly: missionForm.isCulminating && missionForm.firstOnly,
+      paymentType: missionForm.completionType === 'signoff' && missionForm.paymentType ? missionForm.paymentType : null,
+      paymentMin: parseInt(missionForm.paymentMin) || 0
     }
 
     try {
@@ -842,6 +850,7 @@ function AdminDashboard({ staff, onLogout }) {
                           {m.is_culminating && <span className="mission-tag tag-culminating">{m.culminating_first_only ? 'culminating · first only' : 'culminating'}</span>}
                           <span className="mission-tag tag-completion">{m.completion_type}</span>
                           {m.bounty ? <span className="mission-tag tag-bounty">{`$${m.bounty}`}</span> : null}
+                          {m.payment_type ? <span className="mission-tag tag-variable">{`witness pays ${m.payment_type === 'witness_to_player' ? 'player' : 'CEO'} $${m.payment_min}+`}</span> : null}
                           {m.signer_constraint && m.signer_constraint !== 'any' ? <span className="mission-tag tag-constraint">{m.signer_constraint.replace(/_/g, ' ')}</span> : null}
                           {m.variable_pool ? <span className="mission-tag tag-variable">variables</span> : null}
                           {m.variable_source === 'participants' ? <span className="mission-tag tag-variable">player var</span> : null}
@@ -1402,6 +1411,29 @@ function AdminDashboard({ staff, onLogout }) {
                       <option value="same_signer">Must be the same signer as another mission</option>
                       <option value="admin_only">Admin only (hosts)</option>
                     </select>
+                  </div>
+                  <div className="admin-form-group">
+                    <label>Payment at sign-off</label>
+                    <select
+                      value={missionForm.paymentType}
+                      onChange={(e) => setMissionForm({ ...missionForm, paymentType: e.target.value })}
+                    >
+                      <option value="">None</option>
+                      <option value="witness_to_player">Witness pays the player (e.g. buys their art)</option>
+                      <option value="witness_to_house">Witness pays MacGuffin Toys (e.g. invests)</option>
+                    </select>
+                    {missionForm.paymentType && (
+                      <>
+                        <label style={{ marginTop: 'var(--unit-sm)' }}>Minimum payment ($)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={missionForm.paymentMin}
+                          onChange={(e) => setMissionForm({ ...missionForm, paymentMin: e.target.value })}
+                        />
+                      </>
+                    )}
+                    <p className="admin-form-hint">Taken from the witness's bank account when they sign off; the sign-off fails if they can't afford it.</p>
                   </div>
                   {missionForm.signerConstraint === 'same_signer' && (
                     <div className="admin-form-group">

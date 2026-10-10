@@ -14,6 +14,7 @@ const ENTRY_LABELS = {
   push: 'Special ops',
   withdrawal: 'Spent at the bank',
   adjustment: 'Added by the bank',
+  payment: 'Payment',
 }
 
 export function StatementList({ entries }) {

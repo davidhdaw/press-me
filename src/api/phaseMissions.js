@@ -6,7 +6,8 @@ import { normalizePassphrase, passphraseMatchesStored } from './passphrase.js';
 export async function createPhaseMission({
   phase, title, missionBody, completionType,
   successKey, signoffPromptTemplate, variablePool,
-  variableSource, signerConstraint, sameSignerMissionId, sortOrder, bounty, isCulminating, firstOnly
+  variableSource, signerConstraint, sameSignerMissionId, sortOrder, bounty, isCulminating, firstOnly,
+  paymentType, paymentMin
 }) {
   try {
     const result = await sql`
@@ -14,14 +15,14 @@ export async function createPhaseMission({
         phase, title, mission_body, completion_type,
         success_key, signoff_prompt_template, variable_pool,
         variable_source, signer_constraint, same_signer_mission_id, sort_order, bounty, is_culminating,
-        culminating_first_only
+        culminating_first_only, payment_type, payment_min
       ) VALUES (
         ${phase}, ${title}, ${missionBody}, ${completionType},
         ${successKey || null}, ${signoffPromptTemplate || null},
         ${variablePool ? JSON.stringify(variablePool) : null}::jsonb,
         ${variableSource || 'pool'}, ${signerConstraint || null}, ${sameSignerMissionId || null},
         ${sortOrder || 0}, ${bounty || 0}, ${!!isCulminating},
-        ${!!isCulminating && !!firstOnly}
+        ${!!isCulminating && !!firstOnly}, ${paymentType || null}, ${paymentType ? (paymentMin || 0) : null}
       ) RETURNING *
     `;
     return result[0];
@@ -70,7 +71,9 @@ export async function updatePhaseMission(missionId, updates) {
         sort_order = ${updates.sortOrder ?? m.sort_order},
         bounty = ${updates.bounty !== undefined ? updates.bounty : m.bounty},
         is_culminating = ${updates.isCulminating !== undefined ? !!updates.isCulminating : m.is_culminating},
-        culminating_first_only = ${(updates.isCulminating ?? m.is_culminating) && (updates.firstOnly !== undefined ? !!updates.firstOnly : m.culminating_first_only)}
+        culminating_first_only = ${(updates.isCulminating ?? m.is_culminating) && (updates.firstOnly !== undefined ? !!updates.firstOnly : m.culminating_first_only)},
+        payment_type = ${updates.paymentType !== undefined ? (updates.paymentType || null) : m.payment_type},
+        payment_min = ${updates.paymentType !== undefined ? (updates.paymentType ? (updates.paymentMin || 0) : null) : (updates.paymentMin !== undefined ? updates.paymentMin : m.payment_min)}
       WHERE id = ${missionId}
       RETURNING *
     `;
@@ -308,6 +311,8 @@ export async function getPlayerMissions(sessionId, userId) {
         ph.bounty,
         ph.is_culminating,
         ph.culminating_first_only,
+        ph.payment_type,
+        ph.payment_min,
         signer.firstname as signer_firstname,
         signer.lastname as signer_lastname
       FROM player_missions pm
@@ -355,6 +360,8 @@ export async function getPlayerMissions(sessionId, userId) {
         isCulminating: r.is_culminating,
         firstOnly: r.culminating_first_only,
         ...culminatingState(r, unlocked, firsts),
+        paymentType: r.payment_type,
+        paymentMin: r.payment_min,
         currentPhase
       };
     });
@@ -416,11 +423,70 @@ export async function completePhaseMission(playerMissionId, answer, userId) {
 
 // ── Sign-off Completion ─────────────────────────────────────────────────────
 
-export async function signOffMission(playerMissionId, signerPassphrase) {
+// Sign-off that also moves money (e.g. the witness buys the player's "art").
+// One transaction: lock the mission, take the money from the witness only if
+// the mission is still open and they can afford it, pay the player (unless it
+// goes to MacGuffin Toys), and complete the mission only if the payment
+// happened. Either all of it happens or none of it does.
+async function payForSignOff(mission, signer, signerName, requested) {
+  const min = mission.payment_min || 0;
+  const amount = requested === undefined || requested === null || requested === '' ? min : Number(requested);
+  if (!Number.isInteger(amount) || amount <= 0) throw new Error('Enter a whole-dollar amount');
+  if (amount < min) throw new Error(`The payment must be at least $${min.toLocaleString()}`);
+
+  const owner = (await sql`SELECT firstname, lastname FROM users WHERE id = ${mission.user_id}`)[0];
+  const ownerName = `${owner.firstname} ${owner.lastname}`;
+  const toPlayer = mission.payment_type === 'witness_to_player';
+  const id = mission.id;
+  const sessionId = mission.session_id;
+
+  const results = await sql.transaction([
+    sql`SELECT id FROM player_missions WHERE id = ${id} FOR UPDATE`,
+    sql`
+      INSERT INTO bank_transactions (session_id, user_id, amount, kind, note, player_mission_id)
+      SELECT ${sessionId}, ${signer.id}, ${-amount}, 'payment',
+             ${`${mission.title}: paid ${toPlayer ? ownerName : 'MacGuffin Toys'}`}, ${id}
+      WHERE EXISTS (SELECT 1 FROM player_missions WHERE id = ${id} AND NOT completed)
+        AND COALESCE((SELECT SUM(amount) FROM bank_ledger
+                      WHERE session_id = ${sessionId} AND user_id = ${signer.id}), 0) >= ${amount}::int
+      RETURNING id`,
+    ...(toPlayer ? [sql`
+      INSERT INTO bank_transactions (session_id, user_id, amount, kind, note, player_mission_id)
+      SELECT ${sessionId}, ${mission.user_id}, ${amount}, 'payment',
+             ${`${mission.title}: from ${signerName}`}, ${id}
+      WHERE EXISTS (SELECT 1 FROM bank_transactions
+                    WHERE player_mission_id = ${id} AND kind = 'payment' AND amount < 0)
+      RETURNING id`] : []),
+    sql`
+      UPDATE player_missions
+      SET completed = true, completed_at = NOW(),
+          signed_off_by = ${signer.id}, signed_off_at = NOW(),
+          bounty_awarded = ${mission.bounty || 0}
+      WHERE id = ${id} AND completed = false AND EXISTS (SELECT 1 FROM bank_transactions
+                    WHERE player_mission_id = ${id} AND kind = 'payment' AND amount < 0)
+      RETURNING signed_off_at`,
+  ]);
+
+  const updated = results[results.length - 1];
+  if (updated.length === 0) {
+    const [state] = await sql`SELECT completed FROM player_missions WHERE id = ${id}`;
+    if (state.completed) throw new Error('Mission already completed');
+    const [{ balance }] = await sql`
+      SELECT COALESCE(SUM(amount), 0)::int AS balance FROM bank_ledger
+      WHERE session_id = ${sessionId} AND user_id = ${signer.id}`;
+    throw new Error(`${signerName} doesn't have enough money: their balance is $${balance.toLocaleString()} and this costs $${amount.toLocaleString()}`);
+  }
+  return { updated, amount };
+}
+
+// paymentAmount: for missions with a payment_type, what the witness agreed to
+// pay (at least payment_min; defaults to it)
+export async function signOffMission(playerMissionId, signerPassphrase, paymentAmount) {
   try {
     const rows = await sql`
       SELECT pm.*, ph.completion_type, ph.phase, ph.signer_constraint,
              ph.same_signer_mission_id, ph.title, ph.bounty, ph.is_culminating, ph.culminating_first_only,
+             ph.payment_type, ph.payment_min,
              s.current_phase, s.id as session_id, s.participant_user_ids
       FROM player_missions pm
       JOIN phase_missions ph ON pm.mission_id = ph.id
@@ -503,22 +569,32 @@ export async function signOffMission(playerMissionId, signerPassphrase) {
       }
     }
 
-    const updated = await sql`
-      UPDATE player_missions
-      SET completed = true, completed_at = NOW(),
-          signed_off_by = ${signerUserId}, signed_off_at = NOW(),
-          bounty_awarded = ${mission.bounty || 0}
-      WHERE id = ${playerMissionId} AND completed = false
-      RETURNING signed_off_at
-    `;
+    const signerName = `${signer.firstname} ${signer.lastname}`.trim();
+    let updated;
+    let payment = null;
+
+    if (mission.payment_type) {
+      payment = await payForSignOff(mission, signer, signerName, paymentAmount);
+      updated = payment.updated;
+    } else {
+      updated = await sql`
+        UPDATE player_missions
+        SET completed = true, completed_at = NOW(),
+            signed_off_by = ${signerUserId}, signed_off_at = NOW(),
+            bounty_awarded = ${mission.bounty || 0}
+        WHERE id = ${playerMissionId} AND completed = false
+        RETURNING signed_off_at
+      `;
+    }
 
     if (updated.length === 0) throw new Error('Mission already completed');
 
     return {
       message: 'Mission signed off successfully',
       bounty: mission.bounty || 0,
-      signerName: `${signer.firstname} ${signer.lastname}`.trim(),
-      signedOffAt: updated[0].signed_off_at
+      signerName,
+      signedOffAt: updated[0].signed_off_at,
+      payment: payment && { amount: payment.amount, type: mission.payment_type }
     };
   } catch (error) {
     console.error('Error signing off mission:', error);

@@ -42,11 +42,16 @@ function formatWitnessSignedAt(iso) {
   return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-function DepositNotice({ amount }) {
+// payment: money a witness paid this player at sign-off, deposited alongside the bounty
+function DepositNotice({ amount, payment }) {
+  const total = amount + (payment?.amount || 0)
   return (
     <div className="bounty-award">
-      <p className="bounty-award-amount">${amount} deposited!</p>
-      <p className="bounty-award-lede">It's in your bank. Tap BANK at the bottom of the screen to see your balance.</p>
+      <p className="bounty-award-amount">${total.toLocaleString()} deposited!</p>
+      <p className="bounty-award-lede">
+        {payment && `$${amount.toLocaleString()} bounty + $${payment.amount.toLocaleString()} from ${payment.from}. `}
+        It's in your bank. Tap BANK at the bottom of the screen to see your balance.
+      </p>
     </div>
   )
 }
@@ -98,6 +103,9 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
   const [activeSessionId, setActiveSessionId] = useState(null)
   const [currentPhase, setCurrentPhase] = useState(0)
   const [signerPassphrase, setSignerPassphrase] = useState('')
+  // Missions that charge the witness at sign-off: amount they agree to, and what was paid
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [completedPayment, setCompletedPayment] = useState(null)
   const [signoffSuccessSignerName, setSignoffSuccessSignerName] = useState(null)
   const [signoffSignedAt, setSignoffSignedAt] = useState(null)
   const [signoffPhase, setSignoffPhase] = useState('brief')
@@ -348,6 +356,8 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
     setSignoffSuccessSignerName(null)
     setSignoffPhase('brief')
     setSignerPassphrase('')
+    setPaymentAmount('')
+    setCompletedPayment(null)
     setSignoffSignedAt(null)
   }
 
@@ -379,6 +389,8 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
     setSignoffSuccessSignerName(null)
     setSignoffPhase('brief')
     setSignerPassphrase('')
+    setPaymentAmount('')
+    setCompletedPayment(null)
     setSignoffSignedAt(null)
 
     const mission = missions.find(m => m.playerMissionId === missionId)
@@ -429,7 +441,12 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
           setMissionErrors(prev => ({ ...prev, [playerMissionId]: 'The person signing off must enter their passphrase' }))
           return
         }
-        result = await neonApi.signOffMission(playerMissionId, signerPassphrase)
+        result = await neonApi.signOffMission(
+          playerMissionId,
+          signerPassphrase,
+          mission.paymentType ? parseInt(paymentAmount || mission.paymentMin, 10) : undefined
+        )
+        setCompletedPayment(result.payment || null)
       }
 
       setCompletedMissions(prev => new Set([...prev, playerMissionId]))
@@ -619,6 +636,13 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
                         Must be signed off by a host.
                       </p>
                     )}
+                    {selectedMission.paymentType && (
+                      <p className="mission-signoff-hint mission-signoff-hint--constraint-emphasis">
+                        {selectedMission.paymentType === 'witness_to_player'
+                          ? `Your witness pays you at least $${selectedMission.paymentMin.toLocaleString()} from their bank account when they sign off.`
+                          : `Your witness pays at least $${selectedMission.paymentMin.toLocaleString()} from their bank account to MacGuffin Toys when they sign off.`}
+                      </p>
+                    )}
                     {missionErrors[selectedMissionId] && (
                       <div className="mission-error">{missionErrors[selectedMissionId]}</div>
                     )}
@@ -672,6 +696,29 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
                         </div>
                       )}
 
+                      {selectedMission.paymentType && (
+                        <div className="field-group mission-payment">
+                          <label htmlFor="signoff-payment">
+                            {selectedMission.paymentType === 'witness_to_player'
+                              ? `Witness pays ${firstName}`
+                              : 'Witness pays MacGuffin Toys'}
+                          </label>
+                          <div className="mission-payment-row">
+                            <span className="mission-payment-currency">$</span>
+                            <input
+                              id="signoff-payment"
+                              type="text"
+                              inputMode="numeric"
+                              value={paymentAmount === '' ? String(selectedMission.paymentMin) : paymentAmount}
+                              onChange={(e) => setPaymentAmount(e.target.value.replace(/\D/g, ''))}
+                            />
+                          </div>
+                          <p className="mission-signoff-hint">
+                            At least ${selectedMission.paymentMin.toLocaleString()}, taken from the witness's bank account when they sign off. Entering your passphrase agrees to pay.
+                          </p>
+                        </div>
+                      )}
+
                       <div className="field-group">
                         <label htmlFor="signer-passphrase">Authorized witness</label>
                         <div className="input-with-clear">
@@ -719,14 +766,25 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
                       </div>
                     )}
                     <p className="mission-witness-signed-summary">
+                      {completedPayment && (
+                        <>
+                          {completedPayment.type === 'witness_to_house' &&
+                            `${signoffSuccessSignerName || selectedMission.signerName} invested $${completedPayment.amount.toLocaleString()} in MacGuffin Toys. `}
+                        </>
+                      )}
                       Signed by{' '}
                       <strong>{signoffSuccessSignerName || selectedMission.signerName}</strong>
                       {' '}
                       at {formatWitnessSignedAt(signoffSignedAt ?? selectedMission.signedOffAt)}.
                     </p>
-                    {completedBounty > 0 && (
+                    {(completedBounty > 0 || completedPayment?.type === 'witness_to_player') && (
                       <div className="mission-witness-bounty-wrap">
-                        <DepositNotice amount={completedBounty} />
+                        <DepositNotice
+                          amount={completedBounty}
+                          payment={completedPayment?.type === 'witness_to_player'
+                            ? { amount: completedPayment.amount, from: signoffSuccessSignerName || selectedMission.signerName }
+                            : null}
+                        />
                       </div>
                     )}
                   </div>

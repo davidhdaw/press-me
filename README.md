@@ -168,6 +168,11 @@ Mission options (editable in the **Missions** tab):
   - `participants`: another player's name, paired so A↔B are assigned to each other. Used by False Fracas.
 - **Sign-off prompt:** the sentence the witness sees before signing, for example "`{player_name}` served me food…".
 - **Culminating:** hidden until the player finishes the rest of the phase. See below.
+- **Payment at sign-off** (sign-off missions only): the witness's sign-off also moves money, so a mission like "sell your art for at least $300" uses the real bank. Choose **Witness pays the player** (e.g. But Is It Art?, at least $300) or **Witness pays MacGuffin Toys** (e.g. MLM, at least $500; the money just leaves their account).
+  - The phone shows the payment on the sign-off step. It starts at the minimum and the witness can raise it.
+  - Payment and completion happen together or not at all: if the witness can't afford it, the sign-off fails and nothing changes.
+  - A database rule means a mission can only be paid for once.
+  - The host **Complete** button skips the payment. Casino missions use physical chips instead; the bank sells and cashes them.
 - **Bounty:** dollars deposited into the player's bank account the moment the mission is completed. See Banking below.
 
 ### Culminating missions
@@ -197,6 +202,7 @@ Each player has a bank account per session (everyone starts at $0 each event), i
   - **Adding money** takes more steps on purpose: tap the player's name, enter an amount and a required reason, then confirm. The same screen has **Spend another amount** for odd prices, plus the full history.
   - A balance can never go below zero; the check happens in the same database statement as the deduction. Every transaction records which banker made it, and the player sees it in their statement.
   - The bank works while the session is active or paused.
+- **Sign-off payments** appear on both players' statements as "Payment", e.g. "Operation But Is It Art?: paid Katherine Ramos" and "…: from Ryan Swan".
 - Balances come from the `bank_ledger` view: mission deposits + push-mission deposits + `bank_transactions`, which holds banker withdrawals and corrections.
 
 ### Award ceremony
