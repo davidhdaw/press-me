@@ -57,6 +57,18 @@ function DepositNotice({ amount, payment }) {
   )
 }
 
+// The player's code name, shown at the top of their dashboard
+function AgentBadge({ user }) {
+  const codename = [user?.alias_1, user?.alias_2].filter(Boolean).join(' ')
+  if (!codename) return null
+  return (
+    <div className="dashboard-agent">
+      <span className="dashboard-agent-label">Agent</span>
+      <strong className="dashboard-agent-name">{codename}</strong>
+    </div>
+  )
+}
+
 function DashboardFooter({ currentUser, onLogout, onUserUpdate, bankSessionId, bankRefreshKey }) {
   return (
     <footer className="dashboard-footer">
@@ -525,6 +537,7 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
       <div className="dashboard-container">
         <div className="dashboard-page">
           <div className="dashboard-missions-sticky">
+            <AgentBadge user={currentUser} />
             <div className="dashboard-missions-heading">MISSIONS</div>
             <div className="dashboard-content dashboard-content-missions">
               <div className="tab-content">
@@ -552,6 +565,7 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
       <div className="dashboard-container">
         <div className="dashboard-page">
           <div className="dashboard-missions-sticky">
+            <AgentBadge user={currentUser} />
             <div className="dashboard-missions-heading">MISSIONS</div>
             <div className="dashboard-content dashboard-content-missions">
               <div className="tab-content">
@@ -581,7 +595,8 @@ function Dashboard({ agentId, firstName, lastName, onLogout, onUserUpdate, curre
     <div className="dashboard-container">
       <div className="dashboard-page">
         <div className="dashboard-missions-sticky">
-          <div className="dashboard-missions-heading">MISSIONS</div>
+          <AgentBadge user={currentUser} />
+            <div className="dashboard-missions-heading">MISSIONS</div>
           <div className="dashboard-content dashboard-content-missions">
             <MissionsTab
               isInActiveSession={isInActiveSession}

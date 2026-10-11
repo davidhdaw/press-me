@@ -1842,3 +1842,30 @@
   color: #b5432f;
   font-weight: 600;
 }
+
+/* Player's code name at the top of the dashboard */
+.dashboard-agent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--unit-sm) var(--unit-base) 0;
+  font-family: 'Barlow Condensed', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.dashboard-agent-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--white);
+  opacity: 0.8;
+}
+
+.dashboard-agent-name {
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--yellow);
+}
